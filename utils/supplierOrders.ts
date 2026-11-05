@@ -3,6 +3,7 @@
  * приёмка. Данные — `/api/admin/restock` (`orders`), действия — маршруты
  * `/api/admin/restock/orders*` и функции базы `admin_*_supplier_order*`.
  */
+import type { OrderSheetLine } from './orderSheet'
 import type { DraftRow, RestockItem } from './restockOrder'
 import { orderText } from './restockOrder'
 
@@ -113,4 +114,69 @@ export function supplierOrderText(order: Pick<SupplierOrder, 'number' | 'created
     manual: false,
   }))
   return orderText(rows, new Date(order.createdAt), order.number)
+}
+
+/**
+ * Деньги заказа (6 ноября 2026). Владелец: «чтобы писалась общ кол, общ цена
+ * и цена за каждый товар и цена за отпуск товара». Закупка — цена
+ * поставщика за штуку (снимок в заказе или карточка товара), отпуск — цена,
+ * по которой товар продаётся на сайте сейчас (со скидкой). Наценка — только
+ * по строкам, где известны обе цены, иначе цифра врала бы.
+ */
+export interface MoneyLine {
+  quantity: number
+  costPrice: number | null
+  salePrice: number | null
+}
+
+export interface OrderMoney {
+  units: number
+  /** По закупке — строки с ценой закупки */
+  cost: number
+  /** В продаже — строки с ценой на сайте */
+  sale: number
+  /** Продажа минус закупка по строкам с обеими ценами; null — таких строк нет */
+  margin: number | null
+  withoutCost: number
+  withoutSale: number
+}
+
+export function orderMoney(lines: MoneyLine[]): OrderMoney {
+  const live = lines.filter(l => l.quantity > 0)
+  const both = live.filter(l => l.costPrice != null && l.salePrice != null)
+  return {
+    units: live.reduce((n, l) => n + l.quantity, 0),
+    cost: live.reduce((n, l) => n + (l.costPrice ?? 0) * l.quantity, 0),
+    sale: live.reduce((n, l) => n + (l.salePrice ?? 0) * l.quantity, 0),
+    margin: both.length ? both.reduce((n, l) => n + (l.salePrice! - l.costPrice!) * l.quantity, 0) : null,
+    withoutCost: live.filter(l => l.costPrice == null).length,
+    withoutSale: live.filter(l => l.salePrice == null).length,
+  }
+}
+
+/** Цена на сайте у товара строки; товар удалён или цены нет — null */
+export function salePriceOf(line: Pick<SupplierOrderLine, 'productId'>, products: Map<string, { price: number }>): number | null {
+  const price = line.productId ? products.get(line.productId)?.price : undefined
+  return price != null && price > 0 ? price : null
+}
+
+/** Деньги сохранённого заказа: заказано или уже принято */
+export function savedOrderMoney(order: Pick<SupplierOrder, 'lines'>, products: Map<string, { price: number }>, what: 'ordered' | 'received' = 'ordered'): OrderMoney {
+  return orderMoney(order.lines.map(l => ({ quantity: what === 'ordered' ? l.quantity : l.received, costPrice: l.costPrice, salePrice: salePriceOf(l, products) })))
+}
+
+/** Деньги того, что принимается сейчас */
+export function receiveMoney(order: Pick<SupplierOrder, 'lines'>, quantities: Record<string, number>, products: Map<string, { price: number }>): OrderMoney {
+  return orderMoney(order.lines.filter(l => l.productId).map(l => ({ quantity: quantities[l.productId!] ?? 0, costPrice: l.costPrice, salePrice: salePriceOf(l, products) })))
+}
+
+/**
+ * Строки таблицы для поставщика: фото, название, артикул, его цена и
+ * количество. Цены продажи и наценки в файле нет — он уходит поставщику.
+ */
+export function orderSheetLines(
+  supplier: string,
+  lines: { name: string, sku: string | null, costPrice: number | null, quantity: number, photoUrl: string | null }[],
+): OrderSheetLine[] {
+  return lines.filter(l => l.quantity > 0).map(l => ({ supplier, name: l.name, article: l.sku, price: l.costPrice, quantity: l.quantity, photoUrl: l.photoUrl, link: null }))
 }

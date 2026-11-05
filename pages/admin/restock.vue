@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Database } from '@/types'
 import type { DraftRow, OrderTotals, RestockItem } from '@/utils/restockOrder'
-import type { SupplierOrder, SupplierOrderStatus } from '@/utils/supplierOrders'
+import type { OrderMoney, SupplierOrder, SupplierOrderStatus } from '@/utils/supplierOrders'
 import {
   AlertTriangle,
   Ban,
@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
+  FileSpreadsheet,
   FileText,
   Link,
   MessageCircle,
@@ -27,11 +28,13 @@ import {
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { jpegForSheet, saveOrderFile } from '@/composables/useOrderSheetFile'
 import { BUCKET_NAME_PRODUCT } from '@/constants'
 import { useAdminRestockStore } from '@/stores/adminStore/adminRestockStore'
 import { useAdminRevalidateStore } from '@/stores/adminStore/adminRevalidateStore'
+import { buildOrderWorkbook, groupOrderLines, orderFileName } from '@/utils/orderSheet'
 import { draftRows, needsRestock, orderText, orderTotals, plural, pluralPositions, whatsappUrl } from '@/utils/restockOrder'
-import { isOpenOrder, ORDER_STATUS_LABEL, orderSummary, receiveDefaults, receivePlan, remaining, supplierOrderText } from '@/utils/supplierOrders'
+import { isOpenOrder, ORDER_STATUS_LABEL, orderMoney, orderSheetLines, orderSummary, receiveDefaults, receiveMoney, receivePlan, remaining, salePriceOf, savedOrderMoney, supplierOrderText } from '@/utils/supplierOrders'
 
 definePageMeta({ layout: 'admin' })
 
@@ -149,7 +152,12 @@ interface SupplierBlock {
   addable: RestockProduct[]
   autoCount: number
   edited: boolean
-  order: { totals: OrderTotals, text: string, whatsapp: string | null }
+  order: { totals: OrderTotals, money: OrderMoney, text: string, whatsapp: string | null }
+}
+
+/** Деньги черновика: закупка — карточка товара, отпуск — цена на сайте со скидкой */
+function draftMoney(rows: DraftRow<RestockProduct>[]): OrderMoney {
+  return orderMoney(rows.map(r => ({ quantity: r.quantity, costPrice: r.item.costPrice, salePrice: r.item.price > 0 ? r.item.price : null })))
 }
 
 const blocks = computed<SupplierBlock[]>(() => {
@@ -180,7 +188,7 @@ const blocks = computed<SupplierBlock[]>(() => {
       addable: items.filter(p => !inOrder.has(p.id)).sort((a, b) => a.name.localeCompare(b.name, 'ru')),
       autoCount: rows.filter(r => !r.manual).length,
       edited: Object.keys(edits).some(id => items.some(p => p.id === id)),
-      order: { totals: orderTotals(rows), text, whatsapp: whatsappUrl(supplier.phone, text) },
+      order: { totals: orderTotals(rows), money: draftMoney(rows), text, whatsapp: whatsappUrl(supplier.phone, text) },
     })
   }
   result.sort((a, b) => Number(b.autoCount > 0) - Number(a.autoCount > 0)
@@ -199,7 +207,7 @@ const blocks = computed<SupplierBlock[]>(() => {
       addable: [],
       autoCount: orphans.length,
       edited: false,
-      order: { totals: orderTotals([]), text: '', whatsapp: null },
+      order: { totals: orderTotals([]), money: draftMoney([]), text: '', whatsapp: null },
     })
   }
   return result
@@ -337,6 +345,38 @@ function confirmStatus() {
 }
 
 // Приёмка: сколько пришло по каждой строке; по умолчанию — всё, что ждём
+// Таблица Excel для поставщика: фото, артикул, его цена, количество (6.11.2026)
+const sheetBusy = ref<string | null>(null)
+function photoOf(productId: string | null): string | null {
+  const product = productId ? productsById.value.get(productId) : undefined
+  return product?.imageUrl ? getVariantUrl(BUCKET_NAME_PRODUCT, product.imageUrl, 'sm') || null : null
+}
+async function downloadSheet(key: string, supplier: string, lines: Parameters<typeof orderSheetLines>[1], number?: number) {
+  if (sheetBusy.value)
+    return
+  sheetBusy.value = key
+  const id = toast.loading('Собираю таблицу с фото…')
+  try {
+    const groups = groupOrderLines(orderSheetLines(supplier, lines)).map(g => ({ ...g, number }))
+    const now = new Date()
+    saveOrderFile(await buildOrderWorkbook(groups, now, jpegForSheet), orderFileName(now, supplier, number))
+    toast.success('Таблица скачана', { id, description: 'Её можно отправить поставщику — цен продажи в ней нет' })
+  }
+  catch {
+    toast.error('Не удалось собрать таблицу', { id })
+  }
+  finally {
+    sheetBusy.value = null
+  }
+}
+function downloadDraftSheet(block: SupplierBlock) {
+  downloadSheet(`draft:${block.key}`, block.supplier!.name, block.rows.map(r => ({ name: r.item.name, sku: r.item.sku, costPrice: r.item.costPrice, quantity: r.quantity, photoUrl: photoOf(r.item.id) })))
+}
+function downloadSavedSheet(block: SupplierBlock, order: SupplierOrder) {
+  downloadSheet(`order:${order.id}`, block.supplier!.name, order.lines.map(l => ({ name: l.name, sku: l.sku, costPrice: l.costPrice, quantity: l.quantity, photoUrl: photoOf(l.productId) })), order.number)
+}
+const money = (n: number) => `${formatPrice(n)}\u00A0₸`
+
 const receiving = reactive({ order: null as SupplierOrder | null, quantities: {} as Record<string, number>, close: false, saving: false })
 const receiveOpen = computed({
   get: () => receiving.order !== null,
@@ -348,6 +388,7 @@ const receiveOpen = computed({
 const receivePreview = computed(() => receiving.order
   ? receivePlan(receiving.order, receiving.quantities, productsById.value)
   : { units: 0, notified: 0, short: false })
+const receiveSum = computed(() => receiving.order ? receiveMoney(receiving.order, receiving.quantities, productsById.value) : null)
 
 /** Сколько человек ждут товар, которого сейчас 0, — если его принимают, им придёт уведомление. */
 function waitingFor(productId: string | null): number {
@@ -684,6 +725,11 @@ async function assignSupplier(productId: string, supplierId: string) {
                   </Badge>
                   <span class="text-muted-foreground">от {{ formatDay(order.createdAt) }}<template v-if="order.shippedAt"> · в пути с {{ formatDay(order.shippedAt) }}</template></span>
                   <span class="text-muted-foreground tabular-nums">· {{ orderSummary(order).positions }} {{ pluralPositions(orderSummary(order).positions) }}, {{ orderSummary(order).units }} шт.<template v-if="orderSummary(order).receivedUnits"> · принято {{ orderSummary(order).receivedUnits }}</template></span>
+                  <span class="basis-full text-xs text-muted-foreground tabular-nums" data-testid="order-saved-money">
+                    закупка {{ money(savedOrderMoney(order, productsById).cost) }} · в продаже {{ money(savedOrderMoney(order, productsById).sale) }}<template v-if="savedOrderMoney(order, productsById).margin != null">
+                      · наценка {{ money(savedOrderMoney(order, productsById).margin!) }}</template><template v-if="orderSummary(order).receivedUnits">
+                      · принято на {{ money(savedOrderMoney(order, productsById, 'received').cost) }}</template>
+                  </span>
                 </div>
                 <div class="flex flex-wrap gap-2">
                   <Button
@@ -704,6 +750,10 @@ async function assignSupplier(productId: string, supplierId: string) {
                   <Button variant="ghost" size="sm" data-testid="order-saved-copy" @click="copySavedOrder(order)">
                     <Copy class="w-4 h-4 mr-1.5" />
                     Текст
+                  </Button>
+                  <Button variant="ghost" size="sm" :disabled="sheetBusy !== null" data-testid="order-saved-sheet" @click="downloadSavedSheet(block, order)">
+                    <FileSpreadsheet class="w-4 h-4 mr-1.5" />
+                    Таблица
                   </Button>
                   <Button
                     v-if="order.status === 'in_transit' && !orderSummary(order).receivedUnits"
@@ -740,9 +790,10 @@ async function assignSupplier(productId: string, supplierId: string) {
                 </div>
               </div>
               <ul class="grid gap-x-6 gap-y-0.5 text-xs text-muted-foreground sm:grid-cols-2">
-                <li v-for="(line, i) in order.lines" :key="line.productId ?? `d${i}`" class="flex justify-between gap-2" data-testid="supplier-order-line">
-                  <span class="truncate">{{ line.name }}<template v-if="!line.productId"> (товар удалён)</template></span>
+                <li v-for="(line, i) in order.lines" :key="line.productId ?? `d${i}`" class="flex flex-wrap justify-between gap-x-2" data-testid="supplier-order-line">
+                  <span class="min-w-0 flex-1 truncate">{{ line.name }}<template v-if="!line.productId"> (товар удалён)</template></span>
                   <span class="tabular-nums whitespace-nowrap">{{ line.received ? `${line.received} из ${line.quantity}` : line.quantity }} шт.</span>
+                  <span v-if="line.costPrice != null || salePriceOf(line, productsById) != null" class="basis-full tabular-nums"><template v-if="line.costPrice != null">× {{ money(line.costPrice) }} = {{ money(line.costPrice * line.quantity) }}</template><template v-if="salePriceOf(line, productsById) != null"> · продажа {{ money(salePriceOf(line, productsById)!) }}</template></span>
                 </li>
               </ul>
             </div>
@@ -915,12 +966,15 @@ async function assignSupplier(productId: string, supplierId: string) {
                       </div>
                     </TableCell>
                     <TableCell class="text-right text-muted-foreground tabular-nums whitespace-nowrap">
-                      <template v-if="row.item.costPrice != null && row.quantity > 0">
+                      <div v-if="row.item.costPrice != null && row.quantity > 0" class="text-foreground">
                         {{ formatPrice(row.item.costPrice * row.quantity) }}&nbsp;₸
-                      </template>
-                      <template v-else>
-                        —
-                      </template>
+                      </div>
+                      <div class="text-xs" data-testid="row-prices">
+                        {{ row.item.costPrice != null ? `по ${money(row.item.costPrice)}` : 'закупка —' }}
+                      </div>
+                      <div class="text-xs">
+                        продажа {{ row.item.price > 0 ? money(row.item.price) : '—' }}
+                      </div>
                     </TableCell>
                   </template>
                   <TableCell v-else>
@@ -969,6 +1023,11 @@ async function assignSupplier(productId: string, supplierId: string) {
                   </NuxtLink>
                   <p class="text-xs text-muted-foreground">
                     <span v-if="row.item.sku">Арт. {{ row.item.sku }} · </span>продано {{ row.item.sold30 }} / {{ row.item.sold90 }} за 30/90 дн.
+                  </p>
+                  <p v-if="block.supplier" class="text-xs text-muted-foreground tabular-nums">
+                    закупка {{ row.item.costPrice != null ? money(row.item.costPrice) : '—' }} · продажа {{ row.item.price > 0 ? money(row.item.price) : '—' }}<template v-if="row.item.costPrice != null && row.quantity > 0">
+                      · сумма {{ money(row.item.costPrice * row.quantity) }}
+                    </template>
                   </p>
                   <p v-if="row.item.pending" class="text-xs text-amber-700 dark:text-amber-400">
                     уже заказано {{ row.item.pending }} шт.
@@ -1075,8 +1134,12 @@ async function assignSupplier(productId: string, supplierId: string) {
                     В заказе {{ block.order.totals.positions }} {{ pluralPositions(block.order.totals.positions) }},
                     {{ block.order.totals.units }} шт.
                   </span>
-                  <span class="text-muted-foreground">
-                    · по закупке ≈ {{ formatPrice(block.order.totals.cost) }}&nbsp;₸<template v-if="block.order.totals.withoutCost">, без цены закупки — {{ block.order.totals.withoutCost }}</template>
+                  <span class="block text-muted-foreground" data-testid="order-money">
+                    закупка <span class="tabular-nums text-foreground">{{ money(block.order.money.cost) }}</span>
+                    · в продаже <span class="tabular-nums text-foreground">{{ money(block.order.money.sale) }}</span><template v-if="block.order.money.margin != null">
+                      · наценка <span class="tabular-nums text-foreground">{{ money(block.order.money.margin) }}</span></template><template v-if="block.order.money.withoutCost">
+                      · без цены закупки — {{ block.order.money.withoutCost }}</template><template v-if="block.order.money.withoutSale">
+                      · без цены на сайте — {{ block.order.money.withoutSale }}</template>
                   </span>
                 </template>
                 <span v-else class="text-muted-foreground">Заказ пуст</span>
@@ -1138,6 +1201,17 @@ async function assignSupplier(productId: string, supplierId: string) {
                 >
                   <Copy class="w-4 h-4 mr-1.5" />
                   Скопировать
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  :disabled="!block.order.totals.positions || sheetBusy !== null"
+                  title="Excel с фото и артикулами — отправить поставщику"
+                  data-testid="order-sheet"
+                  @click="downloadDraftSheet(block)"
+                >
+                  <FileSpreadsheet class="w-4 h-4 mr-1.5" />
+                  Таблица
                 </Button>
                 <Button
                   v-if="block.order.whatsapp && block.order.totals.positions"
@@ -1217,6 +1291,8 @@ async function assignSupplier(productId: string, supplierId: string) {
                   {{ line.name }}
                 </div>
                 <div class="text-xs text-muted-foreground">
+                  <span class="tabular-nums" data-testid="receive-line-prices">закупка {{ line.costPrice != null ? money(line.costPrice) : '—' }} · продажа {{ salePriceOf(line, productsById) != null ? money(salePriceOf(line, productsById)!) : '—' }}</span>
+                  <br>
                   заказано {{ line.quantity }}<template v-if="line.received">
                     , принято {{ line.received }}
                   </template><template v-if="line.productId && productsById.get(line.productId)">
@@ -1255,7 +1331,9 @@ async function assignSupplier(productId: string, supplierId: string) {
             </span>
           </label>
           <p class="text-sm" data-testid="receive-summary">
-            Будет принято <span class="font-medium tabular-nums">{{ receivePreview.units }}</span> шт.<template v-if="receivePreview.notified">
+            Будет принято <span class="font-medium tabular-nums">{{ receivePreview.units }}</span> шт.<template v-if="receiveSum && receivePreview.units">
+              на <span class="font-medium tabular-nums">{{ money(receiveSum.cost) }}</span> по закупке, в продаже <span class="font-medium tabular-nums">{{ money(receiveSum.sale) }}</span>.
+            </template><template v-if="receivePreview.notified">
               «Товар снова в наличии» сразу уйдёт <span class="font-medium tabular-nums">{{ receivePreview.notified }}</span>
               {{ plural(receivePreview.notified, 'покупателю', 'покупателям', 'покупателям') }}.
             </template>

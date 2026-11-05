@@ -27,6 +27,7 @@
  */
 import { execFileSync } from 'node:child_process'
 import process from 'node:process'
+import ExcelJS from 'exceljs'
 import { chromium } from 'playwright'
 
 const BASE = process.argv.find(a => a.startsWith('--base='))?.slice(7) || 'http://localhost:3141'
@@ -107,21 +108,42 @@ INSERT INTO public.suppliers (name, phone) VALUES ('${SUPPLIER}', '+7 701 000 00
 SELECT (array_agg(id ORDER BY name, id))[1] AS pa, (array_agg(id ORDER BY name, id))[2] AS pb, (array_agg(id ORDER BY name, id))[3] AS pc
 FROM public.products WHERE is_active \\gset
 SELECT json_agg(json_build_object('id', id, 'supplier_id', supplier_id, 'stock_quantity', stock_quantity,
-  'min_stock_level', min_stock_level, 'restock_quantity', restock_quantity))::text AS saved
+  'min_stock_level', min_stock_level, 'restock_quantity', restock_quantity, 'cost_price', cost_price))::text AS saved
 FROM public.products WHERE id IN (:'pa', :'pb', :'pc') \\gset
 UPDATE public.products SET supplier_id = :'sup', min_stock_level = 2, restock_quantity = 5 WHERE id IN (:'pa', :'pb', :'pc');
-UPDATE public.products SET stock_quantity = 0 WHERE id = :'pa';
+UPDATE public.products SET stock_quantity = 0, cost_price = 1000 WHERE id = :'pa';
+UPDATE public.products SET cost_price = 0 WHERE id = :'pb';
 UPDATE public.products SET stock_quantity = 1 WHERE id = :'pb';
 UPDATE public.products SET stock_quantity = 9 WHERE id = :'pc';
 INSERT INTO public.stock_alerts (user_id, product_id) VALUES (:'buyer', :'pa');
 COMMIT;
 SELECT json_build_object('sup', :'sup', 'pa', :'pa', 'pb', :'pb', 'pc', :'pc', 'saved', :'saved'::json,
-  'names', (SELECT json_object_agg(id, btrim(name)) FROM public.products WHERE id IN (:'pa', :'pb', :'pc')));
+  'names', (SELECT json_object_agg(id, btrim(name)) FROM public.products WHERE id IN (:'pa', :'pb', :'pc')),
+  'sale', (SELECT json_object_agg(id, coalesce(nullif(final_price, 0), price, 0)) FROM public.products WHERE id IN (:'pa', :'pb', :'pc')));
 `, { admin: adminId, buyer: buyerId })
   return JSON.parse(out.split('\n').pop())
 }
 
-function cleanup() {
+// Фото товара A для таблицы: локально бакеты пустые — кладём своё, после — убираем
+const photoPaths = []
+async function putPhotos(productId) {
+  const images = await rest(`product_images?select=image_url&product_id=eq.${productId}`)
+  const page = await browser.newPage()
+  await page.setContent('<div id="p" style="width:120px;height:120px;background:#e33"></div>')
+  const png = await page.locator('#p').screenshot()
+  await page.close()
+  for (const { image_url: url } of images) {
+    const path = /\.\w+$/.test(url) ? url : `${url}_sm.webp`
+    const res = await fetch(`${SUPA}/storage/v1/object/product-images/${path}`, { method: 'POST', headers: { 'apikey': SERVICE, 'Authorization': `Bearer ${SERVICE}`, 'content-type': 'image/png', 'x-upsert': 'true' }, body: png })
+    if (!res.ok)
+      throw new Error(`фото в хранилище: ${res.status} ${await res.text()}`)
+    photoPaths.push(path)
+  }
+  return images.length
+}
+async function cleanup() {
+  for (const path of photoPaths)
+    await fetch(`${SUPA}/storage/v1/object/product-images/${path}`, { method: 'DELETE', headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` } }).catch(() => {})
   if (!d)
     return
   psql(`
@@ -129,8 +151,8 @@ BEGIN;
 DELETE FROM public.stock_receipts WHERE product_id IN (:'pa', :'pb', :'pc');
 DELETE FROM public.supplier_orders WHERE supplier_id = :'sup';
 UPDATE public.products p SET supplier_id = s.supplier_id, stock_quantity = s.stock_quantity,
-  min_stock_level = s.min_stock_level, restock_quantity = s.restock_quantity
-FROM json_to_recordset(:'saved'::json) AS s(id uuid, supplier_id uuid, stock_quantity integer, min_stock_level integer, restock_quantity integer)
+  min_stock_level = s.min_stock_level, restock_quantity = s.restock_quantity, cost_price = s.cost_price
+FROM json_to_recordset(:'saved'::json) AS s(id uuid, supplier_id uuid, stock_quantity integer, min_stock_level integer, restock_quantity integer, cost_price numeric)
 WHERE p.id = s.id;
 DELETE FROM public.stock_alerts WHERE product_id = :'pa' AND user_id IN (SELECT id FROM auth.users WHERE email LIKE 'restock-%@example.test');
 DELETE FROM public.suppliers WHERE id = :'sup';
@@ -167,7 +189,7 @@ try {
   const failed = []
   const revalidate = []
   async function newPage(viewport) {
-    const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2 })
+    const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, acceptDownloads: true })
     await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
     // Окно подписки на Telegram (app.vue) всплывает и в админке и перекрывает
     // кнопки — как будто человек уже нажал в нём «Не сейчас»
@@ -212,6 +234,33 @@ try {
   check(rowIds.length === 2 && rowIds.includes(d.pa) && rowIds.includes(d.pb), 'на пороге A и B, C с остатком 9 — нет')
   await block(page).locator(`[data-testid=restock-row][data-product="${d.pa}"] [data-testid=order-qty]`).fill('4')
   await block(page).locator(`[data-testid=restock-row][data-product="${d.pa}"] [data-testid=order-qty]`).press('Tab')
+  const flat = t => t.replace(/\s+/g, ' ').trim()
+  const tg = n => flat(`${new Intl.NumberFormat('ru-RU').format(Math.round(n))} ₸`)
+  const saleA = Number(d.sale[d.pa])
+  const saleB = Number(d.sale[d.pb])
+  const draftMoney = flat(await block(page).locator('[data-testid=order-money]').innerText())
+  check(draftMoney.includes(`закупка ${tg(4000)}`) && draftMoney.includes(`в продаже ${tg(4 * saleA + 5 * saleB)}`) && draftMoney.includes(`наценка ${tg(4 * (saleA - 1000))}`) && draftMoney.includes('без цены закупки — 1'), `черновик: закупка A 4 × 1 000, продажа A и B, наценка — только у A, у B нет закупки: «${draftMoney}»`)
+  const rowPrices = flat(await block(page).locator(`[data-testid=restock-row][data-product="${d.pa}"]`).innerText())
+  check(rowPrices.includes(`по ${tg(1000)}`) && rowPrices.includes(`продажа ${tg(saleA)}`) && rowPrices.includes(tg(4000)), `строка A: цена за штуку, сумма и цена продажи: «${rowPrices}»`)
+  async function sheetOf(button) {
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), button.click()])
+    const book = new ExcelJS.Workbook()
+    await book.xlsx.readFile(await download.path())
+    const ws = book.worksheets[0]
+    const rows = []
+    ws.eachRow((r, n) => n > 3 && rows.push(r.values.slice(1).map(v => (v && typeof v === 'object' && 'result' in v) ? v.result : v)))
+    return { name: download.suggestedFilename(), title: String(ws.getCell('A1').value), rows, images: ws.getImages().length }
+  }
+  const photosA = await putPhotos(d.pa)
+  await putPhotos(d.pb)
+  const draftSheet = await sheetOf(block(page).locator('[data-testid=order-sheet]'))
+  check(photosA > 0 && draftSheet.images >= 1, `в таблице — фото товара: ${draftSheet.images} (у A фото в базе: ${photosA})`)
+  const rowA = draftSheet.rows.find(r => r[2] === name(d.pa))
+  const rowB = draftSheet.rows.find(r => r[2] === name(d.pb))
+  const sheetTotal = draftSheet.rows.find(r => r[2] === 'Итого')
+  check(/^zakaz-.+-\d{4}-\d{2}-\d{2}\.xlsx$/.test(draftSheet.name) && draftSheet.title.includes(SUPPLIER), `таблица черновика: ${draftSheet.name}, «${draftSheet.title}»`)
+  check(rowA?.[4] === 1000 && rowA?.[5] === 4 && rowA?.[6] === 4000 && (rowB?.[4] ?? '') === '' && rowB?.[5] === 5 && sheetTotal?.[5] === 9 && sheetTotal?.[6] === 4000, `в таблице: A 1 000 × 4 = 4 000, B без цены × 5, итого 9 шт. на 4 000: ${JSON.stringify([rowA?.slice(2, 7), rowB?.slice(2, 7), sheetTotal?.slice(5, 7)])}`)
+  check(draftSheet.rows.every(r => !r.includes(saleA) || saleA === 1000 || saleA === 4000), 'цены продажи в таблице поставщику нет')
   await block(page).locator('[data-testid=order-place]').click()
   await block(page).locator('[data-testid=supplier-order]').first().waitFor({ timeout: 15000 })
   let [o1] = await dbOrders()
@@ -219,6 +268,12 @@ try {
   check(o1?.status === 'ordered' && o1.created_by === adminId && line(o1, d.pa)?.quantity === 4 && line(o1, d.pb)?.quantity === 5 && o1.supplier_order_items.length === 2, `заказ №${o1?.number} в базе: «Заказан», A 4 (правка), B 5 (по правилу), кто заказал`)
   const draft = await page.evaluate(() => JSON.parse(localStorage.getItem('uhti-admin-restock-v1') || '{}'))
   check(!draft.drafts?.[d.sup], 'черновик поставщика в браузере сброшен')
+  const savedMoney = flat(await block(page).locator('[data-testid=order-saved-money]').innerText())
+  check(savedMoney.includes(`закупка ${tg(4000)}`) && savedMoney.includes(`в продаже ${tg(4 * saleA + 5 * saleB)}`), `сохранённый заказ — те же деньги: «${savedMoney}»`)
+  const savedLineA = flat(await block(page).locator('[data-testid=supplier-order-line]', { hasText: name(d.pa) }).innerText())
+  check(savedLineA.includes(`4 шт. × ${tg(1000)} = ${tg(4000)}`) && savedLineA.includes(`продажа ${tg(saleA)}`), `строка заказа: «${savedLineA}»`)
+  const savedSheet = await sheetOf(block(page).locator('[data-testid=order-saved-sheet]'))
+  check(savedSheet.name.startsWith(`zakaz-${o1.number}-`) && savedSheet.title.startsWith(`Заказ №${o1.number} `) && savedSheet.rows.find(r => r[2] === 'Итого')?.[5] === 9, `таблица сохранённого заказа — с номером: ${savedSheet.name}, «${savedSheet.title}»`)
   check(await block(page).locator('[data-testid=restock-row]').count() === 0, 'A и B больше не просятся в заказ: заказанное учтено')
   check((await block(page).locator('[data-testid=open-orders-badge]').innerText()).includes('1 заказ'), 'в заголовке поставщика — «1 заказ»')
   if (SHOTS)
@@ -227,6 +282,17 @@ try {
   console.log('\n== телефон 390 px')
   const mobile = await newPage({ width: 390, height: 844 })
   check(await mobile.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'страница с открытым заказом — без горизонтальной прокрутки')
+  if (process.env.DEBUG_WIDE)
+    console.log('WIDE', JSON.stringify(await mobile.evaluate(() => {
+      const out = []
+      for (const e of document.querySelectorAll('main *')) {
+        const cs = getComputedStyle(e)
+        const w = e.getBoundingClientRect().width
+        if (w > 400 && (cs.whiteSpace === 'nowrap' || cs.minWidth !== '0px' && cs.minWidth !== 'auto' || e.tagName === 'TABLE' || e.tagName === 'PRE' || cs.display.includes('grid')))
+          out.push(`${e.tagName}.${String(e.className).slice(0, 70)} ws=${cs.whiteSpace} min=${cs.minWidth} disp=${cs.display} w=${Math.round(w)}`)
+      }
+      return { main: Math.round(document.querySelector('main')?.getBoundingClientRect().width), out: out.slice(0, 10) }
+    })))
   const card = await block(mobile).boundingBox()
   const badge = await block(mobile).locator('[data-testid=open-orders-badge]').boundingBox()
   check(badge && badge.x + badge.width <= card.x + card.width, 'длинное имя поставщика не выталкивает бейджи за край карточки')
@@ -251,6 +317,9 @@ try {
   check(await dialog.getByLabel(`Пришло: ${name(d.pa)}`, { exact: true }).inputValue() === '4' && await dialog.getByLabel(`Пришло: ${name(d.pb)}`, { exact: true }).inputValue() === '5', 'по умолчанию — всё, что ждём: A 4, B 5')
   check((await dialog.locator('[data-testid=receive-waiting]').innerText()).includes('ждёт 1 — получит'), 'у A (остаток 0) — «ждёт 1 — получит „Товар снова в наличии“»')
   check(/Будет принято 9 шт\.[\s\S]*уйдёт 1 покупателю/.test(await dialog.locator('[data-testid=receive-summary]').innerText()), 'итог: 9 шт., уведомление уйдёт 1 покупателю')
+  const receiveText = flat(await dialog.locator('[data-testid=receive-summary]').innerText())
+  check(receiveText.includes(`на ${tg(4000)} по закупке`) && receiveText.includes(`в продаже ${tg(4 * saleA + 5 * saleB)}`), `приёмка — на сколько по закупке и в продаже: «${receiveText}»`)
+  check(flat(await dialog.locator('[data-testid=receive-line]', { hasText: name(d.pa) }).innerText()).includes(`закупка ${tg(1000)}`), 'в строке приёмки — цена закупки')
   await dialog.getByLabel(`Пришло: ${name(d.pb)}`, { exact: true }).fill('2')
   await dialog.getByLabel(`Пришло: ${name(d.pb)}`, { exact: true }).press('Tab')
   check(await dialog.locator('[data-testid=receive-close]').isVisible(), 'пришло меньше — предлагается «остального не будет»')
@@ -301,7 +370,7 @@ try {
 }
 finally {
   await browser.close()
-  cleanup()
+  await cleanup()
   for (const id of users)
     await fetch(`${SUPA}/auth/v1/admin/users/${id}`, { method: 'DELETE', headers: serviceHeaders })
 }
