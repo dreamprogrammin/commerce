@@ -22,6 +22,7 @@ import DemandChart from '@/components/admin/purchasing/DemandChart.vue'
 import { dataUntilLabel, DEMAND_REFRESH_COST, formatUsd, formatVolume, peakLabel, sparkPoints, trendKind, trendLabel } from '@/utils/marketDemand'
 import { plural } from '@/utils/restockOrder'
 import { nextAutoRefresh, PURCHASING_PAGES, purchasingSteps, refreshesLeft, seriesMonths } from '@/utils/smartPurchasing'
+import { visionCost } from '@/utils/supplierOfferList'
 
 definePageMeta({ layout: 'admin' })
 
@@ -50,6 +51,17 @@ const dayMonth = (iso: string) => new Date(iso).toLocaleDateString('ru-RU', { da
 const NO_MIGRATION = 'после миграции базы'
 
 const demand = computed(() => data.value?.demand ?? null)
+/** Чтение ИИ за 30 дней: сколько товаров и во что обошлось */
+const aiSpend = computed(() => {
+  const reading = data.value?.ai?.reading
+  if (!reading)
+    return null
+  const cost = visionCost(reading)
+  return {
+    posts: reading.reduce((n, m) => n + m.posts, 0),
+    cost: cost == null ? 'цена модели неизвестна' : cost > 0 && cost < 0.01 ? 'меньше $0,01' : `≈ ${formatUsd(cost)}`,
+  }
+})
 const overview = computed(() => demand.value?.overview ?? null)
 const hasNumbers = computed(() => !!overview.value?.withData)
 const months = computed(() => {
@@ -552,7 +564,17 @@ const STATE: Record<StepState, { label: string, badge: string, number: string }>
                     <dt class="text-muted-foreground">
                       Расход
                     </dt>
-                    <dd>появится, когда заработает чтение постов</dd>
+                    <dd data-testid="usage-ai-spend">
+                      <template v-if="!aiSpend">
+                        появится {{ NO_MIGRATION }}
+                      </template>
+                      <template v-else-if="!aiSpend.posts">
+                        за 30 дней чтений не было
+                      </template>
+                      <template v-else>
+                        за 30 дней — {{ count(aiSpend.posts, 'товар', 'товара', 'товаров') }}, {{ aiSpend.cost }}
+                      </template>
+                    </dd>
                   </dl>
                   <Button v-if="!data.ai.providers.length" variant="outline" size="sm" class="mt-3" as-child>
                     <NuxtLink to="/admin/ai">

@@ -529,7 +529,13 @@ INSERT INTO public.supplier_channels (supplier_id, invite_hash, title, chat_type
     probeAiKey = true
     await refreshHub(page)
     const ai2 = await stepOf(page, 'ai')
-    check(ai2.state === 'later' && ai2.facts === 'ключ: Anthropic (Claude) · модель: claude-haiku-5-5' && ai2.next.startsWith('Ключ есть'), `ключ ИИ задан — дальше разработка: «${ai2.facts}»`)
+    // С миграцией чтения (20261105120000) — «Готово»; прочитанное за 30 дней, если было, — следующим фактом
+    const reads = Number(psql(`SELECT count(*) FROM public.supplier_offers WHERE read_items IS NOT NULL AND read_at >= now() - interval '30 days';`))
+    const aiFacts = 'ключ: Anthropic (Claude) · модель: claude-haiku-5-5'
+    check(ai2.state === 'done' && (reads ? ai2.facts.startsWith(`${aiFacts} · прочитано за 30 дней: ${reads} `) : ai2.facts === aiFacts), `ключ ИИ задан, чтение подключено — «Готово»: «${ai2.facts}»`)
+    check(ai2.next.startsWith('ИИ читает артикул и цену'), `дальше — чтение при сборе: «${ai2.next}»`)
+    if (!reads)
+      check(await text(page, 'usage-ai-spend') === 'за 30 дней чтений не было', `расход на чтение: «${await text(page, 'usage-ai-spend')}»`)
     check(await text(page, 'usage-ai-keys') === 'Anthropic (Claude)' && await page.locator('[data-testid=usage-ai] a[href="/admin/ai"]').count() === 0, 'расход: ключ Anthropic задан, кнопки «Добавить ключ» нет')
     const aiJson = JSON.stringify((await api('/api/admin/purchasing', adminToken)).json)
     check(!aiJson.includes('probe') && !aiJson.includes(PROBE_AI_KEY.slice(-4)), 'ключ ИИ в ответе не виден ни знаком')

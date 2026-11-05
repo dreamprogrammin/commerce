@@ -27,7 +27,7 @@ function status(patch: Partial<PurchasingStatus> = {}): PurchasingStatus {
     telegram: null,
     offers: null,
     demand: demandPart(),
-    ai: { providers: [], model: 'anthropic/claude-haiku-5-5' },
+    ai: { providers: [], model: 'anthropic/claude-haiku-5-5', reading: null },
     restock: { atThreshold: 0, noSupplier: 0, suppliers: 0, openOrders: 0 },
     supplierLoad: [],
     unassigned: { products: 0, toRestock: 0 },
@@ -191,24 +191,37 @@ describe('purchasingSteps', () => {
   describe('чтение постов ИИ', () => {
     const anthropic = { id: 'anthropic', label: 'Anthropic (Claude)' }
 
-    it('ключ есть и подходит модели — дальше разработка, а не владелец', () => {
-      const s = step(status({ ai: { providers: [anthropic], model: 'anthropic/claude-haiku-5-5' } }), 'ai')
+    it('ключ есть, а миграции чтения нет — ждёт миграции, не владельца', () => {
+      const s = step(status({ ai: { providers: [anthropic], model: 'anthropic/claude-haiku-5-5', reading: null } }), 'ai')
       expect(s.state).toBe('later')
       expect(s.facts).toEqual(['ключ: Anthropic (Claude)', 'модель: claude-haiku-5-5'])
-      expect(s.next).toMatch(/^Ключ есть/)
+      expect(s.next).toBe('Ключ есть. Чтение при сборе «Товаров поставщиков» заработает после миграции базы.')
+    })
+
+    it('ключ есть и чтение подключено — готово; прочитанное за 30 дней — в фактах', () => {
+      const idle = step(status({ ai: { providers: [anthropic], model: 'anthropic/claude-haiku-5-5', reading: [] } }), 'ai')
+      expect(idle.state).toBe('done')
+      expect(idle.facts).toEqual(['ключ: Anthropic (Claude)', 'модель: claude-haiku-5-5'])
+      expect(idle.next).toMatch(/^ИИ читает артикул и цену/)
+      const reading = [
+        { model: 'anthropic/claude-haiku-5-5', posts: 3, inputTokens: 6000, outputTokens: 900 },
+        { model: 'anthropic/claude-sonnet-5-5', posts: 1, inputTokens: 2000, outputTokens: 300 },
+      ]
+      const busy = step(status({ ai: { providers: [anthropic], model: 'anthropic/claude-haiku-5-5', reading } }), 'ai')
+      expect(busy.facts).toEqual(['ключ: Anthropic (Claude)', 'модель: claude-haiku-5-5', 'прочитано за 30 дней: 4 товара'])
     })
 
     it('у выбранной модели нет ключа её провайдера — ждёт владельца', () => {
-      const s = step(status({ ai: { providers: [anthropic], model: 'openai/gpt-6.1-terra' } }), 'ai')
+      const s = step(status({ ai: { providers: [anthropic], model: 'openai/gpt-6.1-terra', reading: [] } }), 'ai')
       expect(s.state).toBe('action')
       expect(s.facts).toEqual(['ключ: Anthropic (Claude)', 'модель: gpt-6.1-terra'])
       expect(s.next).toMatch(/нет ключа/)
     })
 
     it('два ключа — «ключи»', () => {
-      const s = step(status({ ai: { providers: [anthropic, { id: 'gemini', label: 'Google (Gemini)' }], model: 'gemini/gemini-4-argon' } }), 'ai')
+      const s = step(status({ ai: { providers: [anthropic, { id: 'gemini', label: 'Google (Gemini)' }], model: 'gemini/gemini-4-argon', reading: [] } }), 'ai')
       expect(s.facts[0]).toBe('ключи: Anthropic (Claude), Google (Gemini)')
-      expect(s.state).toBe('later')
+      expect(s.state).toBe('done')
     })
 
     it('без миграции ключей — «в разработке»', () => {

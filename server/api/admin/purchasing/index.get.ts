@@ -1,5 +1,6 @@
 import type { DemandTopic } from '~/utils/marketDemand'
 import type { PurchasingStatus, SupplierLoad } from '~/utils/smartPurchasing'
+import type { VisionModelSpend } from '~/utils/supplierOfferList'
 import { needsRestock } from '~/utils/restockOrder'
 import { demandOverview } from '~/utils/smartPurchasing'
 import { isOpenOrder } from '~/utils/supplierOrders'
@@ -19,7 +20,7 @@ import { isOpenOrder } from '~/utils/supplierOrders'
 export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
   const db = await requireAdmin(event)
 
-  const [channels, telegramSecrets, offers, summary, candidates, runs, demandKey, aiKeys, aiModel, restock] = await Promise.all([
+  const [channels, telegramSecrets, offers, summary, candidates, runs, demandKey, aiKeys, aiModel, aiReading, restock] = await Promise.all([
     db.from('supplier_channels').select('supplier_id, web_preview'),
     db.rpc('telegram_secrets_status'),
     db.rpc('supplier_offers_summary'),
@@ -29,6 +30,7 @@ export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
     db.rpc('market_demand_credentials_status'),
     db.rpc('ai_keys_status'),
     db.from('ai_settings').select('value').eq('key', 'supplier_vision_model').maybeSingle(),
+    db.rpc('supplier_offers_read_summary'),
     loadRestock(db),
   ])
   // Таблицы или функции шага нет — миграция не применена; любая другая ошибка — 500
@@ -125,6 +127,8 @@ export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
       : {
           providers: keyRows.flatMap(k => isAiProvider(k.provider) ? [{ id: k.provider, label: AI_PROVIDERS[k.provider].label }] : []),
           model: typeof model === 'string' ? model : AI_TASKS.supplier_vision_model.default,
+          // Сколько прочитано и чем — расход; самих чтений сводка не отдаёт
+          reading: missing(aiReading, supplierOffersNotInstalled) ? null : (aiReading.data as { models: VisionModelSpend[] }).models,
         },
     restock: {
       atThreshold: atThreshold.length,

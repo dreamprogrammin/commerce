@@ -2811,6 +2811,12 @@ export interface Database {
           photo_url: string | null
           post_url: string
           posted_at: string
+          read_at: string | null
+          read_error: string | null
+          read_input_tokens: number | null
+          read_items: Json | null
+          read_model: string | null
+          read_output_tokens: number | null
           status: string
           status_at: string | null
           status_by: string | null
@@ -2826,6 +2832,12 @@ export interface Database {
           photo_url?: string | null
           post_url: string
           posted_at: string
+          read_at?: string | null
+          read_error?: string | null
+          read_input_tokens?: number | null
+          read_items?: Json | null
+          read_model?: string | null
+          read_output_tokens?: number | null
           status?: string
           status_at?: string | null
           status_by?: string | null
@@ -2841,6 +2853,12 @@ export interface Database {
           photo_url?: string | null
           post_url?: string
           posted_at?: string
+          read_at?: string | null
+          read_error?: string | null
+          read_input_tokens?: number | null
+          read_items?: Json | null
+          read_model?: string | null
+          read_output_tokens?: number | null
           status?: string
           status_at?: string | null
           status_by?: string | null
@@ -4035,6 +4053,7 @@ export interface Database {
         }
         Returns: string
       }
+      supplier_offers_read_summary: { Args: never, Returns: Json }
       supplier_offers_summary: { Args: never, Returns: Json }
       telegram_secret_delete: { Args: { p_name: string }, Returns: undefined }
       telegram_secret_get: { Args: { p_name: string }, Returns: string }

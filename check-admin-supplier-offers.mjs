@@ -1,17 +1,20 @@
 /*
- * «Товары поставщиков» (4.11.2026) — только на ЛОКАЛЬНОЙ базе с миграцией
- * 20261104160000_supplier_offers и только на стенде с подделками: сервер
- * запущен с TELEGRAM_FAKE=1 (закрытые каналы читает подделка Telegram из
- * server/utils/telegramAccount.ts) и TELEGRAM_WEB=http://127.0.0.1:3199
- * (открытые — заглушка t.me/s, её поднимает сам страж). Настоящие Telegram и
- * t.me страж не трогает: первым делом ищет в ответе `fake: true` и адрес
- * заглушки и без них останавливается.
+ * «Товары поставщиков» (4.11.2026) — только на ЛОКАЛЬНОЙ базе с миграциями
+ * 20261104160000_supplier_offers и 20261105120000_supplier_offers_read и
+ * только на стенде с подделками: сервер запущен с TELEGRAM_FAKE=1 (закрытые
+ * каналы читает подделка Telegram из server/utils/telegramAccount.ts),
+ * TELEGRAM_WEB=http://127.0.0.1:3199 (открытые — заглушка t.me/s) и
+ * AI_STUB_URL=http://127.0.0.1:8788 (модель ИИ — заглушка Anthropic); обе
+ * заглушки поднимает сам страж. Настоящие Telegram, t.me и провайдера ИИ
+ * страж не трогает: первым делом ищет в ответе `fake: true` и адреса заглушек
+ * и без них останавливается.
  *
  * Заглушка — канал probe_offers: сообщения 1001–1060 через полтора часа,
  * последнее 20 минут назад; 1007, 1017, … — текст без фото, у 1020 два фото,
  * фото 1030 — не с CDN Telegram. Подделка — закрытый канал из 80 сообщений по
  * часу (там же описан); приглашение на Member… — аккаунт в канале, на
- * Expired… — устарело.
+ * Expired… — устарело. Заглушка ИИ «читает» подпись — артикул и цену из неё;
+ * у постов 1013–1024 свои ответы, каждый — на свою ветку карточки (aiAnswer).
  *
  * Проверяет:
  *  1) маршруты: гость — 401, не-администратор — 403; негодные канал, товары и
@@ -21,26 +24,41 @@
  *     частями по 30; альбом с одной подписью — один товар и «2 фото»; текст
  *     без фото — мимо; фото — в закрытом бакете, ссылка открывается; фото не
  *     с CDN Telegram не скачано; устаревшее приглашение — причина у канала;
- *  4) повторный сбор — ничего нового; новые посты — только они;
- *  5) старше 30 дней — удалены вместе с фото; фото удалённого канала — тоже;
- *  6) группировка: по поставщикам, по дням, списком; запоминается;
- *  7) разбор: «Не брать» и «Отменить», «Добавил», «Вернуть в новые»;
+ *  4) чтение ИИ при сборе (5.11.2026): товары с фото прочитаны сразу, один
+ *     запрос на товар — модель, низкий уровень рассуждений, схема ответа,
+ *     фото; на карточке — название, артикул без второй «Арт.», цена из
+ *     подписи или с фото, обе при расхождении, сомнение модели, «товара не
+ *     нашёл»; отказ модели и ответ не JSON — причина на карточке, а остальные
+ *     читаются; без ключа ИИ — подсказка и кнопка «Модели ИИ»;
+ *  5) повторный сбор — ничего нового; новые посты — только они;
+ *  6) старше 30 дней — удалены вместе с фото; фото удалённого канала — тоже;
+ *  7) группировка: по поставщикам, по дням, списком; запоминается;
+ *  8) разбор: «Не брать» и «Отменить», «Добавил», «Вернуть в новые»;
  *     счётчики; в базе — кто и когда;
- *  8) дашборд: шаг 4 «Товары поставщиков» и кнопка страницы;
- *  9) ни один ответ не несёт секретов: сессии, api_hash, кода приглашения;
- * 10) без миграции — страница и дашборд говорят про миграцию, не 500;
- * 11) телефон 390px — без горизонтальной прокрутки; без ошибок консоли.
+ *  9) без ключа ИИ товары собираются без чтения; «Прочитать» берёт фото из
+ *     бакета, порциями по 10; лимит провайдера и обрыв связи — дальше не
+ *     читает; непрочитываемый товар за проход берётся один раз;
+ * 10) дашборд: шаг 4 «Товары поставщиков» и кнопка страницы; шаг «ИИ
+ *     читает посты» и расход на чтение за 30 дней;
+ * 11) ни один ответ не несёт секретов: сессии, api_hash, кода приглашения,
+ *     ключа ИИ; список товаров — даже последних знаков ключа;
+ * 12) без миграции чтения — товары собираются без чтения, «Прочитать» — 409,
+ *     страница и дашборд говорят про миграцию; без миграции товаров — тоже
+ *     про миграцию, не 500;
+ * 13) телефон 390px — без горизонтальной прокрутки, цена с ₸ одной строкой;
+ *     без ошибок консоли.
  *
  * Данные заводит сам — администратор, покупатель, два поставщика с каналами,
- * вход подделки Telegram — и в конце всё убирает, фото в бакете тоже. Если
- * на локальной базе уже есть секреты Telegram, страж останавливается, не
- * тронув их.
+ * вход подделки Telegram, ключ ИИ для заглушки — и в конце всё убирает, фото
+ * в бакете тоже. Если на локальной базе уже есть секреты Telegram, ключи ИИ
+ * или выбрана другая модель чтения, страж останавливается, не тронув их.
  *
  *   sg docker -c "node check-admin-supplier-offers.mjs --base=http://localhost:3141"
  *
  * Стенд: сборка на локальной базе (NUXT_PUBLIC_SUPABASE_URL/KEY и
- * NUXT_SUPABASE_SERVICE_ROLE_KEY — локальные) с TELEGRAM_FAKE=1 и
- * TELEGRAM_WEB=http://127.0.0.1:3199. SHOTS=<папка> — скриншоты.
+ * NUXT_SUPABASE_SERVICE_ROLE_KEY — локальные) с TELEGRAM_FAKE=1,
+ * TELEGRAM_WEB=http://127.0.0.1:3199 и AI_STUB_URL=http://127.0.0.1:8788.
+ * SHOTS=<папка> — скриншоты.
  */
 import { Buffer } from 'node:buffer'
 import { execFileSync } from 'node:child_process'
@@ -51,6 +69,8 @@ import { chromium } from 'playwright'
 const BASE = process.argv.find(a => a.startsWith('--base='))?.slice(7) || 'http://localhost:3141'
 const WEB_PORT = 3199
 const WEB = `http://127.0.0.1:${WEB_PORT}`
+const AI_PORT = 8788
+const AI_WEB = `http://127.0.0.1:${AI_PORT}`
 const SUPA = 'http://127.0.0.1:54321'
 const DB_CONTAINER = 'supabase_db_gvsdevsvzgcivpphcuai'
 // Стандартные демо-ключи локального Supabase — публичные
@@ -60,11 +80,17 @@ const PASSWORD = 'ProbaPassword123!'
 const SUPPLIER_OPEN = 'Проверка товаров — открытый'
 const SUPPLIER_CLOSED = 'Проверка товаров — закрытый'
 const API_HASH = '0123456789abcdef0123456789abcdef'
-const SECRETS = [API_HASH, 'fake-session-', 'fake-temp-', 'MemberProbe_offers', 'ExpiredProbe_offers']
+// Модель чтения по умолчанию и ключ, который принимает заглушка ИИ
+const VISION = 'claude-haiku-5-5'
+const AI_KEY = `sk-ant-api03-PROBEoffers${'x'.repeat(24)}Q7zX`
+const SECRETS = [API_HASH, 'fake-session-', 'fake-temp-', 'MemberProbe_offers', 'ExpiredProbe_offers', AI_KEY]
+// Колонки миграции чтения ИИ — на проверку «без миграции» страж их переименовывает
+const READ_COLS = ['read_items', 'read_model', 'read_at', 'read_error', 'read_input_tokens', 'read_output_tokens']
 const ORPHAN = '00000000-0000-4000-8000-00000000dead'
 const SHOTS = process.env.SHOTS
 const HOUR = 3_600_000
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mPo33EDAAP5AiCMelXAAAAAAElFTkSuQmCC', 'base64')
+const PNG_B64 = PNG.toString('base64')
 
 if (!/localhost|127\.0\.0\.1/.test(BASE))
   throw new Error('Только локальный стенд: страж заводит пользователей, поставщиков и секреты Telegram')
@@ -96,6 +122,8 @@ async function tokenFor(email) {
   return (await res.json()).access_token
 }
 const bodies = []
+// Ответы маршрутов «Товаров поставщиков» — в них ключа ИИ нет даже последними знаками
+const offerBodies = []
 async function api(path, token, body, method = body ? 'POST' : 'GET') {
   const res = await fetch(`${BASE}${path}`, {
     method,
@@ -104,6 +132,8 @@ async function api(path, token, body, method = body ? 'POST' : 'GET') {
   })
   const text = await res.text()
   bodies.push(text)
+  if (path.startsWith('/api/admin/supplier-offers'))
+    offerBodies.push(text)
   let json = null
   try {
     json = JSON.parse(text)
@@ -172,12 +202,93 @@ const server = http.createServer((req, res) => {
 })
 await new Promise(r => server.listen(WEB_PORT, '127.0.0.1', r))
 
+// ---------- заглушка ИИ (Anthropic) ----------
+
+/*
+ * «Читает» пост по подписи: артикул PO-…/ЗК-… и цену из неё. mode: 'limit' —
+ * провайдер отвечает 429, 'down' — рвёт соединение. Фото в журнал не пишется —
+ * только тип и совпало ли с отданным заглушкой t.me и подделкой Telegram.
+ */
+const ai = { mode: 'ok', requests: [], retrieved: 0, tries: new Map() }
+function aiAnswer(article, caption) {
+  const price = Number(/Цена (\d+)/.exec(caption)?.[1]) || null
+  const item = patch => ({ name: `Игрушка ${article}`, article, brand: null, price_text: price, price_image: null, price_note: null, age: '3+', confidence: 'high', doubt: null, ...patch })
+  const tries = (ai.tries.get(article) ?? 0) + 1
+  ai.tries.set(article, tries)
+  switch (article) {
+    // Подпись продавца модель переписывает вместе с артикулом — сервер её срезает
+    case 'PO-1013': return { items: [item({ article: `Арт. ${article}` })] }
+    case 'PO-1014': return { items: [item({ price_text: null, price_image: 2500 })] }
+    case 'PO-1016': return { items: [item({ price_image: 1200 })] }
+    case 'PO-1018': return { items: [item({ confidence: 'low', doubt: 'последняя цифра артикула не читается' })] }
+    case 'PO-1019': return { items: [] }
+    // Отказ — только с первой попытки: «Прочитать» дочитает
+    case 'PO-1021': return tries === 1 ? 'refusal' : { items: [item()] }
+    case 'PO-1022': return 'garbage'
+    case 'PO-1023': return { items: [item(), ...['B-2', 'B-3', 'B-4'].map(a => item({ name: `Набор ${a}`, article: a }))] }
+    case 'PO-1024': return { items: [item({ price_note: 'от 3 шт' })] }
+    default: return { items: [item()] }
+  }
+}
+const aiServer = http.createServer((req, res) => {
+  const { pathname } = new URL(req.url, AI_WEB)
+  const send = (status, body, headers = {}) => {
+    res.writeHead(status, { 'content-type': 'application/json', ...headers })
+    res.end(JSON.stringify(body))
+  }
+  const chunks = []
+  req.on('data', c => chunks.push(c))
+  req.on('end', () => {
+    if (req.headers['x-api-key'] !== AI_KEY)
+      return send(401, { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } })
+    const model = { type: 'model', id: VISION, display_name: 'Claude Haiku 5.5', created_at: '2026-01-01T00:00:00Z' }
+    // Список — им страница «Модели ИИ» проверяет ключ; справка — есть ли у модели уровень рассуждений
+    if (req.method === 'GET' && pathname === '/v1/models')
+      return send(200, { data: [{ ...model, capabilities: { image_input: { supported: true } } }], has_more: false, first_id: VISION, last_id: VISION })
+    if (req.method === 'GET' && pathname === `/v1/models/${VISION}`) {
+      ai.retrieved++
+      return send(200, { ...model, capabilities: { image_input: { supported: true }, effort: { low: { supported: true }, medium: { supported: true }, high: { supported: true } } } })
+    }
+    if (req.method !== 'POST' || pathname !== '/v1/messages')
+      return send(404, { type: 'error', error: { type: 'not_found_error', message: pathname } })
+    const body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+    const content = body.messages?.[0]?.content ?? []
+    const caption = content.find(b => b.type === 'text')?.text ?? ''
+    const article = /(?:PO|ЗК)-\d+/.exec(caption)?.[0] ?? null
+    ai.requests.push({
+      article,
+      model: body.model,
+      effort: body.output_config?.effort,
+      format: body.output_config?.format?.type,
+      system: typeof body.system === 'string' && body.system.startsWith('Ты читаешь посты'),
+      images: content.filter(b => b.type === 'image').map(b => `${b.source?.media_type}${b.source?.data === PNG_B64 ? ' как отдано' : ''}`),
+    })
+    if (ai.mode === 'down')
+      return req.socket.destroy()
+    if (ai.mode === 'limit')
+      return send(429, { type: 'error', error: { type: 'rate_limit_error', message: 'Number of request tokens has exceeded your rate limit' } }, { 'retry-after': '0' })
+    const answer = aiAnswer(article, caption)
+    send(200, {
+      id: `msg_probe_${ai.requests.length}`,
+      type: 'message',
+      role: 'assistant',
+      model: body.model,
+      content: answer === 'refusal' ? [] : [{ type: 'text', text: answer === 'garbage' ? 'Не могу прочитать этот пост' : JSON.stringify(answer) }],
+      stop_reason: answer === 'refusal' ? 'refusal' : 'end_turn',
+      stop_sequence: null,
+      usage: { input_tokens: 2000, output_tokens: 300 },
+    })
+  })
+})
+await new Promise(r => aiServer.listen(AI_PORT, '127.0.0.1', r))
+
 // ---------- данные ----------
 
 const stamp = Date.now()
 const emails = { admin: `offers-admin-${stamp}@example.test`, buyer: `offers-buyer-${stamp}@example.test` }
 const users = []
 const vaultNames = () => psql(`SELECT coalesce(string_agg(substr(name, 10), ',' ORDER BY name), '') FROM vault.secrets WHERE name LIKE 'telegram\\_%';`)
+const aiKeyNames = () => psql(`SELECT coalesce(string_agg(name, ',' ORDER BY name), '') FROM vault.secrets WHERE name LIKE 'ai\\_key\\_%';`)
 let started = false
 const channelIds = []
 
@@ -199,18 +310,30 @@ async function cleanup() {
     await removeFiles(await bucketFiles(id))
   psql(`DELETE FROM public.suppliers WHERE name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
   if (started)
-    psql(`DELETE FROM vault.secrets WHERE name LIKE 'telegram\\_%'; DELETE FROM public.telegram_account;`)
+    psql(`DELETE FROM vault.secrets WHERE name LIKE 'telegram\\_%' OR name LIKE 'ai\\_key\\_%'; DELETE FROM public.telegram_account;`)
 }
 
 const offersOf = channel => Number(psql(`SELECT count(*) FROM public.supplier_offers WHERE channel_id = '${channel}';`))
 
+function renameRead(back) {
+  const [from, to] = back ? ['_check_off', ''] : ['', '_check_off']
+  psql(`BEGIN;
+${READ_COLS.map(c => `ALTER TABLE public.supplier_offers RENAME COLUMN ${c}${from} TO ${c}${to};`).join('\n')}
+ALTER FUNCTION public.supplier_offers_read_summary${from}() RENAME TO supplier_offers_read_summary${to};
+COMMIT;
+NOTIFY pgrst, 'reload schema';`)
+}
+
 const browser = await chromium.launch()
 let renamed = false
+let readRenamed = false
 try {
   if (psql(`SELECT to_regclass('public.supplier_offers') IS NOT NULL;`) !== 't')
     throw new Error('На локальной базе нет миграции 20261104160000_supplier_offers')
   if (vaultNames())
     throw new Error(`На локальной базе уже есть секреты Telegram (${vaultNames()}) — страж их не трогает`)
+  if (aiKeyNames())
+    throw new Error(`На локальной базе уже есть ключи ИИ (${aiKeyNames()}) — страж их не трогает`)
   started = true
   await cleanup()
   const adminId = await createUser(emails.admin)
@@ -219,11 +342,13 @@ try {
   makeAdmin(adminId)
   const adminToken = await tokenFor(emails.admin)
   const buyerToken = await tokenFor(emails.buyer)
-  console.log(`стенд ${BASE}, заглушка t.me ${WEB}`)
+  console.log(`стенд ${BASE}, заглушки t.me ${WEB} и ИИ ${AI_WEB}`)
 
   const first = await api('/api/admin/supplier-offers', adminToken)
-  if (first.json?.fake !== true || first.json?.web !== WEB)
-    throw new Error(`Стенд без подделки Telegram и заглушки t.me (fake: ${first.json?.fake}, web: ${first.json?.web}) — запустите сервер с TELEGRAM_FAKE=1 и TELEGRAM_WEB=${WEB}. Ничего не собиралось`)
+  if (first.json?.fake !== true || first.json?.web !== WEB || first.json?.aiStub !== AI_WEB)
+    throw new Error(`Стенд без подделки Telegram и заглушек t.me и ИИ (fake: ${first.json?.fake}, web: ${first.json?.web}, aiStub: ${first.json?.aiStub}) — запустите сервер с TELEGRAM_FAKE=1, TELEGRAM_WEB=${WEB} и AI_STUB_URL=${AI_WEB}. Ничего не собиралось`)
+  if (first.json?.reading?.model !== `anthropic/${VISION}`)
+    throw new Error(`Чтение ИИ: ${first.json?.reading ? `выбрана модель ${first.json.reading.model}` : 'нет миграции 20261105120000_supplier_offers_read'} — страж ждёт anthropic/${VISION} и чужой выбор не трогает`)
 
   const openSupplier = psql(`INSERT INTO public.suppliers (name) VALUES ('${SUPPLIER_OPEN}') RETURNING id;`)
   const closedSupplier = psql(`INSERT INTO public.suppliers (name) VALUES ('${SUPPLIER_CLOSED}') RETURNING id;`)
@@ -238,20 +363,22 @@ try {
     ['GET', '/api/admin/supplier-offers', null],
     ['POST', '/api/admin/supplier-offers/collect', { channelId: openId }],
     ['POST', '/api/admin/supplier-offers/status', { ids: [openId], status: 'skipped' }],
+    ['POST', '/api/admin/supplier-offers/read', { before: new Date().toISOString() }],
   ]
   for (const [method, path, body] of routes) {
     const guest = await api(path, null, body, method)
     const buyer = await api(path, buyerToken, body, method)
     check(guest.status === 401 && buyer.status === 403, `${method} ${path}: гость — ${guest.status}, не-администратор — ${buyer.status}`)
   }
-  check(!stub.requests.length && offersOf(openId) === 0, 'отказанные запросы в t.me не ходили и ничего не записали')
+  check(!stub.requests.length && !ai.requests.length && offersOf(openId) === 0, 'отказанные запросы в t.me и к модели не ходили и ничего не записали')
   const bad = [
     await api('/api/admin/supplier-offers?status=all', adminToken),
     await api('/api/admin/supplier-offers/collect', adminToken, { channelId: 'x' }),
     await api('/api/admin/supplier-offers/status', adminToken, { ids: ['x'], status: 'skipped' }),
     await api('/api/admin/supplier-offers/status', adminToken, { ids: [openId], status: 'ordered' }),
+    await api('/api/admin/supplier-offers/read', adminToken, { before: 'вчера' }),
   ]
-  check(bad.every(r => r.status === 400), `негодный статус, канал, товары — 400: ${bad.map(r => `${r.status} «${r.json?.message}»`).join(', ')}`)
+  check(bad.every(r => r.status === 400), `негодный статус, канал, товары, начало прохода — 400: ${bad.map(r => `${r.status} «${r.json?.message}»`).join(', ')}`)
   const missing = await api('/api/admin/supplier-offers/collect', adminToken, { channelId: '00000000-0000-4000-8000-000000000000' })
   check(missing.status === 404, `несуществующий канал — 404 «${missing.json?.message}»`)
 
@@ -264,8 +391,11 @@ try {
     page.on('pageerror', e => errors.push(e.message))
     page.on('console', m => m.type() === 'error' && !m.text().startsWith('Failed to load resource') && !m.text().includes('[nuxt-gtag]') && errors.push(m.text()))
     page.on('response', async (r) => {
-      if (r.url().includes('/api/admin/supplier-offers'))
-        bodies.push(await r.text().catch(() => ''))
+      if (r.url().includes('/api/admin/supplier-offers')) {
+        const text = await r.text().catch(() => '')
+        bodies.push(text)
+        offerBodies.push(text)
+      }
       // Устаревшее приглашение — ответ, который страница показывает у канала
       if (r.status() === 409 && r.url().includes('/api/admin/supplier-offers/collect'))
         return
@@ -295,13 +425,48 @@ try {
   // networkidle на этой странице уже наступал, и waitForLoadState вернётся сразу
   const listed = page => page.waitForResponse(r => new URL(r.url()).pathname === '/api/admin/supplier-offers' && r.request().method() === 'GET', { timeout: 180000 })
   const painted = page => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
+  // Прежние уведомления (4 с) уходят до нового сбора: текст берётся у своего
+  const noToasts = page => page.waitForFunction(() => !document.querySelector('[data-sonner-toast]'), null, { timeout: 30000 })
   async function collect(page, toastText) {
+    await noToasts(page)
     const reread = listed(page)
     await page.locator('[data-testid=offers-collect]').click()
-    await toastWith(page, toastText).waitFor({ timeout: 180000 })
+    const toast = toastWith(page, toastText).last()
+    await toast.waitFor({ timeout: 180000 })
+    const text = sp(await toast.textContent())
     await reread
     await painted(page)
+    return text
   }
+  // «Прочитать»: текст уведомления и сколько раз страница позвала сервер
+  async function reread(page, toastText) {
+    await noToasts(page)
+    let calls = 0
+    const onRequest = r => new URL(r.url()).pathname === '/api/admin/supplier-offers/read' && calls++
+    page.on('request', onRequest)
+    const relisted = listed(page)
+    await page.locator('[data-testid=offers-reread]').click()
+    const toast = toastWith(page, toastText).last()
+    await toast.waitFor({ timeout: 180000 })
+    const text = sp(await toast.textContent())
+    await relisted
+    await painted(page)
+    page.off('request', onRequest)
+    return { text, calls }
+  }
+  // Карточка товара по артикулу из подписи — прочитанное ИИ
+  const cardOf = (page, article) => page.locator('[data-testid=offer-card]', { hasText: article }).evaluate((el) => {
+    const t = s => [...el.querySelectorAll(`[data-testid=${s}]`)].map(e => e.textContent.replace(/\s+/g, ' ').trim())
+    return { names: t('offer-name'), articles: t('offer-article'), prices: t('offer-price'), from: t('offer-price-from'), conflict: t('offer-price-conflict'), doubt: t('offer-doubt'), none: t('offer-no-items'), error: t('offer-read-error'), items: t('offer-item').length, text: el.textContent.replace(/\s+/g, ' ').trim() }
+  })
+  const readLine = async page => sp(await page.locator('[data-testid=offers-reading]').textContent())
+  // Не прочитано и не прочлось — у своих каналов стража
+  const ownUnread = () => JSON.parse(psql(`SELECT json_build_object('unread', count(*) FILTER (WHERE read_items IS NULL), 'failed', count(*) FILTER (WHERE read_items IS NULL AND read_error IS NOT NULL)) FROM public.supplier_offers o JOIN public.supplier_channels c ON c.id = o.channel_id JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}') AND o.status = 'new' AND o.photo_path IS NOT NULL;`))
+  const stepAi = page => page.evaluate(() => {
+    const el = document.querySelector('[data-testid=purchasing-steps] > li[data-testid=step-ai]')
+    const t = s => el?.querySelector(`[data-testid=${s}]`)?.textContent.replace(/\s+/g, ' ').trim()
+    return { state: el?.dataset.state, facts: t('step-facts'), next: t('step-next'), spend: document.querySelector('[data-testid=usage-ai-spend]')?.textContent.replace(/\s+/g, ' ').trim() }
+  })
   async function reload(page) {
     const reread = listed(page)
     await page.reload({ waitUntil: 'load' })
@@ -317,17 +482,22 @@ try {
   check(await page.locator('[data-testid=offers-channel] [aria-label="Закрытый канал"]').count() === 2, 'у закрытых каналов — замок')
   check(await page.locator('[data-testid=offers-no-account] a[href="/admin/telegram"]').count() === 1, 'закрытые каналы без аккаунта — подсказка и кнопка «Аккаунт Telegram»')
   check(sp(await page.locator('[data-testid=offers-empty]').textContent()).startsWith('Нажмите «Собрать новые»'), 'пусто — что нажать')
+  const keyless = await readLine(page)
+  check(keyless.includes('задайте ключ для Claude Haiku 5.5') && await page.locator('[data-testid=offers-reading] a[href="/admin/ai"]').count() === 1 && await page.locator('[data-testid=offers-reread]').count() === 0, `без ключа ИИ — «${keyless}», кнопка «Модели ИИ»`)
 
   // Вход подделки Telegram — как на странице «Аккаунт Telegram»
   await api('/api/admin/telegram/app', adminToken, { apiId: '1234567', apiHash: API_HASH }, 'PUT')
   await api('/api/admin/telegram/login', adminToken, { phone: '+7 777 123 45 67' })
   const code = await api('/api/admin/telegram/login/code', adminToken, { code: '12345' })
   check(code.status === 200 && vaultNames().includes('session'), 'аккаунт подделки Telegram подключён')
+  // Ключ — как на странице «Модели ИИ»: сервер проверяет его у заглушки
+  const keySet = await api('/api/admin/ai-settings/key', adminToken, { provider: 'anthropic', key: AI_KEY })
+  check(keySet.status === 200 && aiKeyNames() === 'ai_key_anthropic', `ключ ИИ проверен заглушкой и лёг в Vault: ${keySet.status}`)
 
   console.log('\n== сбор')
   await reload(page)
   check(await page.locator('[data-testid=offers-no-account]').count() === 0, 'с аккаунтом подсказки нет')
-  await collect(page, 'Не собрано: 1 канал')
+  const firstToast = await collect(page, 'Не собрано: 1 канал')
   const openPosts = stub.posts.filter(p => p.photos.length && Date.parse(p.date) >= Date.now() - 72 * HOUR)
   // Подделка: 9–80 за 3 дня, без 15, 25, … 75 (текст) и с альбомом 41–42 — 64 товара
   const closedCount = 64
@@ -369,6 +539,48 @@ try {
   if (SHOTS)
     await page.screenshot({ path: `${SHOTS}/offers-1366.png` })
 
+  console.log('\n== чтение ИИ при сборе')
+  const read = JSON.parse(psql(`SELECT json_agg(json_build_object('m', message_id, 'items', read_items, 'error', read_error, 'model', read_model, 'at', read_at, 'in', read_input_tokens, 'out', read_output_tokens, 'path', photo_path, 'caption', caption)) FROM public.supplier_offers WHERE channel_id IN ('${openId}', '${memberId}');`))
+  const withFile = read.filter(r => r.path)
+  const readOk = read.filter(r => r.items)
+  const readBad = read.filter(r => r.error)
+  check(withFile.length && withFile.every(r => r.at && r.model === `anthropic/${VISION}`) && read.filter(r => !r.path).every(r => !r.at), `товары с фото прочитаны при сборе — ${withFile.filter(r => r.at).length} из ${withFile.length}, без фото — не читались`)
+  check(readBad.length === 2 && readBad.map(r => r.error).sort().join(' | ').startsWith('Модель отказалась читать пост | Ответ модели — не JSON') && readBad.every(r => r.in === null && !r.items), `не прочлись двое — отказ модели и ответ не JSON, причина записана: ${readBad.map(r => r.m).join(', ')}`)
+  check(readOk.length === withFile.length - 2 && readOk.every(r => r.in === 2000 && r.out === 300), `прочитано ${readOk.length}, токены записаны`)
+  check(read.find(r => r.m === 1013)?.items?.[0]?.article === 'PO-1013', `подпись «Арт.» срезана при разборе ответа: ${read.find(r => r.m === 1013)?.items?.[0]?.article}`)
+  check(firstToast.includes(`ИИ прочёл ${readOk.length}`) && firstToast.includes('не прочлось 2 — причина на карточке'), `уведомление сбора: «${firstToast}»`)
+  check(ai.requests.length === withFile.length, `один запрос к модели на товар: ${ai.requests.length}`)
+  const shapes = [...new Set(ai.requests.map(r => `${r.model} ${r.effort} ${r.format} ${r.system} ${r.images.join('+')}`))]
+  check(shapes.length === 1 && shapes[0] === `${VISION} low json_schema true image/png как отдано`, `запрос: модель, уровень low, схема ответа, подсказка, одно фото: ${shapes.join(' / ')}`)
+  check(ai.retrieved <= 1, `справка о модели — не больше одной на сервер: ${ai.retrieved}`)
+
+  const c13 = await cardOf(page, 'PO-1013')
+  check(c13.names[0] === 'Игрушка PO-1013' && c13.articles[0] === 'Арт. PO-1013' && c13.prices[0] === '1 013 ₸' && c13.from[0] === 'в подписи', `карточка: название, артикул без второй «Арт.», цена из подписи — ${c13.names[0]} · ${c13.articles[0]} · ${c13.prices[0]} ${c13.from[0]}`)
+  const c14 = await cardOf(page, 'PO-1014')
+  check(c14.prices[0] === '2 500 ₸' && c14.from[0] === 'на фото', `в подписи цены нет — с фото: ${c14.prices[0]} ${c14.from[0]}`)
+  const c16 = await cardOf(page, 'PO-1016')
+  check(c16.prices[0] === '1 016 ₸' && c16.from[0] === 'в подписи' && c16.conflict[0] === 'На фото другая: 1 200 ₸', `цены расходятся — главная из подписи, с фото рядом: ${c16.prices[0]} · ${c16.conflict[0]}`)
+  const c18 = await cardOf(page, 'PO-1018')
+  check(c18.doubt[0] === 'ИИ не уверен: последняя цифра артикула не читается', `сомнение модели — на карточке: ${c18.doubt[0]}`)
+  const c19 = await cardOf(page, 'PO-1019')
+  check(c19.items === 0 && c19.none[0] === 'ИИ не нашёл на фото товара' && !c19.error.length, 'товара на фото нет — так и сказано')
+  const c21 = await cardOf(page, 'PO-1021')
+  const c22 = await cardOf(page, 'PO-1022')
+  check(c21.error[0] === 'Не прочитано: Модель отказалась читать пост' && c22.error[0]?.startsWith('Не прочитано: Ответ модели — не JSON'), `не прочлось — причина на карточке: ${c21.error[0]} | ${c22.error[0]}`)
+  const c23 = await cardOf(page, 'PO-1023')
+  check(c23.items === 3 && c23.text.includes('И ещё 1 товар — в посте'), `несколько товаров в посте — три и «ещё 1»: ${c23.items}`)
+  check((await cardOf(page, 'PO-1024')).text.includes('от 3 шт'), 'уточнение к цене — дословно')
+  const zk = await cardOf(page, 'ЗК-50')
+  check(zk.articles[0] === 'Арт. ЗК-50' && zk.prices[0] === '5 000 ₸', `закрытый канал — тоже прочитан: ${zk.articles[0]} · ${zk.prices[0]}`)
+  const c30 = await cardOf(page, 'PO-1030')
+  check(!c30.items && !c30.none.length && !c30.error.length, 'товар без фото — без чтения и без ошибки')
+  const line = await readLine(page)
+  check(line.startsWith('Артикул и цену с фото читает Claude Haiku 5.5 — при «Собрать новые».') && line.includes('Не прочлось: 2 — причина на карточке.') && await page.locator('[data-testid=offers-reread]').isVisible(), `строка чтения — модель и непрочитанное: «${line}»`)
+  if (SHOTS) {
+    await page.locator('[data-testid=offer-card]', { hasText: 'PO-1016' }).scrollIntoViewIfNeeded()
+    await page.screenshot({ path: `${SHOTS}/offers-1366-items.png` })
+  }
+
   console.log('\n== повторный сбор, срок и чистка')
   psql(`DELETE FROM public.supplier_channels WHERE id = :'id';`, { id: expiredId })
   await uploadFile(`${ORPHAN}/1.png`)
@@ -383,8 +595,9 @@ try {
   addPost(1061, Date.now() - 5 * 60_000)
   addPost(1067, Date.now() - 4 * 60_000)
   addPost(1068, Date.now() - 3 * 60_000)
-  await collect(page, 'Новых товаров: 2')
+  const twoToast = await collect(page, 'Новых товаров: 2')
   check(offersOf(openId) === openPosts.length + 2, 'новые посты — только они: 2 с фото, текст мимо')
+  check(twoToast.includes('ИИ прочёл 2') && ai.requests.filter(r => r.article === 'PO-1061' || r.article === 'PO-1068').length === 2, `новые прочитаны сразу, прежние второй раз — нет: «${twoToast}»`)
 
   console.log('\n== группировка')
   await page.locator('[data-testid=offers-group-supplier]').click()
@@ -402,13 +615,13 @@ try {
   console.log('\n== разбор')
   const newTotal = total + 2
   const firstCard = cards(page).first()
-  const firstCaption = sp(await firstCard.locator('p').first().textContent())
+  const firstCaption = sp(await firstCard.locator('[data-testid=offer-caption]').textContent())
   await firstCard.locator('[data-testid=offer-skipped]').click()
   await toastWith(page, 'Отмечено: не брать').waitFor({ timeout: 15000 })
   check(await statusCount(page, 'new') === newTotal - 1 && await statusCount(page, 'skipped') === 1 && await cards(page).count() === newTotal - 1, '«Не брать» — карточка ушла, счётчики сдвинулись')
   await toastWith(page, 'Отмечено: не брать').getByRole('button', { name: 'Отменить' }).click()
   await page.waitForFunction(n => document.querySelectorAll('[data-testid=offer-card]').length === n, newTotal, { timeout: 15000 })
-  check(await statusCount(page, 'skipped') === 0 && sp(await cards(page).first().locator('p').first().textContent()) === firstCaption, '«Отменить» — карточка вернулась на место')
+  check(await statusCount(page, 'skipped') === 0 && sp(await cards(page).first().locator('[data-testid=offer-caption]').textContent()) === firstCaption, '«Отменить» — карточка вернулась на место')
   await cards(page).first().locator('[data-testid=offer-added]').click()
   await toastWith(page, 'Отмечено: добавил на сайт').waitFor({ timeout: 15000 })
   const marked = JSON.parse(psql(`SELECT json_agg(json_build_object('status', status, 'by', status_by, 'at', status_at)) FROM public.supplier_offers WHERE status <> 'new' AND channel_id IN ('${openId}', '${memberId}');`))
@@ -423,6 +636,49 @@ try {
   check(await cards(page).count() === 0 && await statusCount(page, 'new') === newTotal && await statusCount(page, 'added') === 0, 'вернул — во «Добавлены» пусто, «Новые» — все')
   check(psql(`SELECT count(*) FROM public.supplier_offers WHERE status_by IS NOT NULL AND channel_id IN ('${openId}', '${memberId}');`) === '0', 'вернул — кто и когда стёрты')
 
+  console.log('\n== без ключа и «Прочитать»')
+  const backToNew = listed(page)
+  await page.locator('[data-testid=offers-status-new]').click()
+  await backToNew
+  await painted(page)
+  const keyOff = await api('/api/admin/ai-settings/key?provider=anthropic', adminToken, null, 'DELETE')
+  check(keyOff.status === 200 && !aiKeyNames(), 'ключ ИИ удалён')
+  let asked = ai.requests.length
+  for (let id = 1071; id <= 1082; id++)
+    addPost(id, Date.now() - (1083 - id) * 60_000)
+  const keylessToast = await collect(page, 'Новых товаров: 11')
+  const unreadNew = JSON.parse(psql(`SELECT json_agg(read_at) FROM public.supplier_offers WHERE channel_id = '${openId}' AND message_id BETWEEN 1071 AND 1082;`))
+  check(unreadNew.length === 11 && unreadNew.every(a => a === null) && ai.requests.length === asked && !keylessToast.includes('ИИ'), `без ключа — собрано, не прочитано, к модели не ходили: «${keylessToast}»`)
+  check((await readLine(page)).includes('задайте ключ') && await page.locator('[data-testid=offers-reread]').count() === 0, 'без ключа — «задайте ключ», «Прочитать» нет')
+  const noKeyRead = await api('/api/admin/supplier-offers/read', adminToken, { before: new Date().toISOString() })
+  check(noKeyRead.status === 409 && /Модели ИИ/.test(noKeyRead.json?.message ?? '') && ai.requests.length === asked, `«Прочитать» без ключа — 409: «${noKeyRead.json?.message}»`)
+  check((await api('/api/admin/ai-settings/key', adminToken, { provider: 'anthropic', key: AI_KEY })).status === 200, 'ключ ИИ задан снова')
+  await reload(page)
+  const own = ownUnread()
+  const summary = JSON.parse(psql(`SELECT public.supplier_offers_read_summary();`))
+  check(own.unread === 13 && own.failed === 2, `у своих каналов — не прочитано 13 (11 без ключа, отказ, не JSON), не прочлось 2: ${own.unread}, ${own.failed}`)
+  check(sp(await page.locator('[data-testid=offers-unread]').textContent()) === `Не прочитано: ${summary.unread}, из них не прочлось — ${summary.failed}.`, `строка — как в сводке базы: «${sp(await page.locator('[data-testid=offers-unread]').textContent())}»`)
+
+  ai.mode = 'limit'
+  asked = ai.requests.length
+  const limited = await reread(page, 'не прочлось')
+  const limitedArticles = new Set(ai.requests.slice(asked).map(r => r.article))
+  check(limited.text === 'не прочлось 2 — причина на карточке, осталось 8 — нажмите «Прочитать»' && limited.calls === 1 && limitedArticles.size === 2, `лимит провайдера — дальше не читает: «${limited.text}», запросов страницы ${limited.calls}, к модели — ${ai.requests.length - asked} по ${limitedArticles.size} товарам`)
+  check(await page.locator('[data-testid=offer-read-error]', { hasText: 'Лимит запросов провайдера — прочитайте позже' }).count() === 2, 'причина — на двух карточках')
+  ai.mode = 'down'
+  asked = ai.requests.length
+  const down = await reread(page, 'не прочлось')
+  check(down.text === limited.text && new Set(ai.requests.slice(asked).map(r => r.article)).size === 2 && await page.locator('[data-testid=offer-read-error]', { hasText: 'Не удалось связаться с провайдером — прочитайте позже' }).count() === 2, `связь с провайдером оборвалась — тоже: «${down.text}»`)
+  ai.mode = 'ok'
+  asked = ai.requests.length
+  const done = await reread(page, 'ИИ прочёл')
+  const passed = ai.requests.slice(asked)
+  check(done.text === 'ИИ прочёл 12, не прочлось 1 — причина на карточке' && done.calls === 2, `«Прочитать» — порциями по 10, пока есть: «${done.text}», запросов страницы ${done.calls}`)
+  check(passed.filter(r => r.article === 'PO-1022').length === 1 && passed.length === 13, `непрочитываемый товар за проход — один раз, проход кончился: запросов к модели ${passed.length}`)
+  check(passed.every(r => r.images.length === 1 && r.images[0] === 'image/png как отдано'), 'фото — из бакета, те же байты')
+  check(ownUnread().unread === 1 && sp(await page.locator('[data-testid=offers-unread]').textContent()) === 'Не прочлось: 1 — причина на карточке.', `остался один, что не читается: «${sp(await page.locator('[data-testid=offers-unread]').textContent())}»`)
+  check((await cardOf(page, 'PO-1021')).prices[0] === '1 021 ₸' && (await cardOf(page, 'PO-1082')).prices[0] === '1 082 ₸', 'дочитанные — с ценой на карточке')
+
   console.log('\n== дашборд')
   await page.goto(`${BASE}/admin/purchasing`, { waitUntil: 'load', timeout: 120000 })
   await page.locator('[data-testid=purchasing-steps]').waitFor({ timeout: 30000 })
@@ -434,6 +690,13 @@ try {
   const fresh = Number(psql(`SELECT count(*) FROM public.supplier_offers WHERE status = 'new' AND posted_at > now() - interval '30 days';`))
   check(dash.state === 'action' && dash.facts?.includes(`не разобрано: ${fresh} `) && dash.href === '/admin/supplier-offers', `шаг 4 — «Нужно ваше действие»: «${dash.facts}», кнопка на страницу`)
   check(await page.locator('[data-testid=purchasing-pages] a[href="/admin/supplier-offers"]').count() === 1, 'кнопка «Товары поставщиков» среди страниц закупа')
+  const spent = JSON.parse(psql(`SELECT json_build_object('posts', count(*), 'in', coalesce(sum(read_input_tokens), 0), 'out', coalesce(sum(read_output_tokens), 0), 'models', coalesce(json_agg(DISTINCT read_model), '[]')) FROM public.supplier_offers WHERE read_items IS NOT NULL AND read_at >= now() - interval '30 days';`))
+  const aiStep = await stepAi(page)
+  check(aiStep.state === 'done' && aiStep.facts?.includes(`прочитано за 30 дней: ${spent.posts} `) && aiStep.next?.startsWith('ИИ читает артикул и цену'), `шаг «ИИ читает посты» — «Готово»: «${aiStep.facts}»`)
+  // Haiku 5.5: $0,10 за миллион токенов входа, $0,50 — выхода
+  const usd = (spent.in * 0.10 + spent.out * 0.50) / 1e6
+  const cost = spent.models.length === 1 && spent.models[0] === `anthropic/${VISION}` ? (usd < 0.01 ? 'меньше $0,01' : `≈ $${usd.toFixed(2).replace('.', ',')}`) : null
+  check(aiStep.spend?.startsWith(`за 30 дней — ${spent.posts} `) && (!cost || aiStep.spend.endsWith(cost)), `расход на чтение: «${aiStep.spend}»${cost ? `, ждали ${cost}` : ''}`)
 
   console.log('\n== телефон 390 px')
   const phone = await newPage({ width: 390, height: 844 })
@@ -442,13 +705,44 @@ try {
   check(box && box.width > 150 && box.width < 200, `карточки в два столбца: ${Math.round(box?.width ?? 0)} px`)
   const buttons = await cards(phone).first().locator('button').evaluateAll(bs => bs.map(b => b.scrollWidth <= b.clientWidth + 1))
   check(buttons.length === 2 && buttons.every(Boolean), 'надписи «Добавил» и «Не брать» помещаются в кнопки')
-  if (SHOTS)
+  const prices = await cards(phone).locator('[data-testid=offer-price]').evaluateAll(ps => ps.slice(0, 12).map(p => p.getClientRects().length === 1 && p.getBoundingClientRect().right <= p.closest('[data-testid=offer-card]').getBoundingClientRect().right + 0.5))
+  check(prices.length === 12 && prices.every(Boolean), `цена с ₸ — одной строкой и в карточке: ${prices.filter(Boolean).length} из ${prices.length}`)
+  check(await phone.locator('[data-testid=offers-reread]').evaluate(b => b.scrollWidth <= b.clientWidth + 1), '«Прочитать» помещается в кнопку')
+  if (SHOTS) {
     await phone.screenshot({ path: `${SHOTS}/offers-390.png` })
+    // Прочитанное в узкой карточке — второй кадр, ниже строки чтения
+    await cards(phone).nth(2).scrollIntoViewIfNeeded()
+    await phone.screenshot({ path: `${SHOTS}/offers-390-cards.png` })
+  }
   await phone.context().close()
 
   console.log('\n== секреты')
   const leaked = SECRETS.filter(s => bodies.some(b => b.includes(s)))
   check(!leaked.length, `ни один ответ маршрутов не несёт секретов${leaked.length ? ` — нашлось: ${leaked.join(', ')}` : ''}`)
+  check(offerBodies.length && !offerBodies.some(b => b.includes('last4')), `ответы «Товаров поставщиков» — без последних знаков ключа ИИ: ${offerBodies.length} ответов`)
+
+  console.log('\n== без миграции чтения')
+  renameRead(false)
+  readRenamed = true
+  await new Promise(r => setTimeout(r, 1500))
+  const unread = await api('/api/admin/supplier-offers', adminToken)
+  check(unread.status === 200 && unread.json?.installed === true && unread.json.reading === null && unread.json.offers?.length > 0 && unread.json.offers.every(o => o.items === null && o.readError === null), `список без миграции чтения — товары есть, прочитанного нет, не 500: ${unread.status}`)
+  const rereadOff = await api('/api/admin/supplier-offers/read', adminToken, { before: new Date().toISOString() })
+  check(rereadOff.status === 409 && /20261105120000/.test(rereadOff.json?.message ?? ''), `«Прочитать» без миграции — 409: «${rereadOff.json?.message}»`)
+  await page.goto(`${BASE}/admin/supplier-offers`, { waitUntil: 'networkidle', timeout: 120000 })
+  check(/после миграции базы 20261105120000_supplier_offers_read/.test(await readLine(page)) && await page.locator('[data-testid=offer-items]').count() === 0, 'страница без миграции чтения — про миграцию, карточки без прочитанного')
+  asked = ai.requests.length
+  addPost(1083, Date.now() - 2 * 60_000)
+  addPost(1084, Date.now() - 60_000)
+  const offToast = await collect(page, 'Новых товаров: 2')
+  check(!offToast.includes('ИИ') && ai.requests.length === asked, `сбор без миграции чтения — собрано, к модели не ходили: «${offToast}»`)
+  await page.goto(`${BASE}/admin/purchasing`, { waitUntil: 'load', timeout: 120000 })
+  await page.locator('[data-testid=purchasing-steps]').waitFor({ timeout: 30000 })
+  const aiOff = await stepAi(page)
+  check(aiOff.state === 'later' && aiOff.next === 'Ключ есть. Чтение при сборе «Товаров поставщиков» заработает после миграции базы.' && aiOff.spend === 'появится после миграции базы', `дашборд без миграции чтения — «${aiOff.next}», расход: «${aiOff.spend}»`)
+  renameRead(true)
+  readRenamed = false
+  await new Promise(r => setTimeout(r, 1500))
 
   console.log('\n== без миграции')
   psql(`ALTER TABLE public.supplier_offers RENAME TO supplier_offers_check_off;
@@ -473,10 +767,13 @@ NOTIFY pgrst, 'reload schema';`)
 finally {
   await browser.close()
   server.close()
+  aiServer.close()
   if (renamed) {
     psql(`ALTER TABLE public.supplier_offers_check_off RENAME TO supplier_offers;
 NOTIFY pgrst, 'reload schema';`)
   }
+  if (readRenamed)
+    renameRead(true)
   await cleanup()
   for (const id of users)
     await fetch(`${SUPA}/auth/v1/admin/users/${id}`, { method: 'DELETE', headers: serviceHeaders })

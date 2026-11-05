@@ -10,6 +10,7 @@
  * коде. Шаги — как договорено 3.11 (docs/HANDOFF.md, «С чего продолжать»).
  */
 import type { DemandTopic } from './marketDemand'
+import type { VisionModelSpend } from './supplierOfferList'
 import { DEMAND_REFRESH_COST, formatUsd, matchesDemandFilter, sortDemandTopics } from './marketDemand'
 import { plural } from './restockOrder'
 
@@ -118,6 +119,8 @@ export interface PurchasingStatus {
     providers: { id: string, label: string }[]
     /** Модель задачи «Чтение постов поставщиков» — `провайдер/модель` */
     model: string
+    /** Удачные чтения за 30 дней по моделям; null — миграции чтения (20261105120000) ещё нет */
+    reading: VisionModelSpend[] | null
   } | null
   restock: {
     /** Дошли до порога остатка — столько же, сколько на «К закупке» */
@@ -330,7 +333,12 @@ function aiStep(s: PurchasingStatus): PurchasingStep {
   ]
   if (!ai.providers.some(p => p.id === ai.model.slice(0, slash)))
     return { ...step, state: 'action', facts, next: 'У выбранной модели нет ключа — задайте ключ её провайдера или выберите другую модель на странице «Модели ИИ».' }
-  return { ...step, state: 'later', facts, next: 'Ключ есть. Дальше — подобрать модель на 20–30 постах ваших каналов и подключить чтение.' }
+  if (!ai.reading)
+    return { ...step, state: 'later', facts, next: 'Ключ есть. Чтение при сборе «Товаров поставщиков» заработает после миграции базы.' }
+  const read = ai.reading.reduce((n, m) => n + m.posts, 0)
+  if (read)
+    facts.push(`прочитано за 30 дней: ${count(read, 'товар', 'товара', 'товаров')}`)
+  return { ...step, state: 'done', facts, next: 'ИИ читает артикул и цену при «Собрать новые» на «Товарах поставщиков».' }
 }
 
 /*
