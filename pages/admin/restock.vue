@@ -793,7 +793,7 @@ async function assignSupplier(productId: string, supplierId: string) {
                 <li v-for="(line, i) in order.lines" :key="line.productId ?? `d${i}`" class="flex min-w-0 flex-wrap justify-between gap-x-2" data-testid="supplier-order-line">
                   <span class="min-w-0 flex-1 truncate">{{ line.name }}<template v-if="!line.productId"> (товар удалён)</template></span>
                   <span class="tabular-nums whitespace-nowrap">{{ line.received ? `${line.received} из ${line.quantity}` : line.quantity }} шт.</span>
-                  <span v-if="line.costPrice != null || salePriceOf(line, productsById) != null" class="basis-full tabular-nums"><template v-if="line.costPrice != null">× {{ money(line.costPrice) }} = {{ money(line.costPrice * line.quantity) }}</template><template v-if="salePriceOf(line, productsById) != null"> · продажа {{ money(salePriceOf(line, productsById)!) }}</template></span>
+                  <span v-if="line.costPrice != null || salePriceOf(line, productsById) != null" class="basis-full tabular-nums"><template v-if="line.costPrice != null">× {{ money(line.costPrice) }} = {{ money(line.costPrice * line.quantity) }}</template><template v-if="salePriceOf(line, productsById) != null">{{ line.costPrice != null ? ' · ' : '' }}продажа {{ money(salePriceOf(line, productsById)!) }}</template></span>
                 </li>
               </ul>
             </div>

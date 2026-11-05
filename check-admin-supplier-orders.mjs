@@ -124,7 +124,7 @@ SELECT json_build_object('sup', :'sup', 'pa', :'pa', 'pb', :'pb', 'pc', :'pc', '
   return JSON.parse(out.split('\n').pop())
 }
 
-// Фото товара A для таблицы: локально бакеты пустые — кладём своё, после — убираем
+// Фото товаров для таблицы: локально бакеты пустые — кладём своё, после — убираем
 const photoPaths = []
 async function putPhotos(productId) {
   const images = await rest(`product_images?select=image_url&product_id=eq.${productId}`)
@@ -282,17 +282,6 @@ try {
   console.log('\n== телефон 390 px')
   const mobile = await newPage({ width: 390, height: 844 })
   check(await mobile.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'страница с открытым заказом — без горизонтальной прокрутки')
-  if (process.env.DEBUG_WIDE)
-    console.log('WIDE', JSON.stringify(await mobile.evaluate(() => {
-      const out = []
-      for (const e of document.querySelectorAll('main *')) {
-        const cs = getComputedStyle(e)
-        const w = e.getBoundingClientRect().width
-        if (w > 400 && (cs.whiteSpace === 'nowrap' || cs.minWidth !== '0px' && cs.minWidth !== 'auto' || e.tagName === 'TABLE' || e.tagName === 'PRE' || cs.display.includes('grid')))
-          out.push(`${e.tagName}.${String(e.className).slice(0, 70)} ws=${cs.whiteSpace} min=${cs.minWidth} disp=${cs.display} w=${Math.round(w)}`)
-      }
-      return { main: Math.round(document.querySelector('main')?.getBoundingClientRect().width), out: out.slice(0, 10) }
-    })))
   const card = await block(mobile).boundingBox()
   const badge = await block(mobile).locator('[data-testid=open-orders-badge]').boundingBox()
   check(badge && badge.x + badge.width <= card.x + card.width, 'длинное имя поставщика не выталкивает бейджи за край карточки')
