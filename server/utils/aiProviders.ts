@@ -1,5 +1,12 @@
 import process from 'node:process'
-import Anthropic from '@anthropic-ai/sdk'
+
+/*
+ * SDK — только по требованию, не импортом сверху: модуль из server/utils
+ * Nitro кладёт в главный чанк и рендерер (его AI_TASKS берёт дашборд «Умный
+ * закуп»), и SDK (~0,1 с загрузки) ложился бы на каждый холодный старт
+ * витрины.
+ */
+const loadAnthropic = () => import('@anthropic-ai/sdk').then(m => m.default)
 
 /**
  * Провайдеры моделей ИИ для страницы «Модели ИИ» в админке.
@@ -66,6 +73,7 @@ export async function listModels(provider: AiProvider, key: string): Promise<AiM
   const stub = stubBase()
 
   if (provider === 'anthropic') {
+    const Anthropic = await loadAnthropic()
     const client = new Anthropic({ apiKey: key, baseURL: stub ?? undefined, maxRetries: 0 })
     const models: AiModel[] = []
     try {
