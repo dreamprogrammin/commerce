@@ -739,8 +739,8 @@ async function assignSupplier(productId: string, supplierId: string) {
                   </Button>
                 </div>
               </div>
-              <ul class="grid gap-x-6 gap-y-0.5 text-xs text-muted-foreground sm:grid-cols-2">
-                <li v-for="(line, i) in order.lines" :key="line.productId ?? `d${i}`" class="flex justify-between gap-2" data-testid="supplier-order-line">
+              <ul class="grid grid-cols-1 gap-x-6 gap-y-0.5 text-xs text-muted-foreground sm:grid-cols-2">
+                <li v-for="(line, i) in order.lines" :key="line.productId ?? `d${i}`" class="flex min-w-0 justify-between gap-2" data-testid="supplier-order-line">
                   <span class="truncate">{{ line.name }}<template v-if="!line.productId"> (товар удалён)</template></span>
                   <span class="tabular-nums whitespace-nowrap">{{ line.received ? `${line.received} из ${line.quantity}` : line.quantity }} шт.</span>
                 </li>
