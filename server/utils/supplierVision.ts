@@ -85,6 +85,9 @@ export async function readFailure(error: unknown): Promise<{ text: string, stop:
   // Тайм-аут — частный случай сбоя связи, тот — ответа с ошибкой
   if (error instanceof Anthropic.APIConnectionTimeoutError)
     return { text: 'Модель не ответила вовремя — прочитайте позже', stop: true }
+  // OpenAI и Google — срок модуля чтения (RESPONSE_TIMEOUT_MS)
+  if (error instanceof Error && error.name === 'TimeoutError')
+    return { text: 'Модель не ответила вовремя — прочитайте позже', stop: true }
   if (error instanceof Anthropic.APIConnectionError)
     return { text: 'Не удалось связаться с провайдером — прочитайте позже', stop: true }
   if (error instanceof Anthropic.APIError)

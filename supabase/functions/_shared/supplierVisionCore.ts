@@ -172,6 +172,13 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
 export const MAX_OUTPUT_TOKENS = 16000
 
 /**
+ * Ответа OpenAI и Google ждём не дольше (5.11.2026): без предела зависший
+ * провайдер держал бы запрос сбора, пока Vercel не снимет функцию. Claude —
+ * тайм-аутом своего SDK. VISION_TIMEOUT_MS — короче, для проверки.
+ */
+export const RESPONSE_TIMEOUT_MS = 45_000
+
+/**
  * Уровень рассуждений — явно низкий (2.11.2026). Прочесть артикул и цену —
  * не задача на долгие раздумья, а без явного уровня Claude 5.5 и GPT думают
  * на medium, Sonnet 5.5 — на high, Gemini — на своём по умолчанию: дольше и
@@ -236,7 +243,7 @@ export async function readSupplierPost(post: SupplierPost, spec: string, env: En
   const started = Date.now()
   const out = config.kind === 'anthropic'
     ? await callAnthropic(createAnthropic({ apiKey, baseURL }), post, model)
-    : await callOpenAICompatible(post, model, apiKey, baseURL!, config.maxTokensParam ?? 'max_tokens')
+    : await callOpenAICompatible(post, model, apiKey, baseURL!, config.maxTokensParam ?? 'max_tokens', Number(env('VISION_TIMEOUT_MS')) || RESPONSE_TIMEOUT_MS)
   return { model: spec, ...out, items: parseItems(out.raw), ms: Date.now() - started }
 }
 
@@ -341,7 +348,7 @@ async function callAnthropic(client: AnthropicClient, post: SupplierPost, model:
   return { raw: block.text, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens }
 }
 
-async function callOpenAICompatible(post: SupplierPost, model: string, apiKey: string, baseURL: string, maxTokensParam: 'max_tokens' | 'max_completion_tokens') {
+async function callOpenAICompatible(post: SupplierPost, model: string, apiKey: string, baseURL: string, maxTokensParam: 'max_tokens' | 'max_completion_tokens', timeoutMs: number) {
   const user = {
     role: 'user',
     content: [
@@ -354,8 +361,12 @@ async function callOpenAICompatible(post: SupplierPost, model: string, apiKey: s
   // моделей без рассуждений, вроде gpt-4.1
   let strict = true
   let effort = true
+  // Один срок на весь разговор с провайдером, с повторами после 400 и чтением ответа;
+  // истёк — TimeoutError
+  const signal = AbortSignal.timeout(timeoutMs)
   const request = () => fetch(`${baseURL.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
+    signal,
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
