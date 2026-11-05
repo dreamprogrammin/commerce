@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { RateLimits, SupplierPost } from '../../supabase/functions/_shared/supplierVisionCore'
 import type { VisionReader } from './supplierVision'
 import type { ChannelPost, ReadOptions } from './telegramAccount'
+import type { DemandTopic } from '~/utils/marketDemand'
+import type { OfferDemandTopic } from '~/utils/offerDemand'
 import type { Offer, OfferChannel, OfferReading, OfferStatus } from '~/utils/supplierOfferList'
 import type { PreviewPost } from '~/utils/telegramPreview'
 import { Buffer } from 'node:buffer'
@@ -96,7 +98,7 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
     .gte('posted_at', since)
     .order('posted_at', { ascending: false })
     .limit(LIST_LIMIT)
-  const [channels, withRead, summary, secrets, readSummary, model, aiKeys] = await Promise.all([
+  const [channels, withRead, summary, secrets, readSummary, model, aiKeys, demand] = await Promise.all([
     db.from('supplier_channels').select('id, title, invite_hash, collected_at, suppliers(name)').order('created_at'),
     listOffers(`${OFFER_COLUMNS}, ${READ_COLUMNS}`),
     db.rpc('supplier_offers_summary'),
@@ -104,6 +106,7 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
     db.rpc('supplier_offers_read_summary'),
     visionModel(db),
     db.rpc('ai_keys_status'),
+    db.rpc('market_demand_summary'),
   ])
   // Миграции чтения ИИ ещё нет — товары без прочитанного, как до 5.11
   const readInstalled = !supplierOffersNotInstalled(readSummary.error) && withRead.error?.code !== '42703'
@@ -123,8 +126,27 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
   const reading: OfferReading | null = readInstalled && read
     ? { model, key: keyed.has(model.slice(0, model.indexOf('/'))), unread: read.unread, failed: read.failed }
     : null
+  // Темы спроса — страница сверяет с ними товары (utils/offerDemand.ts); миграции спроса нет — null
+  if (demand.error && !demandNotInstalled(demand.error))
+    throw dbError(demand.error)
+  const topics: OfferDemandTopic[] | null = demand.error
+    ? null
+    : ((demand.data ?? []) as DemandTopic[]).map(t => ({
+        topic_id: t.topic_id,
+        name: t.name,
+        kind: t.kind,
+        keywords: t.keywords,
+        match_terms: t.match_terms,
+        is_active: t.is_active,
+        volume_avg3: t.volume_avg3,
+        trend_pct: t.trend_pct,
+        season_soon: t.season_soon,
+        our_total: t.our_total,
+        our_in_stock: t.our_in_stock,
+      }))
   return {
     installed: true as const,
+    topics,
     // Страж check-admin-supplier-offers.mjs не собирает, пока не увидит подделку Telegram и заглушки t.me и ИИ
     ...(process.env.TELEGRAM_FAKE === '1' ? { fake: true as const, web: telegramWebBase(), aiStub: aiStubBase() } : {}),
     reading,
