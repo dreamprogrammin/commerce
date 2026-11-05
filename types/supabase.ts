@@ -14,6 +14,30 @@ export interface Database {
   }
   public: {
     Tables: {
+      ai_usage_daily: {
+        Row: {
+          day: string
+          input_tokens: number
+          model: string
+          output_tokens: number
+          posts: number
+        }
+        Insert: {
+          day: string
+          input_tokens?: number
+          model: string
+          output_tokens?: number
+          posts?: number
+        }
+        Update: {
+          day?: string
+          input_tokens?: number
+          model?: string
+          output_tokens?: number
+          posts?: number
+        }
+        Relationships: []
+      }
       attribute_options: {
         Row: {
           attribute_id: number
@@ -181,6 +205,7 @@ export interface Database {
           expires_at: string | null
           id: string
           metadata: Json | null
+          offline_customer_id: string | null
           order_id: string | null
           pending_balance_after: number
           profile_id: string | null
@@ -197,6 +222,7 @@ export interface Database {
           expires_at?: string | null
           id?: string
           metadata?: Json | null
+          offline_customer_id?: string | null
           order_id?: string | null
           pending_balance_after?: number
           profile_id?: string | null
@@ -213,6 +239,7 @@ export interface Database {
           expires_at?: string | null
           id?: string
           metadata?: Json | null
+          offline_customer_id?: string | null
           order_id?: string | null
           pending_balance_after?: number
           profile_id?: string | null
@@ -221,6 +248,13 @@ export interface Database {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'bonus_transactions_offline_customer_id_fkey'
+            columns: ['offline_customer_id']
+            isOneToOne: false
+            referencedRelation: 'offline_customers'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'bonus_transactions_order_id_fkey'
             columns: ['order_id']
@@ -915,6 +949,277 @@ export interface Database {
         }
         Relationships: []
       }
+      market_demand_candidates: {
+        Row: {
+          first_seen: string
+          keyword: string
+          last_seen: string
+          search_volume: number
+          status: string
+          trend_pct: number | null
+        }
+        Insert: {
+          first_seen?: string
+          keyword: string
+          last_seen?: string
+          search_volume: number
+          status?: string
+          trend_pct?: number | null
+        }
+        Update: {
+          first_seen?: string
+          keyword?: string
+          last_seen?: string
+          search_volume?: number
+          status?: string
+          trend_pct?: number | null
+        }
+        Relationships: []
+      }
+      market_demand_keywords: {
+        Row: {
+          competition_index: number | null
+          cpc: number | null
+          keyword: string
+          search_volume: number | null
+          updated_at: string
+        }
+        Insert: {
+          competition_index?: number | null
+          cpc?: number | null
+          keyword: string
+          search_volume?: number | null
+          updated_at?: string
+        }
+        Update: {
+          competition_index?: number | null
+          cpc?: number | null
+          keyword?: string
+          search_volume?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      market_demand_monthly: {
+        Row: {
+          keyword: string
+          month: string
+          search_volume: number
+        }
+        Insert: {
+          keyword: string
+          month: string
+          search_volume: number
+        }
+        Update: {
+          keyword?: string
+          month?: string
+          search_volume?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'market_demand_monthly_keyword_fkey'
+            columns: ['keyword']
+            isOneToOne: false
+            referencedRelation: 'market_demand_keywords'
+            referencedColumns: ['keyword']
+          },
+        ]
+      }
+      market_demand_runs: {
+        Row: {
+          attempts: number
+          cost: number | null
+          error: string | null
+          finished_at: string | null
+          id: number
+          items: number | null
+          keywords_sent: number
+          kind: string
+          request_id: number | null
+          requested_at: string
+          requested_by: string | null
+          scheduled: boolean
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          cost?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: never
+          items?: number | null
+          keywords_sent?: number
+          kind: string
+          request_id?: number | null
+          requested_at?: string
+          requested_by?: string | null
+          scheduled?: boolean
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          cost?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: never
+          items?: number | null
+          keywords_sent?: number
+          kind?: string
+          request_id?: number | null
+          requested_at?: string
+          requested_by?: string | null
+          scheduled?: boolean
+          status?: string
+        }
+        Relationships: []
+      }
+      market_demand_topics: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          keyword_cores: string[]
+          keywords: string[]
+          kind: string
+          match_terms: string[]
+          name: string
+          updated_at: string
+          yandex_phrase: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          keyword_cores?: string[]
+          keywords: string[]
+          kind?: string
+          match_terms?: string[]
+          name: string
+          updated_at?: string
+          yandex_phrase?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          keyword_cores?: string[]
+          keywords?: string[]
+          kind?: string
+          match_terms?: string[]
+          name?: string
+          updated_at?: string
+          yandex_phrase?: string | null
+        }
+        Relationships: []
+      }
+      market_demand_yandex_jobs: {
+        Row: {
+          attempts: number
+          error: string | null
+          finished_at: string | null
+          next_at: string
+          phrase: string
+          request_id: number | null
+          run_id: number
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          error?: string | null
+          finished_at?: string | null
+          next_at?: string
+          phrase: string
+          request_id?: number | null
+          run_id: number
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          error?: string | null
+          finished_at?: string | null
+          next_at?: string
+          phrase?: string
+          request_id?: number | null
+          run_id?: number
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'market_demand_yandex_jobs_run_id_fkey'
+            columns: ['run_id']
+            isOneToOne: false
+            referencedRelation: 'market_demand_yandex_runs'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      market_demand_yandex_monthly: {
+        Row: {
+          count: number
+          month: string
+          phrase: string
+          share: number | null
+        }
+        Insert: {
+          count: number
+          month: string
+          phrase: string
+          share?: number | null
+        }
+        Update: {
+          count?: number
+          month?: string
+          phrase?: string
+          share?: number | null
+        }
+        Relationships: []
+      }
+      market_demand_yandex_runs: {
+        Row: {
+          api_base: string
+          error: string | null
+          finished_at: string | null
+          id: number
+          paused_until: string | null
+          phrases: number
+          requested_at: string
+          requested_by: string | null
+          scheduled: boolean
+          status: string
+        }
+        Insert: {
+          api_base: string
+          error?: string | null
+          finished_at?: string | null
+          id?: never
+          paused_until?: string | null
+          phrases: number
+          requested_at?: string
+          requested_by?: string | null
+          scheduled?: boolean
+          status?: string
+        }
+        Update: {
+          api_base?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: never
+          paused_until?: string | null
+          phrases?: number
+          requested_at?: string
+          requested_by?: string | null
+          scheduled?: boolean
+          status?: string
+        }
+        Relationships: []
+      }
       material_questions: {
         Row: {
           answer_text: string | null
@@ -1016,6 +1321,76 @@ export interface Database {
           user_id?: string
         }
         Relationships: []
+      }
+      offline_customers: {
+        Row: {
+          active_bonus_balance: number
+          created_at: string
+          created_by: string | null
+          first_name: string
+          has_received_welcome_bonus: boolean
+          id: string
+          last_name: string | null
+          merged_at: string | null
+          merged_by: string | null
+          merged_into: string | null
+          pending_bonus_balance: number
+          phone: string
+          phone_digits: string
+        }
+        Insert: {
+          active_bonus_balance?: number
+          created_at?: string
+          created_by?: string | null
+          first_name: string
+          has_received_welcome_bonus?: boolean
+          id?: string
+          last_name?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
+          merged_into?: string | null
+          pending_bonus_balance?: number
+          phone: string
+          phone_digits: string
+        }
+        Update: {
+          active_bonus_balance?: number
+          created_at?: string
+          created_by?: string | null
+          first_name?: string
+          has_received_welcome_bonus?: boolean
+          id?: string
+          last_name?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
+          merged_into?: string | null
+          pending_bonus_balance?: number
+          phone?: string
+          phone_digits?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'offline_customers_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'offline_customers_merged_by_fkey'
+            columns: ['merged_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'offline_customers_merged_into_fkey'
+            columns: ['merged_into']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
       order_items: {
         Row: {
@@ -1180,13 +1555,14 @@ export interface Database {
           guest_name: string | null
           guest_phone: string | null
           id: string
+          offline_customer_id: string | null
           payment_method: string | null
           source: string | null
           status: string
           telegram_message_id: string | null
           total_amount: number
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           assigned_admin_name?: string | null
@@ -1211,13 +1587,14 @@ export interface Database {
           guest_name?: string | null
           guest_phone?: string | null
           id?: string
+          offline_customer_id?: string | null
           payment_method?: string | null
           source?: string | null
           status?: string
           telegram_message_id?: string | null
           total_amount: number
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           assigned_admin_name?: string | null
@@ -1242,15 +1619,23 @@ export interface Database {
           guest_name?: string | null
           guest_phone?: string | null
           id?: string
+          offline_customer_id?: string | null
           payment_method?: string | null
           source?: string | null
           status?: string
           telegram_message_id?: string | null
           total_amount?: number
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'orders_offline_customer_id_fkey'
+            columns: ['offline_customer_id']
+            isOneToOne: false
+            referencedRelation: 'offline_customers'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'orders_user_id_fkey'
             columns: ['user_id']
@@ -2213,6 +2598,24 @@ export interface Database {
         }
         Relationships: []
       }
+      service_meters: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           description: string | null
@@ -2333,6 +2736,297 @@ export interface Database {
           },
         ]
       }
+      stock_receipts: {
+        Row: {
+          id: string
+          order_id: string | null
+          product_id: string
+          quantity: number
+          received_at: string
+          received_by: string | null
+          stock_after: number
+          stock_before: number
+        }
+        Insert: {
+          id?: string
+          order_id?: string | null
+          product_id: string
+          quantity: number
+          received_at?: string
+          received_by?: string | null
+          stock_after: number
+          stock_before: number
+        }
+        Update: {
+          id?: string
+          order_id?: string | null
+          product_id?: string
+          quantity?: number
+          received_at?: string
+          received_by?: string | null
+          stock_after?: number
+          stock_before?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'stock_receipts_order_id_fkey'
+            columns: ['order_id']
+            isOneToOne: false
+            referencedRelation: 'supplier_orders'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'stock_receipts_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'stock_receipts_received_by_fkey'
+            columns: ['received_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      supplier_channels: {
+        Row: {
+          chat_type: string
+          checked_at: string
+          collected_at: string | null
+          collected_up_to: number | null
+          created_at: string
+          created_by: string | null
+          id: string
+          invite_hash: string | null
+          supplier_id: string
+          title: string
+          username: string | null
+          web_preview: boolean
+        }
+        Insert: {
+          chat_type: string
+          checked_at?: string
+          collected_at?: string | null
+          collected_up_to?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invite_hash?: string | null
+          supplier_id: string
+          title: string
+          username?: string | null
+          web_preview?: boolean
+        }
+        Update: {
+          chat_type?: string
+          checked_at?: string
+          collected_at?: string | null
+          collected_up_to?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invite_hash?: string | null
+          supplier_id?: string
+          title?: string
+          username?: string | null
+          web_preview?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'supplier_channels_supplier_id_fkey'
+            columns: ['supplier_id']
+            isOneToOne: false
+            referencedRelation: 'suppliers'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      supplier_offers: {
+        Row: {
+          caption: string
+          channel_id: string
+          created_at: string
+          id: string
+          message_id: number
+          photo_count: number
+          photo_path: string | null
+          photo_url: string | null
+          post_url: string
+          posted_at: string
+          read_at: string | null
+          read_error: string | null
+          read_input_tokens: number | null
+          read_items: Json | null
+          read_model: string | null
+          read_output_tokens: number | null
+          status: string
+          status_at: string | null
+          status_by: string | null
+        }
+        Insert: {
+          caption?: string
+          channel_id: string
+          created_at?: string
+          id?: string
+          message_id: number
+          photo_count?: number
+          photo_path?: string | null
+          photo_url?: string | null
+          post_url: string
+          posted_at: string
+          read_at?: string | null
+          read_error?: string | null
+          read_input_tokens?: number | null
+          read_items?: Json | null
+          read_model?: string | null
+          read_output_tokens?: number | null
+          status?: string
+          status_at?: string | null
+          status_by?: string | null
+        }
+        Update: {
+          caption?: string
+          channel_id?: string
+          created_at?: string
+          id?: string
+          message_id?: number
+          photo_count?: number
+          photo_path?: string | null
+          photo_url?: string | null
+          post_url?: string
+          posted_at?: string
+          read_at?: string | null
+          read_error?: string | null
+          read_input_tokens?: number | null
+          read_items?: Json | null
+          read_model?: string | null
+          read_output_tokens?: number | null
+          status?: string
+          status_at?: string | null
+          status_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'supplier_offers_channel_id_fkey'
+            columns: ['channel_id']
+            isOneToOne: false
+            referencedRelation: 'supplier_channels'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'supplier_offers_status_by_fkey'
+            columns: ['status_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      supplier_order_items: {
+        Row: {
+          cost_price: number | null
+          id: string
+          order_id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          received_quantity: number
+          sku: string | null
+        }
+        Insert: {
+          cost_price?: number | null
+          id?: string
+          order_id: string
+          product_id?: string | null
+          product_name: string
+          quantity: number
+          received_quantity?: number
+          sku?: string | null
+        }
+        Update: {
+          cost_price?: number | null
+          id?: string
+          order_id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          received_quantity?: number
+          sku?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'supplier_order_items_order_id_fkey'
+            columns: ['order_id']
+            isOneToOne: false
+            referencedRelation: 'supplier_orders'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'supplier_order_items_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      supplier_orders: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          number: number
+          shipped_at: string | null
+          status: string
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          number?: never
+          shipped_at?: string | null
+          status?: string
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          number?: never
+          shipped_at?: string | null
+          status?: string
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'supplier_orders_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'supplier_orders_supplier_id_fkey'
+            columns: ['supplier_id']
+            isOneToOne: false
+            referencedRelation: 'suppliers'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       suppliers: {
         Row: {
           address: string | null
@@ -2368,6 +3062,44 @@ export interface Database {
           updated_at?: string
         }
         Relationships: []
+      }
+      telegram_account: {
+        Row: {
+          display_name: string
+          id: boolean
+          logged_in_at: string
+          logged_in_by: string | null
+          phone_last4: string | null
+          user_id: number
+          username: string | null
+        }
+        Insert: {
+          display_name: string
+          id?: boolean
+          logged_in_at?: string
+          logged_in_by?: string | null
+          phone_last4?: string | null
+          user_id: number
+          username?: string | null
+        }
+        Update: {
+          display_name?: string
+          id?: boolean
+          logged_in_at?: string
+          logged_in_by?: string | null
+          phone_last4?: string | null
+          user_id?: number
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'telegram_account_logged_in_by_fkey'
+            columns: ['logged_in_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
       telegram_broadcasts: {
         Row: {
@@ -2525,9 +3257,64 @@ export interface Database {
       }
     }
     Functions: {
+      ai_usage_add: {
+        Args: { p_input: number, p_model: string, p_output: number, p_posts: number }
+        Returns: undefined
+      }
       activate_my_pending_bonuses: { Args: never, Returns: Json }
+      activate_offline_customer_bonuses: { Args: never, Returns: string }
       activate_pending_bonuses: { Args: never, Returns: string }
       activate_pending_order_bonuses: { Args: never, Returns: number }
+      admin_add_bonus: {
+        Args: {
+          p_admin_id: string
+          p_amount: number
+          p_order_id?: string
+          p_profile_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      admin_add_offline_customer_bonus: {
+        Args: {
+          p_admin_id: string
+          p_amount: number
+          p_customer_id: string
+          p_order_id?: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      admin_create_supplier_order: {
+        Args: {
+          p_admin_id: string
+          p_items: Json
+          p_note?: string
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
+      admin_merge_offline_customer: {
+        Args: {
+          p_admin_id: string
+          p_customer_id: string
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      admin_receive_supplier_order: {
+        Args: {
+          p_admin_id: string
+          p_close?: boolean
+          p_items: Json
+          p_order_id: string
+        }
+        Returns: Json
+      }
+      admin_set_supplier_order_status: {
+        Args: { p_admin_id: string, p_order_id: string, p_status: string }
+        Returns: Json
+      }
       can_assign_order: {
         Args: { p_order_id: string, p_table_name: string }
         Returns: boolean
@@ -2574,10 +3361,22 @@ export interface Database {
           }
           Returns: string
         }
+      create_offline_customer: {
+        Args: { p_first_name: string, p_last_name: string, p_phone: string }
+        Returns: {
+          active_bonus_balance: number
+          first_name: string
+          id: string
+          last_name: string
+          pending_bonus_balance: number
+          phone: string
+        }[]
+      }
       create_offline_sale: {
         Args: {
           p_bonuses_to_spend?: number
           p_cart_items: Json
+          p_offline_customer_id?: string
           p_payment_method?: string
           p_profile_id?: string
         }
@@ -3079,7 +3878,156 @@ export interface Database {
         Returns: Json
       }
       is_admin: { Args: never, Returns: boolean }
+      kz_phone_digits: { Args: { p_phone: string }, Returns: string }
       link_telegram_by_code: { Args: { p_code: string }, Returns: Json }
+      market_demand_api_base: { Args: never, Returns: string }
+      market_demand_candidates_list: {
+        Args: { p_limit?: number }
+        Returns: {
+          first_seen: string
+          keyword: string
+          last_seen: string
+          search_volume: number
+          series: number[]
+          trend_pct: number
+        }[]
+      }
+      market_demand_collect: { Args: never, Returns: number }
+      market_demand_core: { Args: { p_keyword: string }, Returns: string }
+      market_demand_covered: { Args: { p_core: string }, Returns: boolean }
+      market_demand_credentials_delete: { Args: never, Returns: undefined }
+      market_demand_credentials_get: {
+        Args: never
+        Returns: {
+          login: string
+          password: string
+        }[]
+      }
+      market_demand_credentials_set: {
+        Args: { p_admin: string, p_login: string, p_password: string }
+        Returns: undefined
+      }
+      market_demand_credentials_status: {
+        Args: never
+        Returns: {
+          login: string
+          password_last4: string
+          updated_at: string
+        }[]
+      }
+      market_demand_idea_seeds: { Args: never, Returns: string[] }
+      market_demand_ingest: {
+        Args: {
+          p_content: string
+          p_error?: string
+          p_http_status: number
+          p_run_id: number
+        }
+        Returns: string
+      }
+      market_demand_is_noise: { Args: { p_keyword: string }, Returns: boolean }
+      market_demand_normalize: {
+        Args: { p_list: string[], p_terms: boolean, p_what: string }
+        Returns: string[]
+      }
+      market_demand_request: {
+        Args: { p_admin?: string, p_scheduled?: boolean }
+        Returns: Json
+      }
+      market_demand_send_ideas: { Args: { p_run_id: number }, Returns: number }
+      market_demand_summary: {
+        Args: never
+        Returns: {
+          data_until: string
+          is_active: boolean
+          keywords: string[]
+          kind: string
+          match_terms: string[]
+          name: string
+          our_in_stock: number
+          our_total: number
+          peak_month: number
+          peak_ratio: number
+          season_soon: boolean
+          series: number[]
+          topic_id: string
+          trend_pct: number
+          updated_at: string
+          volume_avg3: number
+          volume_last: number
+          volume_prev3: number
+          y_data_until: string
+          y_peak_month: number
+          y_peak_ratio: number
+          y_phrase: string
+          y_season_soon: boolean
+          y_series: number[]
+          y_trend_pct: number
+          y_volume_avg3: number
+          y_volume_last: number
+          y_volume_prev3: number
+          yandex_phrase: string
+        }[]
+      }
+      market_demand_term_regex: { Args: { p_term: string }, Returns: string }
+      market_demand_yandex_api_base: { Args: never, Returns: string }
+      market_demand_yandex_finish: {
+        Args: { p_run_id: number }
+        Returns: string
+      }
+      market_demand_yandex_ingest: {
+        Args: {
+          p_content: string
+          p_error?: string
+          p_headers?: Json
+          p_http_status: number
+          p_phrase: string
+          p_run_id: number
+        }
+        Returns: string
+      }
+      market_demand_yandex_key_delete: { Args: never, Returns: undefined }
+      market_demand_yandex_key_set: {
+        Args: {
+          p_admin: string
+          p_api_key: string
+          p_folder_id: string
+          p_region_id: string
+          p_region_name: string
+        }
+        Returns: undefined
+      }
+      market_demand_yandex_key_status: {
+        Args: never
+        Returns: {
+          folder_id: string
+          key_last4: string
+          region_id: string
+          region_name: string
+          updated_at: string
+        }[]
+      }
+      market_demand_yandex_phrase: {
+        Args: { p_keywords: string[], p_override: string }
+        Returns: string
+      }
+      market_demand_yandex_progress: { Args: never, Returns: Json }
+      market_demand_yandex_request: {
+        Args: { p_admin?: string, p_scheduled?: boolean }
+        Returns: Json
+      }
+      market_demand_yandex_tick: { Args: never, Returns: Json }
+      pos_find_offline_customer: {
+        Args: { p_phone: string }
+        Returns: {
+          active_bonus_balance: number
+          first_name: string
+          id: string
+          last_name: string
+          pending_bonus_balance: number
+          phone: string
+        }[]
+      }
       process_confirmed_guest_checkout: {
         Args: { p_checkout_id: string }
         Returns: string
@@ -3139,6 +4087,7 @@ export interface Database {
           barcode: string
           blur_placeholder: string
           bonus_points_award: number
+          full_price: number
           id: string
           image_url: string
           name: string
@@ -3154,6 +4103,21 @@ export interface Database {
           p_token: string
         }
         Returns: string
+      }
+      supplier_offers_read_summary: { Args: never, Returns: Json }
+      supplier_offers_summary: { Args: never, Returns: Json }
+      telegram_secret_delete: { Args: { p_name: string }, Returns: undefined }
+      telegram_secret_get: { Args: { p_name: string }, Returns: string }
+      telegram_secret_set: {
+        Args: { p_admin: string, p_name: string, p_value: string }
+        Returns: undefined
+      }
+      telegram_secrets_status: {
+        Args: never
+        Returns: {
+          name: string
+          updated_at: string
+        }[]
       }
       toggle_stock_alert: { Args: { p_product_id: string }, Returns: Json }
       validate_promo_code: {

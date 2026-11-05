@@ -11,6 +11,7 @@ import { useAuth } from '@/composables/auth/useAuth'
 import { useCacheManager } from '@/composables/useCacheManager'
 import { useAdminQuestionsStore } from '@/stores/adminStore/adminQuestionsStore'
 import { useAdminReviewsStore } from '@/stores/adminStore/adminReviewsStore'
+import { PURCHASING_PAGES } from '@/utils/smartPurchasing'
 
 const { handleOut } = useAuth()
 const { clearAllQueryCache, hardReset } = useCacheManager()
@@ -30,13 +31,20 @@ onMounted(() => {
   adminReviewsStore.fetchUnpublishedCount()
 })
 
+// Умный закуп — одним пунктом (владелец 3.11.2026: «собери всё в одном месте»,
+// «лишнее с сайд-меню убрать»). Его страницы — кнопками на дашборде, и пункт
+// горит на них так же, как на самом дашборде
+const PURCHASING = '/admin/purchasing'
+const inPurchasing = computed(() => [PURCHASING, ...PURCHASING_PAGES.map(p => p.to)]
+  .some(to => route.path === to || route.path.startsWith(`${to}/`)))
+
 // Все ссылки навигации
 const navLinks = [
   { to: '/admin', label: 'Дашборд', exact: true },
   { to: '/admin/categories', label: 'Управление меню' },
   { to: '/admin/popular-categories', label: 'Популярные категории' },
   { to: '/admin/slides', label: 'Управление слайдами' },
-  { to: '/admin/users', label: 'Управление пользователями' },
+  { to: '/admin/users', label: 'Пользователи' },
   { to: '/admin/products', label: 'Управление товарами' },
   { to: '/admin/brands', label: 'Добавление бренда' },
   { to: '/admin/brand-seo', label: 'SEO: Бренд + Категория' },
@@ -45,9 +53,8 @@ const navLinks = [
   { to: '/admin/banners', label: 'Управление банерами' },
   { to: '/admin/questions', label: 'Вопросы', badge: () => adminQuestionsStore.unansweredCount },
   { to: '/admin/reviews', label: 'Отзывы', badge: () => adminReviewsStore.unpublishedCount },
-  { to: '/admin/suppliers', label: 'Поставщики' },
+  { to: PURCHASING, label: 'Умный закуп' },
   { to: '/admin/pickup-points', label: 'Пункты самовывоза' },
-  { to: '/admin/restock', label: 'К закупке' },
   { to: '/admin/pos', label: 'Оффлайн касса' },
   { to: '/admin/returns', label: 'Возвраты' },
   { to: '/admin/sales', label: 'Продажи' },
@@ -82,6 +89,7 @@ const navLinks = [
           :key="link.to"
           :to="link.to"
           class="flex items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          :class="{ 'bg-muted text-primary': link.to === PURCHASING && inPurchasing }"
           active-class="bg-muted text-primary"
         >
           <span>{{ link.label }}</span>
@@ -161,8 +169,9 @@ const navLinks = [
         </NuxtLink>
 
         <NuxtLink
-          to="/admin/restock"
+          :to="PURCHASING"
           class="flex flex-col items-center justify-center gap-0.5 flex-1 py-1 relative text-muted-foreground transition-colors"
+          :class="{ 'text-primary': inPurchasing }"
           active-class="text-primary"
         >
           <AlertTriangle class="w-5 h-5" />
@@ -207,6 +216,7 @@ const navLinks = [
             :key="link.to"
             :to="link.to"
             class="flex items-center justify-between rounded-lg px-3 py-2.5 text-muted-foreground transition-all hover:text-primary active:bg-muted"
+            :class="{ 'bg-muted text-primary': link.to === PURCHASING && inPurchasing }"
             active-class="bg-muted text-primary"
           >
             <span class="text-sm">{{ link.label }}</span>

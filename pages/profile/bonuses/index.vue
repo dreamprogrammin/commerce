@@ -84,6 +84,7 @@ const TRANSACTION_ICONS: Record<string, string> = {
   activation: 'lucide:circle-check',
   birthday: 'lucide:cake',
   expiration: 'lucide:timer',
+  manual: 'lucide:gift',
 }
 
 const TRANSACTION_NAMES: Record<string, string> = {
@@ -96,6 +97,7 @@ const TRANSACTION_NAMES: Record<string, string> = {
   activation: 'Активация бонусов',
   birthday: 'Бонусы ко дню рождения',
   expiration: 'Сгорело бонусов',
+  manual: 'Начисление от магазина',
 }
 
 /*

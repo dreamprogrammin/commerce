@@ -356,7 +356,9 @@ function formatDate(dateStr: string) {
               <thead class="bg-muted/50">
                 <tr>
                   <th class="p-3 w-10">
-                    <Checkbox :checked="allSelected" @update:checked="toggleSelectAll" />
+                    <!-- modelValue (reka-ui 2): до 1.11.2026 здесь и в строках стояли
+                         :checked / @update:checked из radix-vue и не работали -->
+                    <Checkbox :model-value="allSelected" @update:model-value="toggleSelectAll" />
                   </th>
                   <th class="p-3 w-16" />
                   <th class="p-3 text-left">
@@ -382,8 +384,8 @@ function formatDate(dateStr: string) {
                 >
                   <td class="p-3">
                     <Checkbox
-                      :checked="selectedProductIds.includes(product.id)"
-                      @update:checked="toggleProduct(product.id)"
+                      :model-value="selectedProductIds.includes(product.id)"
+                      @update:model-value="toggleProduct(product.id)"
                       @click.stop
                     />
                   </td>

@@ -4,14 +4,16 @@ import { formatPrice } from '@/utils/formatPrice'
 
 /*
  * Корзины (29 сентября 2026) — два разных источника, и это не случайно:
- *  • «Брошенные корзины» — наша база (`server_carts`): только вошедшие
- *    покупатели, зато с именем, телефоном и email — им можно написать;
+ *  • «Брошенные корзины» — наша база: вошедшие (`server_carts`) с именем,
+ *    телефоном и email — им можно написать; с 31.10.2026 и гости
+ *    (`guest_carts`) — без имени, только что лежит в корзине;
  *  • «Что добавляют в корзину» — Google Analytics: все посетители, но
  *    обезличенно. Имён GA не даёт и давать не должна.
  */
 definePageMeta({ layout: 'admin' })
 
 interface AbandonedCart {
+  guest: boolean
   name: string | null
   phone: string | null
   email: string | null
@@ -96,8 +98,8 @@ const maxFunnel = computed(() => Math.max(1, ...(analytics.value?.funnel ?? []).
       <CardHeader>
         <CardTitle>Брошенные корзины</CardTitle>
         <CardDescription>
-          Вошедшие покупатели, у которых в корзине остались товары. У гостей корзина хранится
-          только в их браузере — их здесь нет.
+          Покупатели, у которых в корзине остались товары. Гости — без имени и контактов: видно только,
+          что лежит в корзине. Гостевые старше 30 дней не показываются.
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
@@ -119,7 +121,12 @@ const maxFunnel = computed(() => Math.max(1, ...(analytics.value?.funnel ?? []).
           <div v-for="(cart, i) in carts" v-else :key="i" class="rounded-lg border p-4 space-y-2">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
               <div class="font-semibold">
-                {{ cart.name || 'Без имени' }}
+                <template v-if="cart.guest">
+                  Гость <span class="text-xs font-normal text-muted-foreground">без входа</span>
+                </template>
+                <template v-else>
+                  {{ cart.name || 'Без имени' }}
+                </template>
               </div>
               <div class="text-sm text-muted-foreground">
                 {{ ago(cart.updatedAt) }} · {{ formatPrice(cart.total) }}&nbsp;₸
@@ -128,7 +135,7 @@ const maxFunnel = computed(() => Math.max(1, ...(analytics.value?.funnel ?? []).
             <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
               <a v-if="cart.phone" :href="phoneHref(cart.phone)" class="text-primary hover:underline">{{ cart.phone }}</a>
               <a v-if="cart.email" :href="`mailto:${cart.email}`" class="text-primary hover:underline">{{ cart.email }}</a>
-              <span v-if="!cart.phone && !cart.email" class="text-muted-foreground">контактов нет</span>
+              <span v-if="!cart.guest && !cart.phone && !cart.email" class="text-muted-foreground">контактов нет</span>
             </div>
             <ul class="text-sm space-y-0.5">
               <li v-for="(item, j) in cart.items" :key="j">

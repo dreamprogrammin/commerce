@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import type { AttributeValuePayload, ProductInsert } from '@/types'
+import type { AttributeValuePayload, Database, ProductInsert } from '@/types'
+import type { OfferDraftSource } from '@/utils/supplierOfferList'
 import { toast } from 'vue-sonner'
 import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
+import { adminFetch } from '@/utils/adminFetch'
+import { productDraft } from '@/utils/supplierOfferList'
 
 definePageMeta({ layout: 'admin' })
 
@@ -11,6 +14,38 @@ const router = useRouter()
 
 // ✅ Добавляем SEO composable
 const { notifyProduct } = useSeoIndexing()
+
+/**
+ * «На сайт» из «Товаров поставщиков» (5 ноября 2026): ?offer=<id>&item=<номер
+ * товара в посте>. Форма получает, что прочитал ИИ, и фото поста; созданный
+ * товар отмечается у поставщика «Добавлен».
+ */
+const route = useRoute()
+const supabase = useSupabaseClient<Database>()
+const offerId = typeof route.query.offer === 'string' ? route.query.offer : null
+const offerItem = Number(route.query.item) || 0
+const offer = ref<OfferDraftSource | null>(null)
+const draft = computed(() => offer.value && { ...productDraft(offer.value, offerItem), photoUrl: offer.value.photoUrl })
+/** Такой артикул уже есть на сайте — товар, скорее всего, выложен */
+const existingBySku = ref<{ id: string, name: string } | null>(null)
+
+onMounted(async () => {
+  if (!offerId)
+    return
+  try {
+    offer.value = await adminFetch<OfferDraftSource>('/api/admin/supplier-offers/draft', { query: { id: offerId } })
+  }
+  catch (e: any) {
+    toast.error(e?.data?.message || 'Товар поставщика не загрузился')
+    return
+  }
+  // Своим запросом, не fetchProductBySku: тот на «не найдено» отвечает 406 и тянет весь товар
+  const sku = draft.value?.sku
+  if (sku) {
+    const { data } = await supabase.from('products').select('id, name').eq('sku', sku).limit(1)
+    existingBySku.value = data?.[0] ?? null
+  }
+})
 
 const initialSku = ref('')
 const isSearchingSku = ref(false)
@@ -84,6 +119,10 @@ async function handleCreate(payload: {
   )
 
   if (newProduct) {
+    if (offerId) {
+      await adminFetch('/api/admin/supplier-offers/status', { method: 'POST', body: { ids: [offerId], status: 'added' } })
+        .catch(() => toast.warning('Товар создан, но у поставщика не отмечен «Добавлен» — отметьте вручную'))
+    }
     const valuesToSave = payload.attributeValues.map(value => ({
       ...value,
       product_id: newProduct.id, // Используем ID из `newProduct`
@@ -167,7 +206,33 @@ async function handleCreate(payload: {
         </CardContent>
       </Card>
 
-      <ProductForm @create="handleCreate" />
+      <Card v-if="offer" class="mb-8" data-testid="draft-source">
+        <CardHeader>
+          <CardTitle>Из поста поставщика{{ offer.supplierName ? ` — ${offer.supplierName}` : '' }}</CardTitle>
+          <CardDescription>
+            <template v-if="draft?.name">
+              Подставлено, что прочитал ИИ: название, артикул, закупочная цена, поставщик и фото. Проверьте и задайте розничную цену, категорию и бренд.
+            </template>
+            <template v-else>
+              ИИ не прочитал товар в этом посте — подставлены только поставщик и фото.
+            </template>
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-3">
+          <p v-if="existingBySku" class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="draft-duplicate">
+            Артикул {{ draft?.sku }} уже есть на сайте: «{{ existingBySku.name }}».
+            <NuxtLink :to="`/admin/products/${existingBySku.id}`" class="font-medium underline">
+              Открыть товар
+            </NuxtLink>
+          </p>
+          <p class="line-clamp-4 whitespace-pre-line break-words text-sm text-muted-foreground" data-testid="draft-caption">
+            {{ offer.caption || 'Без подписи' }}
+          </p>
+          <a :href="offer.postUrl" target="_blank" rel="noopener" class="text-sm text-primary hover:underline">Пост в Telegram</a>
+        </CardContent>
+      </Card>
+
+      <ProductForm :draft="draft" @create="handleCreate" />
     </div>
   </div>
 </template>
