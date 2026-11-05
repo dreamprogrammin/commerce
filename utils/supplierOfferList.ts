@@ -1,3 +1,5 @@
+import type { OrderSheetLine } from './orderSheet'
+
 /**
  * «Товары поставщиков» (4 ноября 2026) — что видит страница
  * /admin/supplier-offers и как группирует. Владелец 4.11: «ссылки можно
@@ -158,4 +160,59 @@ export function groupOffers(offers: Offer[], channels: OfferChannel[], by: Offer
     groups.set(key, group)
   }
   return [...groups.values()]
+}
+
+/** Товар поставщика для «На сайт» — ответ /api/admin/supplier-offers/draft */
+export interface OfferDraftSource {
+  id: string
+  caption: string
+  postUrl: string
+  photoUrl: string | null
+  supplierId: string | null
+  supplierName: string | null
+  items: OfferItem[] | null
+}
+
+/** Что форма нового товара берёт из поста; чего нет — остаётся пустым */
+export interface ProductDraft {
+  name: string
+  sku: string | null
+  /** Цена поставщика — закупочная, не розничная: розничную ставит владелец */
+  costPrice: number | null
+  supplierId: string | null
+}
+
+/**
+ * Черновик товара сайта из товара поставщика (5 ноября 2026): товар поста
+ * под номером `item` — его название, артикул и цена; товара не прочитано —
+ * только поставщик, остальное владелец впишет сам.
+ */
+export function productDraft(source: OfferDraftSource, item = 0): ProductDraft {
+  const it = source.items?.[item] ?? null
+  return {
+    name: it?.name ?? '',
+    sku: it?.article ?? null,
+    costPrice: it?.price != null && it.price > 0 ? Math.round(it.price) : null,
+    supplierId: source.supplierId,
+  }
+}
+
+/**
+ * Строка заказа поставщику из товара поста (5 ноября 2026): `item` — номер
+ * товара, прочитанного ИИ; null — пост не прочитан, строка — первой строкой
+ * подписи. Количество — 1, владелец поправит.
+ */
+export function offerOrderLine(offer: Pick<Offer, 'id' | 'caption' | 'postUrl' | 'photoUrl' | 'items'>, item: number | null, supplier: string): OrderSheetLine & { key: string } {
+  const it = item == null ? null : offer.items?.[item] ?? null
+  const firstLine = offer.caption.split('\n').map(l => l.trim()).find(Boolean) ?? ''
+  return {
+    key: `${offer.id}:${item ?? '-'}`,
+    supplier,
+    name: it?.name || firstLine.slice(0, 120),
+    article: it?.article ?? null,
+    price: it?.price != null && it.price > 0 ? it.price : null,
+    quantity: 1,
+    photoUrl: offer.photoUrl,
+    link: offer.postUrl,
+  }
 }

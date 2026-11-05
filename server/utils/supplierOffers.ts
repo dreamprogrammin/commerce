@@ -154,6 +154,38 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
   }
 }
 
+/**
+ * Черновик товара сайта из товара поставщика — «На сайт» (5 ноября 2026).
+ * Владелец 5.11: «когда я выбираю товар, который хочу выложить, пусть
+ * вставляются, если есть откуда брать». Отсюда форма нового товара берёт
+ * название, артикул, цену поставщика, поставщика и фото.
+ */
+export async function supplierOfferDraft(db: SupabaseClient, id: string) {
+  const one = (columns: string) => db.from('supplier_offers')
+    .select(`${columns}, supplier_channels(supplier_id, suppliers(name))`)
+    .eq('id', id)
+    .maybeSingle()
+  let res = await one(`id, caption, post_url, photo_url, ${READ_COLUMNS}`)
+  // Без миграции чтения — черновик без прочитанного
+  if (res.error?.code === '42703')
+    res = await one('id, caption, post_url, photo_url')
+  if (res.error)
+    throw dbError(res.error)
+  if (!res.data)
+    throw createError({ statusCode: 404, message: 'Товар поставщика не найден — возможно, он старше 30 дней' })
+  const row = res.data as unknown as OfferRow & { supplier_channels: { supplier_id: string, suppliers: { name: string } | null } | null }
+  const items = await offerItemsReader()
+  return {
+    id: row.id,
+    caption: row.caption,
+    postUrl: row.post_url,
+    photoUrl: row.photo_url,
+    supplierId: row.supplier_channels?.supplier_id ?? null,
+    supplierName: row.supplier_channels?.suppliers?.name ?? null,
+    items: items(row.read_items),
+  }
+}
+
 /** «Добавил на сайт», «Не брать», «Вернуть» */
 export async function setSupplierOffersStatus(db: SupabaseClient, adminId: string, ids: string[], status: OfferStatus) {
   const marked = status !== 'new'

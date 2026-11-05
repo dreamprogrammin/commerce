@@ -15,6 +15,7 @@ import type {
   ProductWithImages,
 } from '@/types'
 import type { AgeUnit } from '@/utils/productAge'
+import type { ProductDraft } from '@/utils/supplierOfferList'
 import { debounce } from 'lodash-es'
 import { storeToRefs } from 'pinia'
 import { VueDraggableNext } from 'vue-draggable-next'
@@ -61,6 +62,8 @@ interface GalleryItem {
 // --- 1. PROPS & EMITS ---
 const props = defineProps<{
   initialData?: FullProduct | null
+  /** Новый товар из поста поставщика — что подставить в пустую форму */
+  draft?: (ProductDraft & { photoUrl: string | null }) | null
 }>()
 
 const emit = defineEmits<{
@@ -305,6 +308,40 @@ function setupFormData(product: FullProduct | null | undefined) {
 watch(
   () => props.initialData,
   newProduct => setupFormData(newProduct),
+  { immediate: true },
+)
+
+/**
+ * «На сайт» из «Товаров поставщиков» (5 ноября 2026): чего пост не дал —
+ * остаётся пустым. Цена поставщика — закупочная; розничную ставит владелец.
+ */
+watch(
+  () => props.draft,
+  async (draft) => {
+    if (!draft || props.initialData?.id)
+      return
+    if (draft.name)
+      formData.value.name = draft.name
+    if (draft.sku)
+      formData.value.sku = draft.sku
+    if (draft.costPrice)
+      formData.value.cost_price = draft.costPrice
+    if (draft.supplierId)
+      formData.value.supplier_id = draft.supplierId
+    if (!draft.photoUrl)
+      return
+    try {
+      const res = await fetch(draft.photoUrl)
+      if (!res.ok)
+        throw new Error(String(res.status))
+      const blob = await res.blob()
+      const ext = blob.type.split('/')[1] || 'jpg'
+      await processFiles([new File([blob], `supplier.${ext}`, { type: blob.type || 'image/jpeg' })])
+    }
+    catch {
+      toast.warning('Фото поставщика не загрузилось — добавьте его вручную')
+    }
+  },
   { immediate: true },
 )
 
