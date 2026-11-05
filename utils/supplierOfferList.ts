@@ -22,6 +22,28 @@ export interface OfferChannel {
   collectedAt: string | null
 }
 
+/**
+ * Товар поста, как его прочла модель ИИ (5 ноября 2026; читает
+ * server/utils/supplierVision.ts). Владелец 4.11: «актуальная цена в чате,
+ * если её нет — он читает из картинки, там также написан артикул».
+ */
+export interface OfferItem {
+  name: string
+  article: string | null
+  brand: string | null
+  /** Цена по правилу владельца: из подписи, нет в подписи — с фото */
+  price: number | null
+  priceFrom: 'text' | 'image' | null
+  /** Цена на фото, когда в подписи другая, — показать обе */
+  imagePrice: number | null
+  /** «опт», «от 3 шт», цена за упаковку — дословно, как у поставщика */
+  priceNote: string | null
+  age: string | null
+  /** high — прочитано чётко; иначе в doubt — что под сомнением */
+  confidence: 'high' | 'medium' | 'low'
+  doubt: string | null
+}
+
 export interface Offer {
   id: string
   channelId: string
@@ -33,6 +55,59 @@ export interface Offer {
   photoCount: number
   status: OfferStatus
   statusAt: string | null
+  /** Прочитано ИИ; null — ещё не читали или не прочёлся */
+  items: OfferItem[] | null
+  /** Почему не прочёлся */
+  readError: string | null
+}
+
+/** Чтение ИИ на странице «Товары поставщиков» */
+export interface OfferReading {
+  /** `провайдер/модель` со страницы «Модели ИИ» */
+  model: string
+  /** Задан ли ключ провайдера этой модели */
+  key: boolean
+  /** Новые товары с фото, ещё не прочитанные */
+  unread: number
+  /** Из них не прочлись — причина на карточке */
+  failed: number
+}
+
+/** «anthropic/claude-haiku-5-5» → «Claude Haiku 5.5»; незнакомая модель — как есть, без провайдера */
+export function modelLabel(spec: string): string {
+  const model = spec.slice(spec.indexOf('/') + 1)
+  const m = /^claude-([a-z]+)-(\d+)(?:-(\d+))?$/.exec(model)
+  if (!m)
+    return model
+  const family = m[1]!
+  return `Claude ${family[0]!.toUpperCase()}${family.slice(1)} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
+}
+
+/** $ за миллион токенов — вход и выход; официальные цены Anthropic на 5.11.2026 */
+export const VISION_PRICES: Record<string, readonly [number, number]> = {
+  'anthropic/claude-haiku-5-5': [0.10, 0.50],
+  'anthropic/claude-sonnet-5-5': [2, 10],
+  'anthropic/claude-opus-5-5': [4, 20],
+}
+
+/** Удачные чтения модели за 30 дней — из supplier_offers_read_summary() */
+export interface VisionModelSpend {
+  model: string
+  posts: number
+  inputTokens: number
+  outputTokens: number
+}
+
+/** Во что обошлось чтение, $; null — цен какой-то из моделей здесь нет */
+export function visionCost(models: VisionModelSpend[]): number | null {
+  let cost = 0
+  for (const m of models) {
+    const price = VISION_PRICES[m.model]
+    if (!price)
+      return null
+    cost += (m.inputTokens * price[0] + m.outputTokens * price[1]) / 1e6
+  }
+  return cost
 }
 
 export type OfferGrouping = 'supplier' | 'day' | 'none'

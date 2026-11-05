@@ -45,11 +45,12 @@ export interface AiModel {
 }
 
 /*
- * Заглушка для проверки страницы без настоящих ключей: все три провайдера
- * идут на один локальный адрес. Только localhost — иначе переменная
- * окружения увела бы ключи на чужой сервер.
+ * Заглушка для проверки без настоящих ключей — «Моделей ИИ» и чтения постов
+ * при сборе «Товаров поставщиков»: все три провайдера идут на один локальный
+ * адрес. Только localhost — иначе переменная окружения увела бы ключи на
+ * чужой сервер.
  */
-function stubBase(): string | null {
+export function aiStubBase(): string | null {
   const url = process.env.AI_STUB_URL
   if (!url)
     return null
@@ -70,7 +71,7 @@ function rejected(status: number) {
  * ключа.
  */
 export async function listModels(provider: AiProvider, key: string): Promise<AiModel[]> {
-  const stub = stubBase()
+  const stub = aiStubBase()
 
   if (provider === 'anthropic') {
     const Anthropic = await loadAnthropic()
