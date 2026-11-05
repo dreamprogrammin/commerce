@@ -1,4 +1,4 @@
--- Проверка спроса на рынке (миграция 20261101120000_market_demand).
+-- Проверка спроса на рынке (миграция 20261101120000_market_demand; очередь похожих — 20261107120000).
 --
 -- Только на ЛОКАЛЬНОЙ базе, где миграция уже применена:
 --   psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -X -At \
@@ -161,7 +161,10 @@ UPDATE public.market_demand_topics SET is_active = false WHERE name = 'Тама�
 SELECT public.market_demand_request(:'admin_id') AS req \gset
 SELECT (:'req'::jsonb ->> 'volumes_run')::bigint AS vrun, (:'req'::jsonb ->> 'ideas_run')::bigint AS irun \gset
 SELECT r.request_id AS vreq FROM public.market_demand_runs r WHERE r.id = :vrun \gset
-SELECT r.request_id AS ireq FROM public.market_demand_runs r WHERE r.id = :irun \gset
+-- Похожие — в очереди до ответа объёмов (20261107120000); отправляем руками, как это сделает сбор
+SELECT pg_temp.ok((SELECT request_id IS NULL AND attempts = 0 FROM public.market_demand_runs WHERE id = :irun),
+                  'похожие — в очереди, в DataForSEO вместе с объёмами не ушли');
+SELECT public.market_demand_send_ideas(:irun) AS ireq \gset
 
 SELECT pg_temp.ok((SELECT count(*) FROM public.market_demand_runs WHERE id IN (:vrun, :irun) AND status = 'pending'
                      AND requested_by = :'admin_id' AND NOT scheduled) = 2,
