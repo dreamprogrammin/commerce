@@ -1,7 +1,8 @@
 /*
  * «Модели ИИ» в админке (31.10.2026) — только на ЛОКАЛЬНОЙ базе и с
- * заглушкой провайдеров (сервер запущен с AI_STUB_URL=http://localhost:8788,
- * заглушка — по образцу в docs/HANDOFF.md). Проверяет:
+ * заглушкой провайдеров: сервер запущен с AI_STUB_URL=http://localhost:8788,
+ * заглушку на этом порту страж поднимает сам (до 6.11.2026 её поднимали
+ * руками, и в репозитории её не было — страж не прогонялся). Проверяет:
  *  1) гость — 401, не-администратор — 403;
  *  2) отклонённый провайдером ключ, мусор и OpenRouter — 400, в Vault не попадают;
  *  3) через страницу: ключ проверяется и сохраняется, на странице и в ответах
@@ -12,6 +13,7 @@
  *
  *   node check-admin-ai.mjs --base=http://localhost:3141
  */
+import http from 'node:http'
 import process from 'node:process'
 import { createServerClient } from '@supabase/ssr'
 import { chromium } from 'playwright'
@@ -62,6 +64,40 @@ async function api(path, token, init = {}) {
   })() }
 }
 
+/*
+ * Заглушка трёх провайдеров — те же адреса, что у настоящих (server/utils/aiProviders.ts):
+ * Anthropic — /v1/models (SDK, ключ в x-api-key), OpenAI — /openai/v1/models,
+ * Gemini — /gemini/v1beta/models. Принимает только GOOD и GOOD_GEMINI; в отказе —
+ * кусок ключа, как у настоящих провайдеров: сервер не должен его пересказывать.
+ */
+const AI_PORT = 8788
+const stub = http.createServer((req, res) => {
+  const { pathname } = new URL(req.url, `http://127.0.0.1:${AI_PORT}`)
+  const send = (status, body) => {
+    res.writeHead(status, { 'content-type': 'application/json' })
+    res.end(JSON.stringify(body))
+  }
+  const claude = (id, label, image) => ({ type: 'model', id, display_name: label, created_at: '2026-01-01T00:00:00Z', capabilities: { image_input: { supported: image } } })
+  if (pathname === '/v1/models') {
+    const key = req.headers['x-api-key'] ?? ''
+    if (key !== GOOD)
+      return send(401, { type: 'error', error: { type: 'authentication_error', message: `invalid x-api-key ${key}` } })
+    const data = [claude('claude-sonnet-5-5', 'Claude Sonnet 5.5', true), claude('claude-haiku-5-5', 'Claude Haiku 5.5', true), claude('claude-textonly-test', 'Claude Text Only', false)]
+    return send(200, { data, has_more: false, first_id: data[0].id, last_id: data.at(-1).id })
+  }
+  if (pathname === '/openai/v1/models')
+    return send(401, { error: { message: `Incorrect API key provided: ${req.headers.authorization ?? ''}`, code: 'invalid_api_key' } })
+  if (pathname === '/gemini/v1beta/models') {
+    if (req.headers['x-goog-api-key'] !== GOOD_GEMINI)
+      return send(400, { error: { code: 400, message: 'API key not valid', status: 'INVALID_ARGUMENT' } })
+    return send(200, { models: [
+      { name: 'models/gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', supportedGenerationMethods: ['generateContent', 'countTokens'] },
+      { name: 'models/text-embedding-004', displayName: 'Text Embedding 004', supportedGenerationMethods: ['embedContent'] },
+    ] })
+  }
+  send(404, { error: 'нет такого адреса у заглушки' })
+})
+
 async function cleanup() {
   for (const p of ['anthropic', 'openai', 'gemini'])
     await rpc('ai_key_delete', { p_provider: p })
@@ -69,6 +105,7 @@ async function cleanup() {
 }
 
 console.log(`стенд ${BASE}`)
+await new Promise((resolve, reject) => stub.once('error', reject).listen(AI_PORT, '127.0.0.1', resolve))
 await cleanup()
 try {
   console.log('\n== доступ')
@@ -162,6 +199,7 @@ try {
 }
 finally {
   await cleanup()
+  stub.close()
 }
 
 console.log(fails.length ? `\nКРАСНЫЙ: ${fails.length} провал(ов)` : '\nвсё зелено')
