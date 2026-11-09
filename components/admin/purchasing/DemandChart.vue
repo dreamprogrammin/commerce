@@ -1,178 +1,158 @@
 <script setup lang="ts">
 import { useElementSize } from '@vueuse/core'
-import { formatVolume, monthLabel } from '@/utils/marketDemand'
-import { plural } from '@/utils/restockOrder'
+import { formatVolume, monthLabel, trendLabel } from '@/utils/marketDemand'
 
 /*
- * Спрос по всем темам помесячно — одна линия с заливкой (дашборд «Умный
- * закуп»). Месяц показывают наведение и стрелки с клавиатуры; те же числа —
+ * Спрос по всем темам помесячно — столбиками (дашборд «Умный закуп», макет
+ * Canvas-2.dc.html, 9.11.2026). Показывается последние 12 месяцев или весь
+ * ряд; горит последний месяц или тот, что под мышью / выбран стрелками, и над
+ * ним подсказка: месяц, поисков, к тому же месяцу год назад. Те же числа —
  * таблицей под графиком, так что подсказка ничего не прячет.
  */
 const props = defineProps<{
+  /** Весь ряд — от старого месяца к новому; к нему считается «за год» */
   series: number[]
   /** Месяц каждой точки, `YYYY-MM-01` */
   months: string[]
+  /** Сколько последних месяцев показать */
+  range: number
 }>()
 
 const SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
-const PAD = { top: 12, right: 10, bottom: 24, left: 48 }
-const PLOT_H = 150
+const PLOT_H = 200
 
-const box = ref<HTMLElement | null>(null)
-const { width } = useElementSize(box)
-const tipEl = ref<HTMLElement | null>(null)
-const { width: tipW } = useElementSize(tipEl, undefined, { box: 'border-box' })
-const height = PLOT_H + PAD.top + PAD.bottom
+const off = computed(() => Math.max(0, props.series.length - props.range))
+const shown = computed(() => props.series.slice(off.value))
+const n = computed(() => shown.value.length)
+const last = computed(() => n.value - 1)
 
 // Верх шкалы — круглое число: 1 / 2 / 3 / 4 / 5 / 6 / 8 / 10 × 10ⁿ
 const top = computed(() => {
-  const max = Math.max(...props.series, 1)
+  const max = Math.max(...shown.value, 1)
   const p = 10 ** Math.floor(Math.log10(max))
   return ([1, 2, 3, 4, 5, 6, 8, 10].find(k => k * p >= max) ?? 10) * p
 })
 const compact = new Intl.NumberFormat('ru-RU', { notation: 'compact', maximumFractionDigits: 1 })
-const ticks = computed(() => [0, top.value / 2, top.value].map(v => ({ v, y: y(v), label: compact.format(v) })))
+const ticks = computed(() => [top.value, top.value / 2, 0].map(v => ({ v, pct: (1 - v / top.value) * 100, label: v ? compact.format(v) : '0' })))
+const pct = (v: number) => Math.max(v, 0) / top.value * 100
 
-const plotW = computed(() => Math.max(width.value - PAD.left - PAD.right, 1))
-function x(i: number) {
-  const n = props.series.length
-  return PAD.left + (n > 1 ? i * plotW.value / (n - 1) : plotW.value / 2)
+const plot = ref<HTMLElement | null>(null)
+const { width } = useElementSize(plot)
+const barW = computed(() => width.value / Math.max(n.value, 1))
+function short(i: number) {
+  const [yy, mm] = props.months[off.value + i]!.split('-')
+  return n.value <= 12 ? SHORT[Number(mm) - 1]! : `${SHORT[Number(mm) - 1]} ${yy}`
 }
-function y(v: number) {
-  return PAD.top + PLOT_H - Math.max(v, 0) / top.value * PLOT_H
-}
-
-const line = computed(() => props.series.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(''))
-const area = computed(() => {
-  const n = props.series.length
-  return n ? `${line.value}L${x(n - 1).toFixed(1)},${y(0)}L${x(0).toFixed(1)},${y(0)}Z` : ''
+// Подписи — через сколько столбиков влезают: «окт» около 28px, «окт 2026» — около 60px; отсчёт от последнего
+const labelStep = computed(() => {
+  const need = n.value <= 12 ? 30 : 64
+  return [1, 2, 3, 4, 6, 12].find(k => k * barW.value >= need) ?? 12
 })
+const labelled = (i: number) => (last.value - i) % labelStep.value === 0
 
-// Подписи месяцев — каждый шестой от последнего, а если тесно (телефон) —
-// каждый двенадцатый: подпись «окт 2026» шириной около 45px
-const labelStep = computed(() => plotW.value / Math.max(props.series.length - 1, 1) * 6 >= 80 ? 6 : 12)
-const xLabels = computed(() => props.months.flatMap((m, i) => {
-  if ((props.months.length - 1 - i) % labelStep.value)
-    return []
-  const [yy, mm] = m.split('-')
-  return [{ i, label: `${SHORT[Number(mm) - 1]} ${yy}` }]
-}))
-
-const last = computed(() => props.series.length - 1)
-// Подпись последней точки — над линией, если она пришла снизу, и под ней, если сверху
-const endBelow = computed(() => last.value > 0 && props.series[last.value - 1]! > props.series[last.value]!)
-
-const active = ref<number | null>(null)
-function onMove(e: PointerEvent) {
-  const rect = (e.currentTarget as Element).getBoundingClientRect()
-  const n = props.series.length
-  const i = Math.round((e.clientX - rect.left) / (rect.width || 1) * (n - 1))
-  active.value = Math.min(Math.max(i, 0), n - 1)
+const hover = ref<number | null>(null)
+const active = computed(() => hover.value ?? last.value)
+watch(() => props.range, () => {
+  hover.value = null
+})
+function onEnter(e: PointerEvent, i: number) {
+  if (e.pointerType === 'mouse')
+    hover.value = i
 }
-// Палец уходит с экрана — подсказка остаётся до касания в другом месте
 function onLeave(e: PointerEvent) {
   if (e.pointerType === 'mouse')
-    active.value = null
-}
-function onFocus() {
-  active.value ??= last.value
+    hover.value = null
 }
 function onKey(e: KeyboardEvent) {
-  const n = props.series.length
-  const i = active.value ?? n - 1
-  const next = { ArrowLeft: i - 1, ArrowRight: i + 1, Home: 0, End: n - 1 }[e.key]
+  const i = active.value
+  const next = { ArrowLeft: i - 1, ArrowRight: i + 1, Home: 0, End: last.value }[e.key]
   if (next == null)
     return
   e.preventDefault()
-  active.value = Math.min(Math.max(next, 0), n - 1)
+  hover.value = Math.min(Math.max(next, 0), last.value)
 }
 
-const searches = (v: number) => `${formatVolume(v)} ${plural(v, 'поиск', 'поиска', 'поисков')}`
 const tip = computed(() => {
   const i = active.value
-  if (i == null)
+  const v = shown.value[i]
+  if (v == null)
     return null
-  // Подсказка не выходит за края графика — по её настоящей ширине
-  const half = tipW.value / 2
-  const left = Math.min(Math.max(x(i), half), width.value - half)
-  return { i, left, month: monthLabel(props.months[i]), value: searches(props.series[i]!) }
+  const prev = props.series[off.value + i - 12]
+  const yoy = prev ? Math.round((v / prev - 1) * 100) : null
+  // У краёв подсказка прижата к краю графика, а не выходит за него
+  const align = i >= n.value - 2 ? 'right-0' : i <= 1 ? 'left-0' : 'left-1/2 -translate-x-1/2'
+  return { i, month: monthLabel(props.months[off.value + i]), value: formatVolume(v), yoy: yoy == null ? null : `${trendLabel(yoy)} за год`, up: (yoy ?? 0) >= 0, align, bottom: pct(v) }
 })
 const summary = computed(() =>
-  `Спрос по месяцам: с ${monthLabel(props.months[0])} по ${monthLabel(props.months.at(-1))}, в последний месяц ${searches(props.series.at(-1) ?? 0)}`)
+  `Спрос по месяцам: с ${monthLabel(props.months[off.value])} по ${monthLabel(props.months.at(-1))}, в последний месяц ${formatVolume(props.series.at(-1))} поисков`)
 </script>
 
 <template>
   <div>
     <div
-      ref="box"
-      class="relative rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class="relative ml-[52px] mt-14 mb-[30px] rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
       tabindex="0"
+      role="group"
       :aria-label="`${summary}. Стрелки влево и вправо — по месяцам`"
       data-testid="demand-chart"
       @keydown="onKey"
-      @focus="onFocus"
-      @blur="active = null"
+      @blur="hover = null"
     >
-      <!-- Ширина 100%, а не числом: число держало бы ширину страницы, когда окно сужают -->
-      <svg v-if="width > 0" width="100%" :height="height" :viewBox="`0 0 ${width} ${height}`" class="block text-primary" role="img" :aria-label="summary">
-        <g class="text-muted-foreground">
-          <template v-for="t in ticks" :key="t.v">
-            <line :x1="PAD.left" :x2="width - PAD.right" :y1="t.y" :y2="t.y" class="stroke-border" stroke-width="1" />
-            <text :x="PAD.left - 8" :y="t.y" dy="0.32em" text-anchor="end" class="fill-current text-[11px] tabular-nums">{{ t.label }}</text>
-          </template>
-          <text
-            v-for="l in xLabels"
-            :key="l.i"
-            :x="x(l.i)"
-            :y="height - 6"
-            :text-anchor="l.i === last ? 'end' : l.i === 0 ? 'start' : 'middle'"
-            class="fill-current text-[11px]"
-          >{{ l.label }}</text>
-        </g>
+      <div ref="plot" class="relative" :style="{ height: `${PLOT_H}px` }">
+        <div
+          v-for="t in ticks"
+          :key="t.v"
+          class="absolute inset-x-0 border-t border-neutral-200"
+          :class="t.v ? 'border-dashed' : ''"
+          :style="{ top: `${t.pct}%` }"
+        >
+          <span class="absolute right-full -top-2 mr-2.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums">{{ t.label }}</span>
+        </div>
 
-        <path :d="area" fill="currentColor" fill-opacity="0.1" />
-        <path :d="line" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+        <div class="absolute inset-0 flex" @pointerleave="onLeave">
+          <div
+            v-for="(v, i) in shown"
+            :key="months[off + i]"
+            class="relative flex flex-1 cursor-pointer items-end justify-center"
+            :class="n > 12 ? 'px-[3px]' : 'px-1.5'"
+            data-testid="demand-chart-bar"
+            :data-active="i === active ? '' : undefined"
+            @pointerenter="onEnter($event, i)"
+            @pointerdown="hover = i"
+          >
+            <div
+              class="w-full max-w-9 rounded-lg transition-colors"
+              :class="i === active ? 'bg-primary shadow-[0_6px_16px_rgba(43,127,255,0.3)]' : 'bg-primary/15'"
+              :style="{ height: `${pct(v)}%` }"
+            />
+            <span
+              v-if="labelled(i)"
+              class="absolute top-full left-1/2 mt-2.5 -translate-x-1/2 whitespace-nowrap text-xs"
+              :class="i === active ? 'font-semibold text-foreground' : 'text-muted-foreground'"
+              data-testid="demand-chart-label"
+            >{{ short(i) }}</span>
+          </div>
+        </div>
 
-        <template v-if="tip">
-          <line :x1="x(tip.i)" :x2="x(tip.i)" :y1="PAD.top" :y2="PAD.top + PLOT_H" class="stroke-muted-foreground/50" stroke-width="1" />
-          <circle :cx="x(tip.i)" :cy="y(series[tip.i]!)" r="4" fill="currentColor" class="stroke-card" stroke-width="2" />
-        </template>
-        <template v-else>
-          <circle :cx="x(last)" :cy="y(series[last]!)" r="4" fill="currentColor" class="stroke-card" stroke-width="2" />
-          <text
-            :x="x(last) - 8"
-            :y="y(series[last]!) + (endBelow ? 16 : -10)"
-            text-anchor="end"
-            class="fill-foreground text-xs font-semibold"
-            data-testid="demand-chart-end"
-          >{{ formatVolume(series[last]) }}</text>
-        </template>
-
-        <rect
-          :x="PAD.left"
-          :y="PAD.top"
-          :width="plotW"
-          :height="PLOT_H"
-          fill="transparent"
-          @pointermove="onMove"
-          @pointerdown="onMove"
-          @pointerleave="onLeave"
-        />
-      </svg>
-
-      <div
-        v-if="tip"
-        ref="tipEl"
-        class="pointer-events-none absolute top-0 -translate-x-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-sm"
-        :style="{ left: `${tip.left}px` }"
-        aria-live="polite"
-        data-testid="demand-chart-tip"
-      >
-        <span class="text-muted-foreground">{{ tip.month }}</span> · <b class="font-semibold">{{ tip.value }}</b>
+        <div
+          v-if="tip"
+          class="pointer-events-none absolute z-[2] flex flex-col gap-0.5 whitespace-nowrap rounded-xl bg-foreground px-3 py-2 text-white shadow-lg"
+          :class="tip.align"
+          :style="{
+            bottom: `calc(${tip.bottom}% + 12px)`,
+            ...(tip.align.startsWith('left-1/2') ? { left: `${(tip.i + 0.5) / n * 100}%` } : {}),
+          }"
+          aria-live="polite"
+          data-testid="demand-chart-tip"
+        >
+          <span class="text-xs opacity-70" data-testid="demand-chart-tip-month">{{ tip.month }}</span>
+          <span class="text-sm font-bold tabular-nums" data-testid="demand-chart-tip-value">{{ tip.value }}</span>
+          <span v-if="tip.yoy" class="text-xs font-semibold" :class="tip.up ? 'text-green-300' : 'text-red-300'" data-testid="demand-chart-tip-yoy">{{ tip.yoy }}</span>
+        </div>
       </div>
     </div>
 
-    <details class="mt-2 text-sm">
+    <details class="text-sm">
       <summary class="cursor-pointer text-xs text-muted-foreground">
         По месяцам — таблицей
       </summary>
