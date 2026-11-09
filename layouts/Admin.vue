@@ -104,7 +104,7 @@ const navLinks = [
       </nav>
     </aside>
 
-    <div class="flex flex-1 flex-col pb-16 md:pb-0">
+    <div class="flex min-w-0 flex-1 flex-col pb-16 md:pb-0">
       <!-- Хедер -->
       <header
         class="sticky top-0 z-10 flex h-14 md:h-16 items-center gap-4 border-b bg-background px-4 md:px-6"
