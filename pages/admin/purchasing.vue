@@ -2,22 +2,21 @@
 import type { Component } from 'vue'
 import type { TrendKind } from '@/utils/marketDemand'
 import type { DemandLine, PurchasingStatus, StepState, SupplierLoad } from '@/utils/smartPurchasing'
-import type { BatteryState } from '@/utils/usageBatteries'
+import type { Battery, BatteryState } from '@/utils/usageBatteries'
 import {
-  AlertTriangle,
   ArrowRight,
   Bot,
-  CalendarClock,
-  Package,
+  Check,
+  Gauge,
+  Inbox,
   PackageSearch,
+  PackageX,
   RefreshCw,
   Search,
   Send,
   ShoppingCart,
-  TrendingDown,
-  TrendingUp,
+  Sparkles,
   Truck,
-  Wallet,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import DemandChart from '@/components/admin/purchasing/DemandChart.vue'
@@ -30,12 +29,15 @@ import { usageBatteries } from '@/utils/usageBatteries'
 definePageMeta({ layout: 'admin' })
 
 /*
- * «Умный закуп» — дашборд (3.11.2026). Владелец: «собери всё в одном месте»,
- * следом — «дашборд со всеми показателями уровня спроса и юзадж: сколько
- * осталось, сколько поставщиков загружено, — и лишнее с сайд-меню убрать».
- * Сверху цифры: спрос, поставщики, к закупке, остаток DataForSEO; ниже — спрос
- * по темам, поставщики, расход и шаги. Страницы закупа — кнопками, в боковом
- * меню их нет. Сводка — `/api/admin/purchasing`, расчёты — `utils/smartPurchasing.ts`.
+ * «Умный закуп» — дашборд (3.11.2026; вид — по макету Canvas-2.dc.html из
+ * Claude Design, 9.11.2026). Владелец: «собери всё в одном месте», следом —
+ * «дашборд со всеми показателями уровня спроса и юзадж: сколько осталось,
+ * сколько поставщиков загружено, — и лишнее с сайд-меню убрать».
+ * Сверху — четыре цифры; ниже спрос в Google столбиками и «Что сделать
+ * сейчас»; потом темы по вкладкам, поставщики и сервисы. Страниц закупа в
+ * боковом меню нет — они кнопками под заголовком (в макете их нет, но без
+ * них «Аккаунт Telegram» и «Модели ИИ» не открыть).
+ * Сводка — `/api/admin/purchasing`, расчёты — `utils/smartPurchasing.ts`.
  */
 const { data, pending, error, refresh }
   = useAsyncData('admin-purchasing', () => adminFetch<PurchasingStatus>('/api/admin/purchasing'), { server: false })
@@ -49,11 +51,25 @@ const PAGE_ICON: Record<(typeof PURCHASING_PAGES)[number]['to'], Component> = {
   '/admin/restock': ShoppingCart,
 }
 
+const CARD = 'rounded-[20px] bg-background shadow-sm'
 const count = (n: number, one: string, few: string, many: string) => `${n} ${plural(n, one, few, many)}`
 const dayMonth = (iso: string) => new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', timeZone: 'Asia/Almaty' })
 const NO_MIGRATION = 'после миграции базы'
 
+// Пилюли: зелёная — растёт или в норме, красная — падает или пусто, жёлтая — мало, серая — нет данных
+const CHIP = 'inline-flex items-center whitespace-nowrap rounded-full px-2 py-[3px] text-xs font-semibold'
+const TREND_CHIP: Record<TrendKind, string> = { up: 'bg-green-100 text-green-700', down: 'bg-red-600/10 text-red-700', flat: 'bg-neutral-100 text-muted-foreground' }
+const trendChip = (pct: number | null) => TREND_CHIP[trendKind(pct) ?? 'flat']
+
 const demand = computed(() => data.value?.demand ?? null)
+const overview = computed(() => demand.value?.overview ?? null)
+const hasNumbers = computed(() => !!overview.value?.withData)
+const months = computed(() => {
+  const o = overview.value
+  return o?.series && o.dataUntil ? seriesMonths(o.dataUntil, o.series.length) : []
+})
+const range = ref(12)
+
 /** Чтение ИИ за 30 дней: сколько товаров и во что обошлось */
 const aiSpend = computed(() => {
   const reading = data.value?.ai?.reading
@@ -65,16 +81,27 @@ const aiSpend = computed(() => {
     cost: cost == null ? 'цена модели неизвестна' : cost > 0 && cost < 0.01 ? 'меньше $0,01' : `≈ ${formatUsd(cost)}`,
   }
 })
-const overview = computed(() => demand.value?.overview ?? null)
-const hasNumbers = computed(() => !!overview.value?.withData)
-const months = computed(() => {
-  const o = overview.value
-  return o?.series && o.dataUntil ? seriesMonths(o.dataUntil, o.series.length) : []
+
+/** Ключ провайдера выбранной модели: есть / ключи есть, но не того провайдера / ключей нет */
+const aiKeyState = computed(() => {
+  const ai = data.value?.ai
+  if (!ai?.providers.length)
+    return 'none'
+  return ai.providers.some(p => p.id === ai.model.slice(0, ai.model.indexOf('/'))) ? 'ok' : 'other'
 })
-// --- «Батарейки» (6.11.2026): сколько осталось и когда сброс ---
+
+// --- Сервисы («батарейки», 6.11.2026): сколько осталось и когда сброс ---
 const batteries = computed(() => data.value?.meters ? usageBatteries(data.value.meters) : [])
-const BATTERY_BAR: Record<BatteryState, string> = { ok: 'bg-emerald-500', low: 'bg-amber-500', empty: 'bg-red-500', off: 'bg-muted-foreground/30' }
-const BATTERY_TEXT: Record<BatteryState, string> = { ok: 'text-foreground', low: 'text-amber-700', empty: 'text-destructive', off: 'text-muted-foreground' }
+const BATTERY_ICON: Record<Battery['id'], Component> = { ai_budget: Sparkles, ai_limits: Gauge, dataforseo: Search, telegram: Send }
+const BATTERY_TILE: Record<BatteryState, string> = { ok: 'bg-green-100 text-green-700', low: 'bg-amber-100 text-amber-700', empty: 'bg-red-600/10 text-red-700', off: 'bg-neutral-100 text-neutral-500' }
+const BATTERY_BAR: Record<BatteryState, string> = { ok: 'bg-primary', low: 'bg-amber-500', empty: 'bg-red-500', off: 'bg-muted-foreground/30' }
+function batteryStatus(b: Battery) {
+  if (b.id === 'telegram' && b.state === 'low')
+    return 'Не собрано'
+  if (b.id === 'telegram' && b.state === 'empty')
+    return 'Ждём Telegram'
+  return { ok: 'В норме', low: 'Мало', empty: 'Пусто', off: 'Нет данных' }[b.state]
+}
 const budgetOpen = ref(false)
 const budgetUsd = ref('')
 const budgetReset = ref('')
@@ -102,6 +129,15 @@ async function saveBudget(remove = false) {
 }
 
 const left = computed(() => demand.value?.balance != null ? refreshesLeft(demand.value.balance) : null)
+/** На сколько обновлений спроса хватит остатка DataForSEO — под его «батарейкой» */
+const balanceLine = computed(() => {
+  const n = left.value
+  if (n == null)
+    return null
+  if (!n)
+    return { text: 'не хватит ни на одно обновление — пополните баланс', warn: true }
+  return { text: `хватит на ${count(n, 'обновление', 'обновления', 'обновлений')}${n < 2 ? ' — пора пополнить' : ''}`, warn: n < 2 }
+})
 // «Последний месяц — октябрь 2026, обновлено 3 ноября»
 const demandAsOf = computed(() => {
   const until = dataUntilLabel(overview.value?.dataUntil ?? null)
@@ -111,45 +147,17 @@ const demandAsOf = computed(() => {
 })
 const nextAuto = computed(() => demand.value?.hasKey ? dayMonth(nextAutoRefresh(demand.value.lastDoneAt)) : null)
 
-// --- Плитки ---
+// --- Четыре цифры сверху ---
 interface Tile {
   id: string
   label: string
   icon: Component
+  /** Цвет плитки с иконкой */
+  tone: string
   value: string
   note: string
-  delta?: { text: string, kind: TrendKind } | null
-  warn?: string | null
+  delta?: { text: string, pct: number } | null
 }
-
-const TREND_CLASS: Record<TrendKind, string> = { up: 'text-green-700', down: 'text-red-700', flat: 'text-muted-foreground' }
-// «Ровно» — без значка: тире перед «−5%» читалось бы как второй минус
-const TREND_ICON: Partial<Record<TrendKind, Component>> = { up: TrendingUp, down: TrendingDown }
-function trendClass(pct: number | null) {
-  const kind = trendKind(pct)
-  return kind ? TREND_CLASS[kind] : 'text-muted-foreground'
-}
-
-const demandTiles = computed<Tile[]>(() => {
-  const o = overview.value
-  const none = o ? 'цифр ещё нет' : NO_MIGRATION
-  const topics = (n: number, rest: string) => hasNumbers.value ? `${plural(n, 'тема', 'темы', 'тем')} ${rest}` : none
-  const value = (n: number | undefined) => hasNumbers.value && n != null ? String(n) : '—'
-  const kind = trendKind(o?.trend ?? null)
-  return [
-    {
-      id: 'monthly',
-      label: 'Спрос в месяц',
-      icon: Search,
-      value: hasNumbers.value ? formatVolume(o!.monthly) : '—',
-      note: hasNumbers.value ? 'поисков в Google по всем темам' : none,
-      delta: kind && o?.trend != null ? { text: `${trendLabel(o.trend)} к прошлому году`, kind } : null,
-    },
-    { id: 'missing', label: 'Ищут, а у нас нет', icon: PackageSearch, value: value(o?.missing), note: topics(o?.missing ?? 0, 'без наших товаров') },
-    { id: 'growing', label: 'Растёт', icon: TrendingUp, value: value(o?.growing), note: topics(o?.growing ?? 0, '— спрос за год +15% и больше') },
-    { id: 'season', label: 'Скоро сезон', icon: CalendarClock, value: value(o?.season), note: topics(o?.season ?? 0, 'с пиком в ближайшие 2 месяца') },
-  ]
-})
 
 function restockNote(r: PurchasingStatus['restock']) {
   if (!r.atThreshold)
@@ -161,512 +169,572 @@ function restockNote(r: PurchasingStatus['restock']) {
   return r.noSupplier ? `${at}, ${r.noSupplier} без поставщика` : at
 }
 
-function balanceNote(): Pick<Tile, 'note' | 'warn'> {
-  const d = demand.value
-  if (!d)
-    return { note: NO_MIGRATION }
-  if (!d.hasKey)
-    return { note: 'ключ не задан' }
-  if (d.balanceError)
-    return { note: 'не удалось узнать' }
-  if (left.value == null)
-    return { note: 'DataForSEO не сообщил остаток' }
-  if (!left.value)
-    return { note: 'не хватит ни на одно обновление', warn: 'пополните баланс' }
-  return { note: `хватит на ${count(left.value, 'обновление', 'обновления', 'обновлений')}`, warn: left.value < 2 ? 'пора пополнить' : null }
+function offersTile(o: PurchasingStatus['offers']): Pick<Tile, 'value' | 'note'> {
+  if (!o)
+    return { value: '—', note: NO_MIGRATION }
+  if (!o.collectedAt)
+    return { value: '—', note: 'ещё не собирали' }
+  return { value: String(o.fresh), note: o.fresh ? `${plural(o.fresh, 'новый товар', 'новых товара', 'новых товаров')} поставщиков` : 'всё разобрано' }
 }
 
-const supplyTiles = computed<Tile[]>(() => {
+const tiles = computed<Tile[]>(() => {
   const s = data.value!
-  const ch = s.channels
+  const o = overview.value
+  const none = o ? 'цифр ещё нет' : NO_MIGRATION
   return [
     {
-      id: 'suppliers',
-      label: 'Поставщики',
-      icon: Truck,
-      value: String(s.suppliers),
-      note: !ch ? `каналы — ${NO_MIGRATION}` : ch.total ? `${count(ch.total, 'канал', 'канала', 'каналов')} в Telegram — у ${ch.suppliers} из ${s.suppliers}` : 'каналов в Telegram ещё нет',
+      id: 'monthly',
+      label: 'Спрос в месяц',
+      icon: Search,
+      tone: 'bg-primary/10 text-primary',
+      value: hasNumbers.value ? formatVolume(o!.monthly) : '—',
+      note: hasNumbers.value ? 'поисков в Google, в среднем за 3 месяца' : none,
+      delta: hasNumbers.value && o?.trend != null ? { text: trendLabel(o.trend)!, pct: o.trend } : null,
     },
     {
-      id: 'products',
-      label: 'Товаров от поставщиков',
-      icon: Package,
-      value: String(s.supplierLoad.reduce((sum, x) => sum + x.products, 0)),
-      note: s.unassigned.products ? `и ${s.unassigned.products} без поставщика` : 'у всех товаров есть поставщик',
+      id: 'missing',
+      label: 'Ищут, а у нас нет',
+      icon: PackageX,
+      tone: 'bg-red-600/10 text-red-700',
+      value: hasNumbers.value ? String(o!.missing) : '—',
+      note: hasNumbers.value ? `${plural(o!.missing, 'тема', 'темы', 'тем')} без наших товаров` : none,
     },
-    { id: 'restock', label: 'К закупке', icon: ShoppingCart, value: String(s.restock.atThreshold), note: restockNote(s.restock) },
-    { id: 'balance', label: 'Остаток DataForSEO', icon: Wallet, value: demand.value?.balance != null ? formatUsd(demand.value.balance) : '—', ...balanceNote() },
+    { id: 'restock', label: 'Нужно заказать', icon: ShoppingCart, tone: 'bg-amber-100 text-amber-700', value: String(s.restock.atThreshold), note: restockNote(s.restock) },
+    { id: 'offers', label: 'Не разобрано', icon: Inbox, tone: 'bg-green-100 text-green-700', ...offersTile(s.offers) },
   ]
 })
 
-// --- Спрос по темам ---
+// --- Что ищут: вкладки ---
+type ListId = 'missing' | 'growing' | 'season' | 'volume'
+const tab = ref<ListId>('missing')
 const lists = computed(() => {
   const o = overview.value
   if (!o)
     return []
   return [
-    { id: 'missing', title: 'Ищут, а у нас нет', count: o.missing, items: o.top.missing, empty: 'Таких тем нет — по всему, что ищут, товар у нас есть.' },
-    { id: 'growing', title: 'Растёт', count: o.growing, items: o.top.growing, empty: 'Растущих тем нет.' },
-    { id: 'season', title: 'Скоро сезон', count: o.season, items: o.top.season, empty: 'В ближайшие 2 месяца пиков нет.' },
-    { id: 'volume', title: 'Больше всего ищут', count: null, items: o.top.volume, empty: '' },
+    { id: 'missing', label: 'Нет у нас', count: o.missing, items: o.top.missing, empty: 'Таких тем нет — по всему, что ищут, товар у нас есть.' },
+    { id: 'growing', label: 'Растут', count: o.growing, items: o.top.growing, empty: 'Растущих тем нет.' },
+    { id: 'season', label: 'Скоро сезон', count: o.season, items: o.top.season, empty: 'В ближайшие 2 месяца пиков нет.' },
+    { id: 'volume', label: 'Больше всего ищут', count: null, items: o.top.volume, empty: '' },
   ] as const
 })
+const activeList = computed(() => lists.value.find(l => l.id === tab.value))
 
 function ours(t: DemandLine) {
-  if (!t.ourTotal)
-    return 'у нас нет'
-  return `у нас ${count(t.ourTotal, 'товар', 'товара', 'товаров')}, в наличии ${t.ourInStock}`
+  return t.ourTotal ? count(t.ourTotal, 'товар', 'товара', 'товаров') : null
 }
-function lineNote(listId: string, t: DemandLine) {
+function lineNote(listId: ListId, t: DemandLine) {
   const peak = listId === 'season' ? peakLabel(t.peakMonth) : null
-  return peak ? `${peak} · ${ours(t)}` : ours(t)
+  return [ours(t) ?? (peak ? 'нет у нас' : null), peak].filter(Boolean).join(' · ')
 }
+const SPARK: Record<TrendKind, string> = { up: 'text-green-600', down: 'text-red-600', flat: 'text-neutral-500' }
+const spark = (t: DemandLine) => sparkPoints(t.series?.slice(-12), 76, 24)
 
 // --- Поставщики ---
-function channelsText(s: SupplierLoad) {
-  if (s.channels == null)
-    return '—'
-  return s.channels ? String(s.channels) : 'нет'
+const maxProducts = computed(() => Math.max(1, ...(data.value?.supplierLoad ?? []).map(s => s.products), data.value?.unassigned.products ?? 0))
+function supplierMeta(s: SupplierLoad) {
+  const parts = [count(s.products, 'товар', 'товара', 'товаров')]
+  if (s.toRestock)
+    parts.push(`${s.toRestock} к заказу`)
+  if (s.channels) {
+    const closed = s.openChannels != null ? s.channels - s.openChannels : 0
+    parts.push(`${count(s.channels, 'канал', 'канала', 'каналов')}${closed ? `, ${closed} через аккаунт` : ''}`)
+  }
+  return parts.join(' · ')
 }
+const supplierSummary = computed(() => {
+  const s = data.value!
+  const ch = s.channels
+  const who = count(s.suppliers, 'поставщик', 'поставщика', 'поставщиков')
+  if (!ch)
+    return `${who} · каналы — ${NO_MIGRATION}`
+  return ch.total ? `${who} · ${count(ch.total, 'канал', 'канала', 'каналов')} в Telegram — у ${ch.suppliers} из ${s.suppliers}` : `${who} · каналов в Telegram ещё нет`
+})
 
 // --- Шаги ---
 const steps = computed(() => data.value ? purchasingSteps(data.value) : [])
+const doneCount = computed(() => steps.value.filter(s => s.state === 'done').length)
 
-// Номера шагов, которые ждут владельца, — «1, 2 и 5»
-const waiting = computed(() => steps.value.flatMap((s, i) => s.state === 'action' ? [i + 1] : []))
-const waitingText = computed(() => {
-  const n = waiting.value
-  return n.length > 1 ? `${n.slice(0, -1).join(', ')} и ${n.at(-1)}` : String(n[0] ?? '')
-})
-
-const STATE: Record<StepState, { label: string, badge: string, number: string }> = {
-  done: { label: 'Готово', badge: 'bg-green-100 text-green-900 hover:bg-green-100', number: 'bg-green-600 text-white' },
-  action: { label: 'Нужно ваше действие', badge: 'bg-amber-100 text-amber-900 hover:bg-amber-100', number: 'bg-amber-500 text-white' },
-  running: { label: 'Идёт', badge: 'bg-sky-100 text-sky-900 hover:bg-sky-100', number: 'bg-sky-600 text-white' },
-  later: { label: 'В разработке', badge: 'bg-muted text-muted-foreground hover:bg-muted', number: 'bg-muted text-muted-foreground' },
+const STATE: Record<StepState, { label: string, number: string, ring: string }> = {
+  done: { label: 'Готово', number: 'bg-green-100 text-green-700', ring: 'var(--primary)' },
+  action: { label: 'Нужно ваше действие', number: 'bg-amber-100 text-amber-700', ring: 'rgb(254 243 198)' },
+  running: { label: 'Идёт', number: 'bg-sky-100 text-sky-700', ring: 'rgb(186 230 253)' },
+  later: { label: 'В разработке', number: 'bg-neutral-200 text-neutral-500', ring: 'rgb(229 229 229)' },
 }
+// Кольцо шагов: по отрезку на шаг, готовые — синие
+const RING_R = 30
+const RING_L = 2 * Math.PI * RING_R
+const ringSegments = computed(() => {
+  const seg = RING_L / Math.max(steps.value.length, 1)
+  return steps.value.map((s, k) => ({ id: s.id, color: STATE[s.state].ring, dash: `${seg - 4} ${RING_L - seg + 4}`, offset: -k * seg }))
+})
 </script>
 
 <template>
-  <div class="container mx-auto max-w-6xl space-y-6 p-4 md:p-8">
-    <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-      <div class="min-w-0">
-        <h1 class="text-2xl font-bold tracking-tight md:text-3xl">
+  <div class="mx-auto max-w-[1400px] space-y-4 p-4">
+    <div class="flex flex-wrap items-center gap-3 px-1 pt-1.5">
+      <div class="flex min-w-0 flex-[1_1_280px] flex-col gap-1">
+        <h1 class="text-[26px] font-bold leading-tight tracking-[-0.02em]">
           Умный закуп
         </h1>
-        <p class="mt-1 text-sm text-muted-foreground">
-          Отбираем у поставщиков товары, которые ищут покупатели, и собираем из них заказ.
+        <p class="text-sm text-muted-foreground text-pretty">
+          Смотрим, что ищут покупатели, и заказываем это у поставщиков
         </p>
       </div>
-      <Button variant="outline" size="sm" :disabled="pending" @click="refresh()">
-        <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': pending }" />
+      <span v-if="demand?.lastDoneAt" class="text-[13px] text-muted-foreground" data-testid="purchasing-updated">
+        Обновлено {{ dayMonth(demand.lastDoneAt) }}
+      </span>
+      <Button :disabled="pending" @click="refresh()">
+        <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': pending }" />
         Обновить
       </Button>
     </div>
 
-    <nav class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" aria-label="Страницы умного закупа" data-testid="purchasing-pages">
-      <Button v-for="p in PURCHASING_PAGES" :key="p.to" variant="outline" class="justify-start" as-child>
-        <NuxtLink :to="p.to">
-          <component :is="PAGE_ICON[p.to]" class="mr-2 h-4 w-4 text-muted-foreground" />
-          {{ p.label }}
-        </NuxtLink>
-      </Button>
+    <nav class="flex flex-wrap gap-2 px-1" aria-label="Страницы умного закупа" data-testid="purchasing-pages">
+      <NuxtLink
+        v-for="p in PURCHASING_PAGES"
+        :key="p.to"
+        :to="p.to"
+        class="inline-flex items-center gap-2 rounded-full bg-background px-3 py-1.5 text-sm font-medium shadow-xs transition-colors hover:bg-primary/10 hover:text-primary"
+      >
+        <component :is="PAGE_ICON[p.to]" class="h-4 w-4 text-muted-foreground" />
+        {{ p.label }}
+      </NuxtLink>
     </nav>
 
     <ClientOnly>
       <p v-if="error" class="text-sm text-destructive">
         Не удалось загрузить: {{ error.data?.message || error.message }}
       </p>
-      <div v-else-if="pending && !data" class="space-y-6">
-        <div v-for="row in 2" :key="row" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Skeleton v-for="i in 4" :key="i" class="h-28 w-full" />
+      <div v-else-if="pending && !data" class="space-y-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Skeleton v-for="i in 4" :key="i" class="h-36 w-full rounded-[20px]" />
         </div>
-        <Skeleton class="h-80 w-full" />
+        <Skeleton class="h-96 w-full rounded-[20px]" />
       </div>
-      <div v-else-if="data" class="space-y-6 transition-opacity" :class="{ 'opacity-60': pending }">
-        <p class="text-sm" data-testid="purchasing-waiting">
-          <template v-if="waiting.length">
-            Сейчас от вас нужно: {{ waiting.length > 1 ? 'шаги' : 'шаг' }} <b class="font-semibold">{{ waitingText }}</b> —
-            <NuxtLink :to="{ hash: '#steps' }" class="underline underline-offset-2 hover:text-primary">
-              что сделать, внизу ↓
-            </NuxtLink>
-          </template>
-          <template v-else>
-            Сейчас от вас ничего не нужно.
-          </template>
-        </p>
-
-        <section v-for="row in [{ id: 'demand', title: 'Спрос в Google', tiles: demandTiles }, { id: 'supply', title: 'Поставщики и остаток', tiles: supplyTiles }]" :key="row.id" class="space-y-2">
-          <h2 class="text-sm font-medium text-muted-foreground">
-            {{ row.title }}
-          </h2>
-          <div class="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4" :data-testid="`tiles-${row.id}`">
-            <Card v-for="t in row.tiles" :key="t.id" class="gap-2 py-4 md:py-5" :data-testid="`tile-${t.id}`">
-              <CardHeader class="flex flex-row items-start justify-between gap-2 px-4 md:px-5">
-                <CardTitle class="text-sm font-medium leading-snug">
-                  {{ t.label }}
-                </CardTitle>
-                <component :is="t.icon" class="h-4 w-4 shrink-0 text-muted-foreground" />
-              </CardHeader>
-              <CardContent class="px-4 md:px-5">
-                <div class="text-2xl font-semibold" data-testid="tile-value">
-                  {{ t.value }}
-                </div>
-                <p v-if="t.delta" class="mt-1 flex items-center gap-1 text-xs" :class="TREND_CLASS[t.delta.kind]" data-testid="tile-delta">
-                  <component :is="TREND_ICON[t.delta.kind]" v-if="TREND_ICON[t.delta.kind]" class="h-3.5 w-3.5 shrink-0" />
-                  {{ t.delta.text }}
-                </p>
-                <p class="mt-1 text-xs text-muted-foreground" data-testid="tile-note">
-                  {{ t.note }}
-                </p>
-                <Badge v-if="t.warn" class="mt-2 bg-amber-100 font-normal text-amber-900 hover:bg-amber-100" data-testid="tile-warn">
-                  <AlertTriangle class="mr-1 h-3 w-3" />
-                  {{ t.warn }}
-                </Badge>
-              </CardContent>
-            </Card>
+      <div v-else-if="data" class="space-y-4 transition-opacity" :class="{ 'opacity-60': pending }">
+        <!-- Четыре цифры -->
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="tiles-kpi">
+          <div v-for="t in tiles" :key="t.id" class="flex flex-col gap-3.5 p-5" :class="CARD" :data-testid="`tile-${t.id}`">
+            <div class="flex items-center gap-2.5">
+              <span class="flex size-10 shrink-0 items-center justify-center rounded-xl" :class="t.tone">
+                <component :is="t.icon" class="size-5" />
+              </span>
+              <span class="text-sm font-medium text-muted-foreground">{{ t.label }}</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2.5">
+              <span class="text-[30px] font-bold leading-none tracking-[-0.02em] tabular-nums" data-testid="tile-value">{{ t.value }}</span>
+              <span v-if="t.delta" :class="[CHIP, trendChip(t.delta.pct)]" data-testid="tile-delta">{{ t.delta.text }}</span>
+            </div>
+            <span class="text-[13px] text-muted-foreground" data-testid="tile-note">{{ t.note }}</span>
           </div>
-        </section>
+        </div>
 
-        <!-- «Батарейки»: сколько осталось у платных сервисов и когда сброс -->
-        <section class="space-y-2" data-testid="batteries">
-          <h2 class="text-sm font-medium text-muted-foreground">
-            Здоровье сервисов
-          </h2>
-          <p v-if="data.meters && !data.meters.installed" class="text-xs text-muted-foreground" data-testid="batteries-no-migration">
-            Расход и лимиты ИИ появятся после миграции базы 20261106120000_usage_meters.
-          </p>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-4">
-            <Card v-for="b in batteries" :key="b.id" class="gap-2 py-4 md:py-5" :data-testid="`battery-${b.id}`" :data-state="b.state">
-              <CardHeader class="px-4 md:px-5">
-                <CardTitle class="text-sm font-medium leading-snug">
-                  {{ b.title }}
-                </CardTitle>
-              </CardHeader>
-              <CardContent class="space-y-2 px-4 md:px-5">
-                <div
-                  class="h-2.5 w-full overflow-hidden rounded-full bg-muted"
-                  role="meter"
-                  :aria-label="b.title"
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                  :aria-valuenow="b.level == null ? undefined : Math.round(b.level * 100)"
-                >
-                  <div class="h-full rounded-full transition-[width]" :class="BATTERY_BAR[b.state]" :style="{ width: `${b.level == null ? 0 : Math.max(b.level > 0 ? 3 : 0, Math.round(b.level * 100))}%` }" data-testid="battery-bar" />
+        <!--
+          Две колонки на широком экране: слева график и темы, справа шаги, поставщики
+          и сервисы — иначе график стоял бы над пустым полем рядом с высокими шагами.
+          Уже — одна колонка в порядке макета: обёртки `contents`, порядок — order-*.
+        -->
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-start">
+          <div class="contents xl:flex xl:min-w-0 xl:flex-[2_1_0%] xl:flex-col xl:gap-4">
+            <!-- Спрос в Google -->
+            <section class="order-1 flex min-w-0 flex-col gap-3 p-5 xl:order-none" :class="CARD" data-testid="demand-card">
+              <div class="flex flex-wrap items-start gap-3">
+                <div class="flex min-w-0 flex-[1_1_220px] flex-col gap-1">
+                  <h2 class="text-base font-semibold">
+                    Спрос в Google
+                  </h2>
+                  <span class="text-[13px] text-muted-foreground">
+                    Все темы вместе, поисков в месяц<template v-if="hasNumbers && demandAsOf">. {{ demandAsOf }}</template>
+                  </span>
                 </div>
-                <p class="text-base font-semibold tabular-nums" :class="BATTERY_TEXT[b.state]" data-testid="battery-value">
-                  {{ b.value }}
+                <div
+                  v-if="hasNumbers && (overview!.series?.length ?? 0) > 12"
+                  class="inline-flex rounded-lg bg-muted p-1"
+                  role="tablist"
+                  aria-label="Период графика"
+                  data-testid="demand-range"
+                >
+                  <button
+                    v-for="r in [{ v: 12, label: '12 месяцев' }, { v: overview!.series!.length, label: `${overview!.series!.length / 12 === 2 ? '2 года' : `${overview!.series!.length} мес.`}` }]"
+                    :key="r.v"
+                    type="button"
+                    role="tab"
+                    class="rounded-md px-3 py-1 text-sm font-medium transition-colors"
+                    :class="range === r.v ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                    :aria-selected="range === r.v"
+                    @click="range = r.v"
+                  >
+                    {{ r.label }}
+                  </button>
+                </div>
+              </div>
+
+              <p v-if="!demand" class="text-sm text-muted-foreground">
+                Спрос заработает после миграции базы.
+              </p>
+              <div v-else-if="!hasNumbers" class="space-y-2 text-sm" data-testid="demand-empty">
+                <p class="font-medium">
+                  Цифр спроса ещё нет — {{ count(overview!.topics, 'тема', 'темы', 'тем') }} ждут первого обновления.
                 </p>
-                <p v-if="b.reset" class="text-xs font-medium" data-testid="battery-reset">
-                  {{ b.reset }}
+                <p v-if="demand.running" class="text-muted-foreground">
+                  Обновление идёт — цифры появятся, когда DataForSEO ответит.
                 </p>
-                <p v-if="b.note" class="text-xs text-muted-foreground" data-testid="battery-note">
-                  {{ b.note }}
+                <p v-else-if="!demand.hasKey" class="text-muted-foreground">
+                  Задайте ключ DataForSEO на «Спросе на рынке» и нажмите «Обновить сейчас» — около {{ formatUsd(DEMAND_REFRESH_COST) }} с баланса DataForSEO.
                 </p>
-                <template v-if="b.id === 'ai_budget' && data.meters.installed">
-                  <form v-if="budgetOpen" class="space-y-2 border-t pt-2" data-testid="budget-form" @submit.prevent="saveBudget()">
-                    <label class="block text-xs">
-                      На счёте провайдера, $
-                      <Input v-model="budgetUsd" inputmode="decimal" class="mt-1 h-8" placeholder="5" data-testid="budget-usd" required />
-                    </label>
-                    <label class="block text-xs">
-                      День сброса (1–28), пусто — без сброса
-                      <Input v-model="budgetReset" inputmode="numeric" class="mt-1 h-8" placeholder="без сброса" data-testid="budget-reset" />
-                    </label>
-                    <p class="text-xs text-muted-foreground">
-                      Расход считаем с сегодняшнего дня.
-                    </p>
-                    <div class="flex flex-wrap gap-1.5">
-                      <Button type="submit" size="sm" :disabled="budgetSaving" data-testid="budget-save">
-                        Сохранить
-                      </Button>
-                      <Button v-if="data.meters.aiBudget" type="button" size="sm" variant="ghost" :disabled="budgetSaving" data-testid="budget-remove" @click="saveBudget(true)">
-                        Убрать
-                      </Button>
-                      <Button type="button" size="sm" variant="ghost" :disabled="budgetSaving" @click="budgetOpen = false">
-                        Отмена
+                <p v-else class="text-muted-foreground">
+                  Нажмите «Обновить сейчас» на «Спросе на рынке» — около {{ formatUsd(DEMAND_REFRESH_COST) }} с баланса DataForSEO.
+                </p>
+                <p v-if="demand.lastFailed" class="text-destructive">
+                  Последнее обновление не удалось — подробности на «Спросе на рынке».
+                </p>
+              </div>
+              <template v-else>
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <span class="text-[30px] font-bold tracking-[-0.02em] tabular-nums">{{ formatVolume(overview!.monthly) }}</span>
+                  <span v-if="overview!.trend != null" :class="[CHIP, trendChip(overview!.trend)]" data-testid="demand-trend">{{ trendLabel(overview!.trend) }} за год</span>
+                  <span class="text-[13px] text-muted-foreground">в среднем за 3 месяца</span>
+                </div>
+                <DemandChart :series="overview!.series!" :months="months" :range="range" />
+              </template>
+            </section>
+
+            <!-- Что ищут -->
+            <section v-if="hasNumbers" class="order-3 flex min-w-0 flex-col pt-5 pb-1.5 xl:order-none" :class="CARD" data-testid="demand-topics">
+              <div class="flex flex-col gap-3.5 px-5 pb-3.5">
+                <div class="flex flex-col gap-1">
+                  <h2 class="text-base font-semibold">
+                    Что ищут
+                  </h2>
+                  <span class="text-[13px] text-muted-foreground">Темы в Google, поисков в месяц</span>
+                </div>
+                <div class="flex flex-wrap gap-1 rounded-lg bg-muted p-1" role="tablist" aria-label="Темы">
+                  <button
+                    v-for="l in lists"
+                    :key="l.id"
+                    type="button"
+                    role="tab"
+                    class="flex-1 whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-colors"
+                    :class="tab === l.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                    :aria-selected="tab === l.id"
+                    :data-testid="`demand-tab-${l.id}`"
+                    @click="tab = l.id"
+                  >
+                    {{ l.label }}<template v-if="l.count != null">
+                      · {{ l.count }}
+                    </template>
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-[28px_minmax(0,1fr)_auto] gap-3 bg-neutral-50 px-5 py-2 text-xs text-muted-foreground sm:grid-cols-[28px_minmax(0,1fr)_80px_72px_72px]">
+                <span>№</span><span>Тема</span><span class="hidden sm:block">Динамика</span><span class="text-right">Поисков</span><span class="hidden text-right sm:block">За год</span>
+              </div>
+              <!-- Все четыре списка в разметке, на экране — выбранный -->
+              <div v-for="l in lists" v-show="tab === l.id" :key="l.id" role="tabpanel" :data-testid="`demand-list-${l.id}`">
+                <ul v-if="l.items.length">
+                  <li
+                    v-for="(t, i) in l.items"
+                    :key="t.id"
+                    class="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-t border-neutral-100 px-5 py-3 sm:grid-cols-[28px_minmax(0,1fr)_80px_72px_72px]"
+                    data-testid="demand-line"
+                  >
+                    <span class="flex size-7 items-center justify-center rounded-[10px] bg-neutral-100 text-[13px] font-semibold">{{ i + 1 }}</span>
+                    <div class="flex min-w-0 flex-col items-start gap-[3px]">
+                      <span class="text-sm font-semibold" data-testid="line-name">{{ t.name }}</span>
+                      <span
+                        v-if="!t.ourTotal && l.id !== 'season'"
+                        class="inline-flex rounded-full bg-red-600/10 px-[7px] py-px text-[11px] font-semibold text-red-700"
+                        data-testid="line-note"
+                      >нет у нас</span>
+                      <span v-else class="text-xs text-muted-foreground" data-testid="line-note">{{ lineNote(l.id, t) }}</span>
+                    </div>
+                    <svg v-if="t.series" width="80" height="28" viewBox="0 0 80 28" class="hidden sm:block" :class="SPARK[trendKind(t.trend) ?? 'flat']" aria-hidden="true">
+                      <polyline :points="spark(t)" transform="translate(2 2)" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="round" />
+                    </svg>
+                    <span v-else class="hidden sm:block" />
+                    <div class="flex flex-col items-end gap-1">
+                      <span class="text-right text-sm font-semibold tabular-nums" data-testid="line-volume">{{ formatVolume(t.volume) }}</span>
+                      <span v-if="t.trend != null" class="sm:hidden" :class="[CHIP, trendChip(t.trend)]">{{ trendLabel(t.trend) }}</span>
+                    </div>
+                    <!-- Прячет обёртка: у пилюли свой inline-flex, он перебил бы hidden -->
+                    <span class="hidden justify-self-end sm:block">
+                      <span :class="t.trend != null ? [CHIP, trendChip(t.trend)] : 'text-xs text-muted-foreground'" data-testid="line-trend">{{ trendLabel(t.trend) ?? '—' }}</span>
+                    </span>
+                  </li>
+                </ul>
+                <p v-else class="border-t border-neutral-100 px-5 py-3 text-sm text-muted-foreground">
+                  {{ l.empty }}
+                </p>
+              </div>
+              <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-neutral-100 px-5 pt-3 pb-2.5 text-sm font-medium">
+                <NuxtLink
+                  :to="tab === 'volume' ? '/admin/demand' : `/admin/demand?filter=${tab}`"
+                  class="text-primary hover:underline"
+                  data-testid="demand-list-all"
+                >
+                  {{ activeList?.count && activeList.count > activeList.items.length ? `Все ${activeList.count} →` : 'Все темы →' }}
+                </NuxtLink>
+                <span v-if="overview!.newQueries" class="text-[13px] font-normal text-muted-foreground" data-testid="demand-new-queries">
+                  Новых запросов на рынке, ещё не разобранных: <b class="font-semibold text-foreground">{{ overview!.newQueries }}</b> —
+                  <NuxtLink to="/admin/demand" class="text-primary hover:underline">разобрать</NuxtLink>
+                </span>
+              </div>
+            </section>
+          </div>
+          <div class="contents xl:flex xl:min-w-0 xl:flex-[1_1_0%] xl:flex-col xl:gap-4">
+            <!-- Что сделать сейчас -->
+            <section id="steps" class="order-2 flex min-w-0 scroll-mt-4 flex-col gap-3.5 p-5 xl:order-none" :class="CARD" data-testid="steps-card">
+              <div class="flex items-center gap-4">
+                <div class="relative size-[76px] shrink-0" aria-hidden="true">
+                  <svg width="76" height="76" viewBox="0 0 76 76" class="block -rotate-90">
+                    <circle
+                      v-for="s in ringSegments"
+                      :key="s.id"
+                      cx="38"
+                      cy="38"
+                      :r="RING_R"
+                      fill="none"
+                      :stroke="s.color"
+                      stroke-width="8"
+                      :stroke-dasharray="s.dash"
+                      :stroke-dashoffset="s.offset"
+                    />
+                  </svg>
+                  <span class="absolute inset-0 flex items-center justify-center text-base font-bold">{{ doneCount }}/{{ steps.length }}</span>
+                </div>
+                <div class="flex flex-col gap-1">
+                  <h2 class="text-base font-semibold">
+                    Что сделать сейчас
+                  </h2>
+                  <span class="text-[13px] text-muted-foreground" data-testid="purchasing-waiting">
+                    {{ doneCount === steps.length ? 'Все шаги готовы — от вас ничего не нужно' : `${doneCount} из ${steps.length} шагов готово` }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Порядок в разметке — по шагам; на экране готовые уходят вниз строчками -->
+              <ol class="flex flex-col gap-3.5" data-testid="purchasing-steps">
+                <li
+                  v-for="(step, i) in steps"
+                  :key="step.id"
+                  :data-testid="`step-${step.id}`"
+                  :data-state="step.state"
+                  :class="step.state === 'done' ? 'order-last flex items-start gap-2 px-1 text-[13px] text-muted-foreground' : 'flex gap-3 rounded-2xl bg-neutral-100 p-3.5'"
+                >
+                  <template v-if="step.state === 'done'">
+                    <span class="mt-px flex size-5 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700">
+                      <Check class="size-3" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                      <NuxtLink v-if="step.link" :to="step.link.to" class="font-medium text-foreground hover:text-primary" data-testid="step-link">
+                        {{ step.title }}
+                      </NuxtLink>
+                      <span v-else class="font-medium text-foreground">{{ step.title }}</span>
+                      <span class="sr-only" data-testid="step-state">{{ STATE[step.state].label }}</span>
+                      <p v-if="step.facts.length" class="text-xs" data-testid="step-facts">
+                        {{ step.facts.join(' · ') }}
+                      </p>
+                      <p v-if="step.next" class="text-xs" data-testid="step-next">
+                        {{ step.next }}
+                      </p>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <span class="flex size-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold" :class="STATE[step.state].number">
+                      {{ i + 1 }}
+                    </span>
+                    <div class="flex min-w-0 flex-1 flex-col items-start gap-1">
+                      <span class="text-sm font-semibold">{{ step.title }}</span>
+                      <span
+                        :class="step.state === 'action' ? 'sr-only' : [CHIP, STATE[step.state].number, 'px-1.5 py-px text-[11px]']"
+                        data-testid="step-state"
+                      >{{ STATE[step.state].label }}</span>
+                      <p v-if="step.next" class="text-[13px] text-muted-foreground text-pretty" data-testid="step-next">
+                        {{ step.next }}
+                      </p>
+                      <p v-if="step.facts.length" class="text-xs text-muted-foreground/80" data-testid="step-facts">
+                        {{ step.facts.join(' · ') }}
+                      </p>
+                      <Button v-if="step.link" size="sm" class="mt-1.5" as-child>
+                        <NuxtLink :to="step.link.to" data-testid="step-link">
+                          {{ step.link.label }}
+                          <ArrowRight class="h-3.5 w-3.5" />
+                        </NuxtLink>
                       </Button>
                     </div>
-                  </form>
-                  <Button v-else size="sm" variant="outline" data-testid="budget-edit" @click="openBudget">
-                    {{ data.meters.aiBudget ? 'Изменить' : 'Задать бюджет' }}
-                  </Button>
-                </template>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-
-        <!-- Спрос по темам -->
-        <Card data-testid="demand-card">
-          <CardHeader class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div class="space-y-1.5">
-              <CardTitle>Спрос по темам</CardTitle>
-              <CardDescription v-if="hasNumbers">
-                Поисков в Google в месяц — в среднем за 3 последних, рост — к тем же месяцам год назад. {{ demandAsOf }}.
-              </CardDescription>
-            </div>
-            <Button variant="outline" size="sm" class="shrink-0" as-child>
-              <NuxtLink to="/admin/demand">
-                Все темы
-                <ArrowRight class="ml-1 h-4 w-4" />
-              </NuxtLink>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <p v-if="!demand" class="text-sm text-muted-foreground">
-              Спрос заработает после миграции базы.
-            </p>
-            <div v-else-if="!hasNumbers" class="space-y-2 text-sm" data-testid="demand-empty">
-              <p class="font-medium">
-                Цифр спроса ещё нет — {{ count(overview!.topics, 'тема', 'темы', 'тем') }} ждут первого обновления.
-              </p>
-              <p v-if="demand.running" class="text-muted-foreground">
-                Обновление идёт — цифры появятся, когда DataForSEO ответит.
-              </p>
-              <p v-else-if="!demand.hasKey" class="text-muted-foreground">
-                Задайте ключ DataForSEO на «Спросе на рынке» и нажмите «Обновить сейчас» — около {{ formatUsd(DEMAND_REFRESH_COST) }} с баланса DataForSEO.
-              </p>
-              <p v-else class="text-muted-foreground">
-                Нажмите «Обновить сейчас» на «Спросе на рынке» — около {{ formatUsd(DEMAND_REFRESH_COST) }} с баланса DataForSEO.
-              </p>
-              <p v-if="demand.lastFailed" class="text-destructive">
-                Последнее обновление не удалось — подробности на «Спросе на рынке».
-              </p>
-            </div>
-            <div v-else class="space-y-8">
-              <section>
-                <h3 class="mb-2 text-sm font-semibold">
-                  Все темы вместе, поисков в месяц
-                </h3>
-                <DemandChart :series="overview!.series!" :months="months" />
-              </section>
-
-              <div class="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
-                <section v-for="list in lists" :key="list.id" :data-testid="`demand-list-${list.id}`">
-                  <div class="flex items-baseline justify-between gap-2 border-b pb-2">
-                    <h3 class="text-sm font-semibold">
-                      {{ list.title }}
-                      <span v-if="list.count != null" class="font-normal text-muted-foreground">· {{ list.count }}</span>
-                    </h3>
-                    <NuxtLink
-                      v-if="list.count && list.count > list.items.length"
-                      :to="`/admin/demand?filter=${list.id}`"
-                      class="whitespace-nowrap text-xs text-muted-foreground hover:text-primary"
-                      data-testid="demand-list-all"
-                    >
-                      все {{ list.count }} →
-                    </NuxtLink>
-                  </div>
-                  <ul v-if="list.items.length" class="divide-y">
-                    <li v-for="t in list.items" :key="t.id" class="flex items-center gap-3 py-2" data-testid="demand-line">
-                      <!-- С переносом, не truncate: строка без переноса распирает колонку админки на телефоне -->
-                      <div class="min-w-0 flex-1">
-                        <p class="text-sm font-medium leading-snug">
-                          {{ t.name }}
-                        </p>
-                        <p class="text-xs leading-snug text-muted-foreground">
-                          {{ lineNote(list.id, t) }}
-                        </p>
-                      </div>
-                      <svg v-if="t.series" width="64" height="20" viewBox="0 0 64 20" class="shrink-0 text-muted-foreground/70" aria-hidden="true">
-                        <polyline :points="sparkPoints(t.series, 64, 20)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
-                      </svg>
-                      <div class="w-16 shrink-0 text-right">
-                        <div class="text-sm font-semibold tabular-nums">
-                          {{ formatVolume(t.volume) }}
-                        </div>
-                        <div class="text-xs tabular-nums" :class="trendClass(t.trend)">
-                          {{ trendLabel(t.trend) ?? '—' }}
-                        </div>
-                      </div>
-                    </li>
-                  </ul>
-                  <p v-else class="py-2 text-sm text-muted-foreground">
-                    {{ list.empty }}
-                  </p>
-                </section>
-              </div>
-
-              <p v-if="overview!.newQueries" class="flex flex-wrap items-baseline gap-x-2 text-sm" data-testid="demand-new-queries">
-                <span>Новых запросов на рынке, ещё не разобранных: <b class="font-semibold">{{ overview!.newQueries }}</b></span>
-                <NuxtLink to="/admin/demand" class="text-muted-foreground underline underline-offset-2 hover:text-primary">
-                  разобрать на «Спросе на рынке» →
+                  </template>
+                </li>
+              </ol>
+            </section>
+            <!-- Поставщики -->
+            <section class="order-4 flex flex-col gap-4 p-5 xl:order-none" :class="CARD" data-testid="supplier-card">
+              <div class="flex items-center gap-2">
+                <div class="flex min-w-0 flex-1 flex-col gap-1">
+                  <h2 class="text-base font-semibold">
+                    Поставщики
+                  </h2>
+                  <span class="text-[13px] text-muted-foreground" data-testid="supplier-summary">{{ supplierSummary }}</span>
+                </div>
+                <NuxtLink to="/admin/suppliers" class="self-start text-[13px] font-medium text-primary hover:underline">
+                  Все →
                 </NuxtLink>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <!-- grid-cols-1, а не просто grid: колонка minmax(0, 1fr) не даёт таблице распирать страницу на телефоне -->
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <!-- Поставщики -->
-          <Card data-testid="supplier-card">
-            <CardHeader class="flex flex-row items-start justify-between gap-3 px-4 md:px-6">
-              <div class="space-y-1.5">
-                <CardTitle>Поставщики</CardTitle>
-                <CardDescription>Сколько их товаров на сайте, что пора заказать и где они выкладывают новинки.</CardDescription>
               </div>
-              <Button variant="outline" size="sm" class="shrink-0" as-child>
-                <NuxtLink to="/admin/suppliers">
-                  Все
-                  <ArrowRight class="ml-1 h-4 w-4" />
-                </NuxtLink>
-              </Button>
-            </CardHeader>
-            <CardContent class="px-4 md:px-6">
               <p v-if="!data.supplierLoad.length" class="text-sm text-muted-foreground">
                 Поставщиков ещё нет — добавьте на странице «Поставщики».
               </p>
-              <Table v-else data-testid="supplier-load">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead class="pl-0">
-                      Поставщик
-                    </TableHead>
-                    <TableHead class="text-right">
-                      Товаров
-                    </TableHead>
-                    <TableHead class="whitespace-normal text-right">
-                      К закупке
-                    </TableHead>
-                    <TableHead class="pr-0 text-right">
-                      Каналы
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow v-for="s in data.supplierLoad" :key="s.id" data-testid="supplier-row">
-                    <TableCell class="whitespace-normal pl-0 font-medium">
-                      {{ s.name }}
-                    </TableCell>
-                    <TableCell class="text-right tabular-nums">
-                      {{ s.products }}
-                    </TableCell>
-                    <TableCell class="text-right tabular-nums">
-                      {{ s.toRestock || '—' }}
-                    </TableCell>
-                    <TableCell class="pr-0 text-right tabular-nums">
-                      {{ channelsText(s) }}
-                      <div v-if="s.channels && s.openChannels != null && s.openChannels < s.channels" class="whitespace-normal text-xs text-muted-foreground">
-                        {{ s.channels - s.openChannels }} через аккаунт
+              <ul v-else class="flex flex-col gap-4" data-testid="supplier-load">
+                <li v-for="s in data.supplierLoad" :key="s.id" class="flex flex-col gap-2" data-testid="supplier-row">
+                  <div class="flex flex-wrap justify-between gap-x-2 text-sm">
+                    <span class="min-w-0 font-medium" data-testid="supplier-name">{{ s.name }}</span>
+                    <span class="text-[13px] text-muted-foreground" data-testid="supplier-meta">{{ supplierMeta(s) }}</span>
+                  </div>
+                  <div class="h-2 overflow-hidden rounded-full bg-primary/15">
+                    <div class="h-full rounded-full bg-primary" :style="{ width: `${s.products / maxProducts * 100}%` }" />
+                  </div>
+                </li>
+                <li v-if="data.unassigned.products" class="flex flex-col gap-2" data-testid="supplier-row-none">
+                  <div class="flex flex-wrap justify-between gap-x-2 text-sm">
+                    <span class="font-medium text-muted-foreground">Без поставщика</span>
+                    <span class="text-[13px] text-muted-foreground" data-testid="supplier-meta">
+                      {{ count(data.unassigned.products, 'товар', 'товара', 'товаров') }}<template v-if="data.unassigned.toRestock">
+                        · {{ data.unassigned.toRestock }} к заказу
+                      </template>
+                    </span>
+                  </div>
+                  <div class="h-2 overflow-hidden rounded-full bg-neutral-100">
+                    <div class="h-full rounded-full bg-neutral-400" :style="{ width: `${data.unassigned.products / maxProducts * 100}%` }" />
+                  </div>
+                </li>
+              </ul>
+            </section>
+
+            <!-- Сервисы -->
+            <section class="order-5 flex flex-col gap-4 p-5 xl:order-none" :class="CARD" data-testid="usage-card">
+              <h2 class="text-base font-semibold">
+                Сервисы
+              </h2>
+              <p v-if="data.meters && !data.meters.installed" class="text-xs text-muted-foreground" data-testid="batteries-no-migration">
+                Расход и лимиты ИИ появятся после миграции базы 20261106120000_usage_meters.
+              </p>
+              <div
+                v-for="b in batteries"
+                :key="b.id"
+                class="flex items-start gap-3"
+                :data-testid="`battery-${b.id}`"
+                :data-state="b.state"
+              >
+                <span class="flex size-9 shrink-0 items-center justify-center rounded-xl" :class="BATTERY_TILE[b.state]">
+                  <component :is="BATTERY_ICON[b.id]" class="size-[18px]" />
+                </span>
+                <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-sm font-medium">{{ b.title }}</span>
+                    <span :class="[CHIP, BATTERY_TILE[b.state]]" data-testid="battery-status">{{ batteryStatus(b) }}</span>
+                  </div>
+                  <span class="text-[13px] text-muted-foreground">
+                    <span class="font-medium text-foreground tabular-nums" data-testid="battery-value">{{ b.value }}</span><template v-if="b.reset">
+                      · <span data-testid="battery-reset">{{ b.reset }}</span>
+                    </template>
+                  </span>
+                  <div
+                    v-if="b.level != null"
+                    class="h-2 w-full overflow-hidden rounded-full bg-primary/15"
+                    role="meter"
+                    :aria-label="b.title"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    :aria-valuenow="Math.round(b.level * 100)"
+                  >
+                    <div class="h-full rounded-full transition-[width]" :class="BATTERY_BAR[b.state]" :style="{ width: `${Math.max(b.level > 0 ? 3 : 0, Math.round(b.level * 100))}%` }" data-testid="battery-bar" />
+                  </div>
+                  <p v-if="b.note" class="text-xs text-muted-foreground" data-testid="battery-note">
+                    {{ b.note }}
+                  </p>
+
+                  <!-- DataForSEO: на сколько обновлений хватит, последнее и следующее -->
+                  <div v-if="b.id === 'dataforseo' && demand" class="space-y-1 text-xs text-muted-foreground" data-testid="usage-dataforseo">
+                    <p v-if="balanceLine" :class="balanceLine.warn ? 'font-medium text-amber-700' : ''" data-testid="usage-balance">
+                      {{ balanceLine.text }}
+                    </p>
+                    <p>
+                      Обновление — около {{ formatUsd(DEMAND_REFRESH_COST) }}. Последнее:
+                      <span data-testid="usage-last">{{ demand.lastDoneAt ? `${dayMonth(demand.lastDoneAt)}${demand.lastCost != null ? ` · ${formatUsd(demand.lastCost)}` : ''}` : 'ещё не было' }}</span>.
+                      Само:
+                      <span data-testid="usage-next">{{ nextAuto ? `${nextAuto} — каждое 5-е число` : 'не будет, пока не задан ключ' }}</span>.
+                    </p>
+                    <p v-if="demand.running">
+                      Обновление идёт — DataForSEO ещё не ответил.
+                    </p>
+                    <p v-if="demand.lastFailed" class="text-destructive">
+                      Последнее обновление не удалось — подробности на «Спросе на рынке».
+                    </p>
+                    <Button v-if="!demand.hasKey" variant="outline" size="sm" class="mt-1" as-child>
+                      <NuxtLink to="/admin/demand">
+                        Задать ключ
+                        <ArrowRight class="h-3.5 w-3.5" />
+                      </NuxtLink>
+                    </Button>
+                  </div>
+
+                  <template v-if="b.id === 'ai_budget' && data.meters.installed">
+                    <form v-if="budgetOpen" class="space-y-2 border-t pt-2" data-testid="budget-form" @submit.prevent="saveBudget()">
+                      <label class="block text-xs">
+                        На счёте провайдера, $
+                        <Input v-model="budgetUsd" inputmode="decimal" class="mt-1 h-8" placeholder="5" data-testid="budget-usd" required />
+                      </label>
+                      <label class="block text-xs">
+                        День сброса (1–28), пусто — без сброса
+                        <Input v-model="budgetReset" inputmode="numeric" class="mt-1 h-8" placeholder="без сброса" data-testid="budget-reset" />
+                      </label>
+                      <p class="text-xs text-muted-foreground">
+                        Расход считаем с сегодняшнего дня.
+                      </p>
+                      <div class="flex flex-wrap gap-1.5">
+                        <Button type="submit" size="sm" :disabled="budgetSaving" data-testid="budget-save">
+                          Сохранить
+                        </Button>
+                        <Button v-if="data.meters.aiBudget" type="button" size="sm" variant="ghost" :disabled="budgetSaving" data-testid="budget-remove" @click="saveBudget(true)">
+                          Убрать
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" :disabled="budgetSaving" @click="budgetOpen = false">
+                          Отмена
+                        </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow v-if="data.unassigned.products" class="text-muted-foreground" data-testid="supplier-row-none">
-                    <TableCell class="whitespace-normal pl-0">
-                      Без поставщика
-                    </TableCell>
-                    <TableCell class="text-right tabular-nums">
-                      {{ data.unassigned.products }}
-                    </TableCell>
-                    <TableCell class="text-right tabular-nums">
-                      {{ data.unassigned.toRestock || '—' }}
-                    </TableCell>
-                    <TableCell class="pr-0 text-right">
-                      —
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                    </form>
+                    <Button v-else size="sm" variant="outline" class="self-start" data-testid="budget-edit" @click="openBudget">
+                      {{ data.meters.aiBudget ? 'Изменить' : 'Задать бюджет' }}
+                    </Button>
+                  </template>
+                </div>
+              </div>
 
-          <!-- Расход и остаток -->
-          <Card data-testid="usage-card">
-            <CardHeader>
-              <CardTitle>Расход и остаток</CardTitle>
-              <CardDescription>Платные сервисы умного закупа.</CardDescription>
-            </CardHeader>
-            <CardContent class="space-y-6">
-              <section data-testid="usage-dataforseo">
-                <h3 class="text-sm font-semibold">
-                  DataForSEO — спрос в Google
-                </h3>
-                <p v-if="!demand" class="mt-2 text-sm text-muted-foreground">
-                  Заработает после миграции базы.
-                </p>
-                <template v-else>
-                  <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-                    <dt class="text-muted-foreground">
-                      Остаток
-                    </dt>
-                    <dd data-testid="usage-balance">
-                      <template v-if="demand.balance != null">
-                        <b class="font-semibold">{{ formatUsd(demand.balance) }}</b> — {{ left ? `хватит на ${count(left, 'обновление', 'обновления', 'обновлений')}` : 'не хватит на обновление' }}
-                      </template>
-                      <template v-else-if="!demand.hasKey">
-                        ключ не задан
-                      </template>
-                      <span v-else-if="demand.balanceError" class="text-destructive">не узнать: {{ demand.balanceError }}</span>
-                      <template v-else>
-                        DataForSEO не сообщил
-                      </template>
-                    </dd>
-                    <dt class="text-muted-foreground">
-                      Одно обновление
-                    </dt>
-                    <dd>около {{ formatUsd(DEMAND_REFRESH_COST) }}</dd>
-                    <dt class="text-muted-foreground">
-                      Последнее
-                    </dt>
-                    <dd data-testid="usage-last">
-                      <template v-if="demand.lastDoneAt">
-                        {{ dayMonth(demand.lastDoneAt) }}<template v-if="demand.lastCost != null">
-                          · {{ formatUsd(demand.lastCost) }}
-                        </template>
-                      </template>
-                      <template v-else>
-                        ещё не было
-                      </template>
-                    </dd>
-                    <dt class="text-muted-foreground">
-                      Следующее само
-                    </dt>
-                    <dd data-testid="usage-next">
-                      {{ nextAuto ? `${nextAuto} — каждое 5-е число` : 'не будет, пока не задан ключ' }}
-                    </dd>
-                  </dl>
-                  <p v-if="demand.running" class="mt-2 text-sm text-muted-foreground">
-                    Обновление идёт — DataForSEO ещё не ответил.
+              <!-- Модель ИИ: ключи, выбранная модель, расход на чтение -->
+              <div class="flex items-start gap-3" data-testid="usage-ai">
+                <span class="flex size-9 shrink-0 items-center justify-center rounded-xl" :class="!data.ai ? BATTERY_TILE.off : aiKeyState === 'ok' ? BATTERY_TILE.ok : BATTERY_TILE.empty">
+                  <!-- Через :is: Nuxt на сервере выбрасывает импорт компонента, стоящего только
+                       внутри ClientOnly, а Bot нужен и в PAGE_ICON — сервер падал «Bot is not defined» -->
+                  <component :is="PAGE_ICON['/admin/ai']" class="size-[18px]" />
+                </span>
+                <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-sm font-medium">Модель ИИ</span>
+                    <span :class="[CHIP, !data.ai ? BATTERY_TILE.off : aiKeyState === 'ok' ? BATTERY_TILE.ok : BATTERY_TILE.empty]">
+                      {{ !data.ai ? 'Нет данных' : aiKeyState === 'ok' ? 'Ключ есть' : aiKeyState === 'other' ? 'Нет ключа модели' : 'Нет ключа' }}
+                    </span>
+                  </div>
+                  <p v-if="!data.ai" class="text-[13px] text-muted-foreground">
+                    Заработает после миграции базы.
                   </p>
-                  <p v-if="demand.lastFailed" class="mt-2 text-sm text-destructive">
-                    Последнее обновление не удалось — подробности на «Спросе на рынке».
-                  </p>
-                  <Button v-if="!demand.hasKey" variant="outline" size="sm" class="mt-3" as-child>
-                    <NuxtLink to="/admin/demand">
-                      Задать ключ
-                      <ArrowRight class="ml-1 h-4 w-4" />
-                    </NuxtLink>
-                  </Button>
-                </template>
-              </section>
-
-              <section class="border-t pt-6" data-testid="usage-ai">
-                <h3 class="text-sm font-semibold">
-                  Модели ИИ — чтение постов поставщиков
-                </h3>
-                <p v-if="!data.ai" class="mt-2 text-sm text-muted-foreground">
-                  Заработает после миграции базы.
-                </p>
-                <template v-else>
-                  <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-                    <dt class="text-muted-foreground">
-                      Ключи
-                    </dt>
-                    <dd data-testid="usage-ai-keys">
-                      {{ data.ai.providers.length ? data.ai.providers.map(p => p.label).join(', ') : 'не заданы' }}
-                    </dd>
-                    <dt class="text-muted-foreground">
-                      Модель
-                    </dt>
-                    <dd class="break-all font-mono text-xs leading-5">
+                  <template v-else>
+                    <p class="text-[13px] text-muted-foreground">
+                      Ключи: <span class="text-foreground" data-testid="usage-ai-keys">{{ data.ai.providers.length ? data.ai.providers.map(p => p.label).join(', ') : 'не заданы' }}</span>
+                    </p>
+                    <p class="break-all font-mono text-xs leading-5">
                       {{ data.ai.model }}
-                    </dd>
-                    <dt class="text-muted-foreground">
-                      Расход
-                    </dt>
-                    <dd data-testid="usage-ai-spend">
+                    </p>
+                    <p class="text-xs text-muted-foreground" data-testid="usage-ai-spend">
                       <template v-if="!aiSpend">
                         появится {{ NO_MIGRATION }}
                       </template>
@@ -676,74 +744,19 @@ const STATE: Record<StepState, { label: string, badge: string, number: string }>
                       <template v-else>
                         за 30 дней — {{ count(aiSpend.posts, 'товар', 'товара', 'товаров') }}, {{ aiSpend.cost }}
                       </template>
-                    </dd>
-                  </dl>
-                  <Button v-if="!data.ai.providers.length" variant="outline" size="sm" class="mt-3" as-child>
-                    <NuxtLink to="/admin/ai">
-                      Добавить ключ
-                      <ArrowRight class="ml-1 h-4 w-4" />
-                    </NuxtLink>
-                  </Button>
-                </template>
-              </section>
-            </CardContent>
-          </Card>
-        </div>
-
-        <!-- Шаги -->
-        <Card id="steps" class="scroll-mt-4" data-testid="steps-card">
-          <CardHeader>
-            <CardTitle>Шаги</CardTitle>
-            <CardDescription>Отбор товаров по спросу — по порядку: что готово и что ждёт вас.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ol class="divide-y" data-testid="purchasing-steps">
-              <li
-                v-for="(step, i) in steps"
-                :key="step.id"
-                class="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-start"
-                :data-testid="`step-${step.id}`"
-                :data-state="step.state"
-              >
-                <div class="flex min-w-0 flex-1 gap-3">
-                  <span
-                    class="flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-                    :class="STATE[step.state].number"
-                  >
-                    {{ i + 1 }}
-                  </span>
-                  <div class="min-w-0 flex-1 space-y-1">
-                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <h3 class="font-semibold leading-tight">
-                        {{ step.title }}
-                      </h3>
-                      <Badge :class="STATE[step.state].badge" data-testid="step-state">
-                        {{ STATE[step.state].label }}
-                      </Badge>
-                    </div>
-                    <p v-if="step.facts.length" class="text-xs text-muted-foreground" data-testid="step-facts">
-                      {{ step.facts.join(' · ') }}
                     </p>
-                    <p
-                      v-if="step.next"
-                      class="text-sm"
-                      :class="step.state === 'action' ? 'font-medium' : 'text-muted-foreground'"
-                      data-testid="step-next"
-                    >
-                      {{ step.next }}
-                    </p>
-                  </div>
+                    <Button v-if="!data.ai.providers.length" variant="outline" size="sm" class="mt-1 self-start" as-child>
+                      <NuxtLink to="/admin/ai">
+                        Добавить ключ
+                        <ArrowRight class="h-3.5 w-3.5" />
+                      </NuxtLink>
+                    </Button>
+                  </template>
                 </div>
-                <Button v-if="step.link" variant="outline" size="sm" class="ml-10 self-start sm:ml-0" as-child>
-                  <NuxtLink :to="step.link.to" data-testid="step-link">
-                    {{ step.link.label }}
-                    <ArrowRight class="ml-1 h-4 w-4" />
-                  </NuxtLink>
-                </Button>
-              </li>
-            </ol>
-          </CardContent>
-        </Card>
+              </div>
+            </section>
+          </div>
+        </div>
       </div>
     </ClientOnly>
   </div>
