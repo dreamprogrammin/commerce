@@ -74,16 +74,17 @@ export function offerDemand(offer: Pick<Offer, 'caption' | 'items'>, topics: Off
   }
 }
 
-export type OfferDemandFilter = 'all' | 'demand' | 'none'
+export type OfferDemandFilter = 'all' | 'high' | 'none'
 
 export const OFFER_DEMAND_FILTERS: { id: OfferDemandFilter, label: string }[] = [
   { id: 'all', label: 'Все' },
-  { id: 'demand', label: 'Есть спрос' },
+  { id: 'high', label: 'Высокий спрос' },
   { id: 'none', label: 'Темы нет' },
 ]
 
 /**
- * Отбор и порядок по спросу: «Есть спрос» — тема с цифрами больше нуля,
+ * Отбор и порядок по спросу: «Высокий спрос» (владелец 18.11.2026, по
+ * макету) — уровень «высокий», как метка на фото: верхняя треть своих тем,
  * сверху самый большой спрос; «Темы нет» — ни одна тема не нашла товар.
  * «Все» — порядок не меняется (по времени поста).
  */
@@ -93,8 +94,9 @@ export function filterByDemand<T extends Pick<Offer, 'caption' | 'items'>>(offer
   const withDemand = offers.map(o => ({ o, d: offerDemand(o, topics) }))
   if (filter === 'none')
     return withDemand.filter(x => !x.d).map(x => x.o)
+  const bounds = demandLevelBounds(topics)
   return withDemand
-    .filter(x => (x.d?.volume ?? 0) > 0)
+    .filter(x => demandLevel(x.d, bounds) === 'high')
     .sort((a, b) => (b.d!.volume ?? 0) - (a.d!.volume ?? 0))
     .map(x => x.o)
 }
