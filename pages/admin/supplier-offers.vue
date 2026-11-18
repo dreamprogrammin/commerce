@@ -3,7 +3,7 @@ import type { OfferDemandFilter, OfferDemandTopic } from '@/utils/offerDemand'
 import type { OrderSheetLine } from '@/utils/orderSheet'
 import type { Offer, OfferChannel, OfferGrouping, OfferReading, OfferStatus } from '@/utils/supplierOfferList'
 import { useLocalStorage } from '@vueuse/core'
-import { ExternalLink, ImageOff, Lock, RefreshCw } from 'lucide-vue-next'
+import { Check, ChevronDown, Download, ExternalLink, ImageOff, Inbox, ListChecks, Lock, RefreshCw, Send, ShoppingCart, Sparkles, Undo2, X } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { jpegForSheet, saveOrderFile } from '@/composables/useOrderSheetFile'
 import { formatPrice } from '@/utils/formatPrice'
@@ -54,12 +54,24 @@ const STATUSES: { id: OfferStatus, label: string }[] = [
   { id: 'skipped', label: 'Не брать' },
 ]
 const GROUPINGS: { id: OfferGrouping, label: string }[] = [
-  { id: 'supplier', label: 'По поставщикам' },
-  { id: 'day', label: 'По дням' },
-  { id: 'none', label: 'Списком' },
+  { id: 'supplier', label: 'Поставщики' },
+  { id: 'day', label: 'Дни' },
+  // «Списком» путалось бы с видом «Список» (макет 18.11)
+  { id: 'none', label: 'Без групп' },
 ]
 
 const status = ref<OfferStatus>('new')
+// Плитка или список — по макету; запоминается в этом браузере
+const view = useLocalStorage<'grid' | 'list'>('admin-supplier-offers-view', 'grid')
+const VIEWS = [{ id: 'grid', label: 'Плитка' }, { id: 'list', label: 'Список' }] as const
+// Свёрнутые группы — заголовок с «Показать»
+const collapsed = ref(new Set<string>())
+function toggleGroup(key: string) {
+  const next = new Set(collapsed.value)
+  if (!next.delete(key))
+    next.add(key)
+  collapsed.value = next
+}
 // Группировка запоминается в этом браузере
 const grouping = useLocalStorage<OfferGrouping>('admin-supplier-offers-grouping', 'supplier')
 
@@ -88,24 +100,35 @@ const groups = computed(() => {
 // Уровень спроса — метка в углу фото: трети своих тем по запросам в месяц
 const levelBounds = computed(() => demandLevelBounds(page.value?.topics ?? []))
 const levelOf = (o: Offer) => demandLevel(demandById.value.get(o.id) ?? null, levelBounds.value)
-const LEVEL_CLASS = {
-  high: 'bg-emerald-600 text-white',
-  mid: 'bg-amber-400 text-amber-950',
-  low: 'bg-slate-200 text-slate-800',
-  none: 'bg-slate-200 text-slate-600',
-  unknown: 'bg-white/90 text-slate-600',
+// Пилюли по макету «Товары поставщиков» (Claude Design, 18.11.2026)
+const CARD = 'rounded-[20px] bg-background shadow-sm'
+const CHIP = 'inline-flex items-center whitespace-nowrap rounded-full px-2 py-[3px] text-xs font-semibold'
+const SEGMENTS = 'inline-flex flex-wrap gap-1 rounded-lg bg-muted p-1'
+const segment = (on: boolean) => ['rounded-md px-3 py-1 text-sm font-medium transition-colors', on ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']
+// На фото — белая подложка у «низкого» и «нет данных»; в списке — серая
+const LEVEL_CHIP = {
+  high: 'bg-green-100 text-green-700',
+  mid: 'bg-amber-100 text-amber-700',
+  low: 'bg-background text-muted-foreground',
+  none: 'bg-background text-muted-foreground',
+  unknown: 'bg-background text-muted-foreground',
 } as const
-const LEVEL_BARS = { high: 3, mid: 2, low: 1, none: 0, unknown: 0 } as const
+const levelChipFlat = (o: Offer) => LEVEL_CHIP[levelOf(o)].replace('bg-background', 'bg-neutral-100')
+const TREND_CHIP = { up: 'bg-green-100 text-green-700', down: 'bg-red-600/10 text-red-700', flat: 'bg-background text-muted-foreground' } as const
 function newTopicLink(o: Offer) {
   const d = topicDraft(o)
   return { path: '/admin/demand', query: d ? { newTopic: d.name, keyword: d.keyword } : { newTopic: '' } }
 }
-const TREND_TEXT = { up: 'text-emerald-700', down: 'text-destructive', flat: 'text-muted-foreground' } as const
 const channelById = computed(() => new Map((page.value?.channels ?? []).map(c => [c.id, c])))
 const closedWithoutAccount = computed(() => !!page.value && !page.value.account && page.value.channels.some(c => c.closed))
 
 const errorText = (e: any, fallback: string) => e?.data?.message || e?.statusMessage || fallback
 const count = (n: number, one: string, few: string, many: string) => `${n} ${plural(n, one, few, many)}`
+
+// «Разобрано N из M» — за 30 дней, что держит список
+const total = computed(() => page.value ? page.value.counts.new + page.value.counts.added + page.value.counts.skipped : 0)
+const decided = computed(() => page.value ? page.value.counts.added + page.value.counts.skipped : 0)
+const priceFrom = (it: { priceFrom: 'text' | 'image' | null }) => it.priceFrom === 'text' ? 'цена из подписи' : 'цена с фото'
 
 /** Под карточкой — то, чего нет в заголовке группы */
 function meta(o: Offer) {
@@ -308,48 +331,85 @@ async function downloadOrder() {
 </script>
 
 <template>
-  <div class="container mx-auto max-w-6xl p-4 md:p-8 space-y-6">
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-      <div>
-        <h1 class="text-2xl md:text-3xl font-bold tracking-tight">
+  <!-- Вёрстка по макету «Товары поставщиков.dc.html» (Claude Design, 18.11.2026) -->
+  <div class="mx-auto max-w-[1400px] space-y-4 p-4">
+    <div class="flex flex-wrap items-end gap-3 px-1 pt-1.5">
+      <div class="flex min-w-0 flex-[1_1_320px] flex-col gap-1.5">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink as-child>
+                <NuxtLink to="/admin/purchasing">
+                  Умный закуп
+                </NuxtLink>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Товары поставщиков</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <h1 class="text-[26px] font-bold leading-tight tracking-[-0.02em]">
           Товары поставщиков
         </h1>
-        <p class="text-sm text-muted-foreground mt-1">
-          Новые товары из каналов поставщиков за 30 дней: фото, подпись и ссылка на пост.
-          Разобрали товар — отметьте, и в «Новых» останется только неразобранное.
+        <p class="text-sm text-muted-foreground text-pretty">
+          Новые товары из каналов поставщиков за 30 дней. Отметьте каждый: «Добавил» или «Не брать».
         </p>
       </div>
-      <div class="flex shrink-0 gap-2">
-        <Button
-          v-if="page?.channels.length"
-          size="sm"
-          :disabled="!!collecting || rereading !== null"
-          data-testid="offers-collect"
-          @click="collectAll"
-        >
-          <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': collecting }" />
-          {{ collecting ? 'Собираю…' : 'Собрать новые' }}
-        </Button>
-        <Button variant="outline" size="sm" :disabled="pending || !!collecting" @click="refresh()">
-          Обновить
-        </Button>
-      </div>
+      <Button variant="outline" :disabled="pending || !!collecting" @click="refresh()">
+        <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': pending && !!data }" />
+        Обновить
+      </Button>
+      <Button
+        v-if="page?.channels.length"
+        :disabled="!!collecting || rereading !== null"
+        data-testid="offers-collect"
+        @click="collectAll"
+      >
+        <RefreshCw v-if="collecting" class="h-4 w-4 animate-spin" />
+        <Download v-else class="h-4 w-4" />
+        {{ collecting ? 'Собираю…' : 'Собрать новые' }}
+      </Button>
     </div>
 
     <ClientOnly>
       <p v-if="error" class="text-sm text-destructive">
         Не удалось загрузить: {{ error.data?.message || error.message }}
       </p>
-      <Skeleton v-else-if="pending && !data" class="h-64 w-full" />
-      <Card v-else-if="data && !page" data-testid="offers-not-installed">
-        <CardContent class="text-sm text-muted-foreground">
-          Заработает после миграции базы 20261104160000_supplier_offers.
-        </CardContent>
-      </Card>
+      <div v-else-if="pending && !data" class="space-y-4">
+        <div class="flex flex-wrap gap-4">
+          <Skeleton class="h-40 min-w-0 flex-[1_1_260px] rounded-[20px]" />
+          <Skeleton class="h-40 min-w-0 flex-[2_1_460px] rounded-[20px]" />
+        </div>
+        <Skeleton class="h-96 w-full rounded-[20px]" />
+      </div>
+      <div v-else-if="data && !page" class="p-5 text-sm text-muted-foreground" :class="CARD" data-testid="offers-not-installed">
+        Заработает после миграции базы 20261104160000_supplier_offers.
+      </div>
       <template v-else-if="page">
-        <!-- Каналы -->
-        <Card data-testid="offers-channels">
-          <CardContent class="space-y-3">
+        <div class="flex flex-wrap items-stretch gap-4">
+          <!-- Разобрано -->
+          <section class="flex min-w-0 flex-[1_1_260px] flex-col gap-3.5 p-5" :class="CARD" data-testid="offers-progress">
+            <div class="flex items-center gap-2.5">
+              <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <ListChecks class="size-5" />
+              </span>
+              <span class="text-sm font-medium text-muted-foreground">Разобрано</span>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-[30px] font-bold leading-none tracking-[-0.02em] tabular-nums">{{ decided }}</span>
+              <span class="text-[15px] text-muted-foreground">из {{ total }}</span>
+            </div>
+            <Progress :model-value="total ? decided / total * 100 : 0" class="h-2" :aria-label="`Разобрано ${decided} из ${total}`" />
+            <span class="text-[13px] text-muted-foreground">Осталось {{ page.counts.new }}</span>
+          </section>
+
+          <!-- Каналы -->
+          <section class="flex min-w-0 flex-[2_1_460px] flex-col gap-1 p-5" :class="CARD" data-testid="offers-channels">
+            <h2 class="mb-2 text-base font-semibold">
+              Каналы поставщиков
+            </h2>
             <div v-if="!page.channels.length" class="space-y-3">
               <p class="text-sm text-muted-foreground">
                 Каналов нет — их добавляют поставщикам: «⋯» → «Редактировать» → «Каналы в Telegram».
@@ -360,21 +420,25 @@ async function downloadOrder() {
                 </NuxtLink>
               </Button>
             </div>
-            <ul v-else class="divide-y text-sm">
-              <li v-for="c in page.channels" :key="c.id" class="flex flex-col gap-0.5 py-2 first:pt-0 last:pb-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4" data-testid="offers-channel">
-                <p class="font-medium">
-                  <Lock v-if="c.closed" class="mr-1 inline h-3.5 w-3.5 align-[-2px] text-muted-foreground" aria-label="Закрытый канал" />
-                  {{ c.title }}<span v-if="c.supplierName" class="font-normal text-muted-foreground"> · {{ c.supplierName }}</span>
-                </p>
-                <p v-if="channelErrors[c.id]" class="text-xs text-destructive" data-testid="offers-channel-error">
+            <ul v-else>
+              <li v-for="c in page.channels" :key="c.id" class="flex flex-wrap items-center gap-3 border-b border-neutral-100 py-2.5" data-testid="offers-channel">
+                <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Lock v-if="c.closed" class="size-[18px]" aria-label="Закрытый канал" />
+                  <Send v-else class="size-[18px]" />
+                </span>
+                <div class="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
+                  <span class="break-words text-sm font-medium">{{ c.title }}</span>
+                  <span v-if="c.supplierName || c.closed" class="text-xs text-muted-foreground">{{ [c.supplierName, c.closed ? 'закрытый канал' : ''].filter(Boolean).join(' · ') }}</span>
+                </div>
+                <span v-if="channelErrors[c.id]" class="text-xs text-destructive" data-testid="offers-channel-error">
                   {{ channelErrors[c.id] }}
-                </p>
-                <p v-else class="text-xs text-muted-foreground">
+                </span>
+                <span v-else class="text-xs text-muted-foreground">
                   {{ collecting?.id === c.id ? `собираю… новых: ${collecting.added}` : collectedText(c.collectedAt) }}
-                </p>
+                </span>
               </li>
             </ul>
-            <div v-if="closedWithoutAccount" class="flex flex-col gap-2 rounded-md bg-amber-50 p-3 text-xs text-amber-900 sm:flex-row sm:items-center sm:justify-between" data-testid="offers-no-account">
+            <div v-if="closedWithoutAccount" class="mt-2.5 flex flex-col gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-900 sm:flex-row sm:items-center sm:justify-between" data-testid="offers-no-account">
               <p>Закрытые каналы читаются через аккаунт Telegram — подключите его.</p>
               <Button variant="outline" size="sm" class="shrink-0" as-child>
                 <NuxtLink to="/admin/telegram">
@@ -384,10 +448,11 @@ async function downloadOrder() {
             </div>
             <!-- Чтение ИИ -->
             <template v-if="page.channels.length">
-              <p v-if="!page.reading" class="border-t pt-3 text-xs text-muted-foreground" data-testid="offers-reading">
+              <p v-if="!page.reading" class="flex items-center gap-2 pt-2.5 text-[13px] text-muted-foreground" data-testid="offers-reading">
+                <Sparkles class="size-4 shrink-0 text-primary" />
                 Артикул и цену с фото прочтёт ИИ — после миграции базы 20261105120000_supplier_offers_read.
               </p>
-              <div v-else-if="!page.reading.key" class="flex flex-col gap-2 rounded-md bg-amber-50 p-3 text-xs text-amber-900 sm:flex-row sm:items-center sm:justify-between" data-testid="offers-reading">
+              <div v-else-if="!page.reading.key" class="mt-2.5 flex flex-col gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-900 sm:flex-row sm:items-center sm:justify-between" data-testid="offers-reading">
                 <p>Артикул и цену с фото читает ИИ — задайте ключ для {{ modelLabel(page.reading.model) }} на странице «Модели ИИ».</p>
                 <Button variant="outline" size="sm" class="shrink-0" as-child>
                   <NuxtLink to="/admin/ai">
@@ -395,14 +460,17 @@ async function downloadOrder() {
                   </NuxtLink>
                 </Button>
               </div>
-              <div v-else class="flex flex-col gap-2 border-t pt-3 text-xs sm:flex-row sm:items-center sm:justify-between" data-testid="offers-reading">
-                <p>
-                  Артикул и цену с фото читает {{ modelLabel(page.reading.model) }} — при «Собрать новые».
-                  <span v-if="page.reading.failed === page.reading.unread && page.reading.unread" class="text-muted-foreground" data-testid="offers-unread">
-                    Не прочлось: {{ page.reading.unread }} — причина на карточке.
-                  </span>
-                  <span v-else-if="page.reading.unread" class="text-muted-foreground" data-testid="offers-unread">
-                    Не прочитано: {{ page.reading.unread }}<template v-if="page.reading.failed">, из них не прочлось — {{ page.reading.failed }}</template>.
+              <div v-else class="flex flex-col gap-2 pt-2.5 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between" data-testid="offers-reading">
+                <p class="flex items-start gap-2">
+                  <Sparkles class="mt-0.5 size-4 shrink-0 text-primary" />
+                  <span>
+                    Артикул и цену с фото читает {{ modelLabel(page.reading.model) }} при «Собрать новые».
+                    <span v-if="page.reading.failed === page.reading.unread && page.reading.unread" data-testid="offers-unread">
+                      Не прочлось: {{ page.reading.unread }} — причина на карточке.
+                    </span>
+                    <span v-else-if="page.reading.unread" data-testid="offers-unread">
+                      Не прочитано: {{ page.reading.unread }}<template v-if="page.reading.failed">, из них не прочлось — {{ page.reading.failed }}</template>.
+                    </span>
                   </span>
                 </p>
                 <Button
@@ -418,232 +486,316 @@ async function downloadOrder() {
                 </Button>
               </div>
             </template>
-          </CardContent>
-        </Card>
+          </section>
+        </div>
 
         <!-- Заказ поставщику: выбранное «В заказ» -->
-        <Card v-if="pickList.length" data-testid="order-bar">
-          <CardContent class="space-y-3 pt-6">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p class="text-sm">
-                <span class="font-medium">В заказе {{ count(pickList.length, 'товар', 'товара', 'товаров') }}</span>
-                <span class="text-muted-foreground"> · {{ count(pickGroups.length, 'поставщик', 'поставщика', 'поставщиков') }}</span>
-              </p>
-              <div class="flex gap-2">
-                <Button size="sm" :disabled="downloading" data-testid="order-download" @click="downloadOrder">
-                  {{ downloading ? 'Собираю…' : 'Скачать таблицу' }}
-                </Button>
-                <Button size="sm" variant="ghost" :disabled="downloading" data-testid="order-clear" @click="picks = {}">
-                  Очистить
-                </Button>
-              </div>
+        <section v-if="pickList.length" class="space-y-3 p-5" :class="CARD" data-testid="order-bar">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm">
+              <span class="font-semibold">В заказе {{ count(pickList.length, 'товар', 'товара', 'товаров') }}</span>
+              <span class="text-muted-foreground"> · {{ count(pickGroups.length, 'поставщик', 'поставщика', 'поставщиков') }}</span>
+            </p>
+            <div class="flex gap-2">
+              <Button size="sm" :disabled="downloading" data-testid="order-download" @click="downloadOrder">
+                <Download class="h-4 w-4" />
+                {{ downloading ? 'Собираю…' : 'Скачать таблицу' }}
+              </Button>
+              <Button size="sm" variant="ghost" :disabled="downloading" data-testid="order-clear" @click="picks = {}">
+                Очистить
+              </Button>
             </div>
-            <ul class="divide-y text-sm">
-              <li v-for="g in pickGroups" :key="g.supplier" class="flex flex-wrap items-baseline justify-between gap-x-4 py-1.5" data-testid="order-supplier">
-                <span class="font-medium">{{ g.supplier }}</span>
-                <span class="tabular-nums text-muted-foreground">
-                  {{ count(g.lines.length, 'товар', 'товара', 'товаров') }}, {{ g.units }}&nbsp;шт.<template v-if="g.sum"> · {{ formatPrice(g.sum) }}&nbsp;₸</template><template v-if="g.unpriced"> · без цены: {{ g.unpriced }}</template>
-                </span>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
+          </div>
+          <ul class="text-sm">
+            <li v-for="g in pickGroups" :key="g.supplier" class="flex flex-wrap items-baseline justify-between gap-x-4 border-t border-neutral-100 py-1.5" data-testid="order-supplier">
+              <span class="font-medium">{{ g.supplier }}</span>
+              <span class="tabular-nums text-muted-foreground">
+                {{ count(g.lines.length, 'товар', 'товара', 'товаров') }}, {{ g.units }}&nbsp;шт.<template v-if="g.sum"> · {{ formatPrice(g.sum) }}&nbsp;₸</template><template v-if="g.unpriced"> · без цены: {{ g.unpriced }}</template>
+              </span>
+            </li>
+          </ul>
+        </section>
 
-        <!-- Отбор и группировка -->
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div class="flex flex-wrap gap-2" role="group" aria-label="Какие товары">
-            <Button
+        <!-- Отбор, группировка и вид -->
+        <div class="flex flex-wrap items-center gap-3 p-3" :class="CARD">
+          <div :class="SEGMENTS" role="group" aria-label="Какие товары">
+            <button
               v-for="s in STATUSES"
               :key="s.id"
-              size="sm"
-              :variant="status === s.id ? 'default' : 'outline'"
+              type="button"
+              :class="segment(status === s.id)"
               :aria-pressed="status === s.id"
               :data-testid="`offers-status-${s.id}`"
               @click="status = s.id"
             >
-              {{ s.label }} <span class="ml-1 tabular-nums opacity-70">{{ page.counts[s.id] }}</span>
-            </Button>
+              {{ s.label }} · <span class="tabular-nums">{{ page.counts[s.id] }}</span>
+            </button>
           </div>
-          <div v-if="page.topics" class="flex flex-wrap gap-2" role="group" aria-label="Спрос">
-            <Button
+          <div v-if="page.topics" :class="SEGMENTS" role="group" aria-label="Спрос">
+            <button
               v-for="f in OFFER_DEMAND_FILTERS"
               :key="f.id"
-              size="sm"
-              :variant="demandFilter === f.id ? 'secondary' : 'ghost'"
+              type="button"
+              :class="segment(demandFilter === f.id)"
               :aria-pressed="demandFilter === f.id"
               :data-testid="`offers-demand-${f.id}`"
               @click="demandFilter = f.id"
             >
               {{ f.label }}
-            </Button>
+            </button>
           </div>
-          <div class="flex flex-wrap gap-2" role="group" aria-label="Группировка">
-            <Button
-              v-for="g in GROUPINGS"
-              :key="g.id"
-              size="sm"
-              :variant="grouping === g.id ? 'secondary' : 'ghost'"
-              :aria-pressed="grouping === g.id"
-              :data-testid="`offers-group-${g.id}`"
-              @click="grouping = g.id"
-            >
-              {{ g.label }}
-            </Button>
+          <!-- Группировка и вид — одним блоком справа: переносятся вместе -->
+          <div class="flex flex-wrap gap-3 lg:ml-auto">
+            <div :class="SEGMENTS" role="group" aria-label="Группировка">
+              <button
+                v-for="g in GROUPINGS"
+                :key="g.id"
+                type="button"
+                :class="segment(grouping === g.id)"
+                :aria-pressed="grouping === g.id"
+                :data-testid="`offers-group-${g.id}`"
+                @click="grouping = g.id"
+              >
+                {{ g.label }}
+              </button>
+            </div>
+            <div :class="SEGMENTS" role="group" aria-label="Вид">
+              <button
+                v-for="v in VIEWS"
+                :key="v.id"
+                type="button"
+                :class="segment(view === v.id)"
+                :aria-pressed="view === v.id"
+                :data-testid="`offers-view-${v.id}`"
+                @click="view = v.id"
+              >
+                {{ v.label }}
+              </button>
+            </div>
           </div>
         </div>
 
-        <p v-if="!groups.length" class="py-8 text-center text-sm text-muted-foreground" data-testid="offers-empty">
-          <template v-if="page.offers.length && page.topics && demandFilter !== 'all'">
-            {{ demandFilter === 'demand' ? 'Ни у одного товара нет темы со спросом — посмотрите «Все» или добавьте темы на «Спросе на рынке».' : 'У всех товаров нашлась тема спроса.' }}
-          </template>
-          <template v-else-if="status !== 'new'">
-            Здесь пока пусто.
-          </template>
-          <template v-else-if="page.channels.some(c => c.collectedAt)">
-            Новых товаров нет. Посты, вышедшие позже, соберёт «Собрать новые».
-          </template>
-          <template v-else>
-            Нажмите «Собрать новые» — сюда придут товары из каналов поставщиков за последние 3 дня.
-          </template>
-        </p>
+        <div v-if="!groups.length" class="flex flex-col items-center gap-2.5 px-5 py-12 text-center" :class="CARD" data-testid="offers-empty">
+          <span class="flex size-12 items-center justify-center rounded-2xl bg-neutral-100 text-muted-foreground">
+            <Inbox class="size-[22px]" />
+          </span>
+          <span class="text-[15px] font-semibold">{{ page.offers.length ? 'Таких товаров нет' : 'Пока пусто' }}</span>
+          <span class="max-w-md text-[13px] text-muted-foreground text-pretty">
+            <template v-if="page.offers.length && page.topics && demandFilter !== 'all'">
+              {{ demandFilter === 'demand' ? 'Ни у одного товара нет темы со спросом — посмотрите «Все» или добавьте темы на «Спросе на рынке».' : 'У всех товаров нашлась тема спроса.' }}
+            </template>
+            <template v-else-if="status !== 'new'">
+              {{ status === 'added' ? 'Здесь будут товары, которые вы выложили на сайт.' : 'Здесь будут товары, которые вы решили не брать.' }}
+            </template>
+            <template v-else-if="page.channels.some(c => c.collectedAt)">
+              Новых товаров нет. Посты, вышедшие позже, соберёт «Собрать новые».
+            </template>
+            <template v-else>
+              Нажмите «Собрать новые» — сюда придут товары из каналов поставщиков за последние 3 дня.
+            </template>
+          </span>
+        </div>
 
-        <section v-for="g in groups" :key="g.key" class="space-y-3" data-testid="offers-group">
-          <h2 v-if="g.title" class="text-base font-semibold">
-            {{ g.title }} <span class="font-normal text-muted-foreground tabular-nums">· {{ g.offers.length }}</span>
-          </h2>
-          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            <article v-for="o in g.offers" :key="o.id" class="flex flex-col overflow-hidden rounded-lg border bg-card" data-testid="offer-card">
-              <a :href="o.photoUrl ?? o.postUrl" target="_blank" rel="noopener" class="relative block aspect-[4/3] bg-muted" :aria-label="o.photoUrl ? 'Фото крупно' : 'Пост в Telegram'">
-                <img v-if="o.photoUrl" :src="o.photoUrl" alt="" loading="lazy" decoding="async" class="h-full w-full object-contain">
-                <span v-else class="flex h-full items-center justify-center text-muted-foreground">
-                  <ImageOff class="h-6 w-6" />
-                </span>
-                <span v-if="page.topics" class="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium shadow-sm" :class="LEVEL_CLASS[levelOf(o)]" :data-level="levelOf(o)" data-testid="offer-demand-level">
-                  <span class="flex h-3 items-end gap-px" aria-hidden="true">
-                    <span v-for="n in 3" :key="n" class="w-[3px] rounded-sm" :class="n <= LEVEL_BARS[levelOf(o)] ? 'bg-current' : 'bg-current opacity-30'" :style="{ height: `${n * 4}px` }" />
+        <section v-for="g in groups" :key="g.key" class="space-y-4" data-testid="offers-group">
+          <div
+            v-if="g.title"
+            class="flex items-center gap-2.5"
+            :class="collapsed.has(g.key) ? ['px-4 py-3.5', CARD] : 'px-1 pt-1'"
+          >
+            <h2 class="text-lg font-bold" data-testid="offers-group-title">
+              {{ g.title }}
+            </h2>
+            <span class="rounded-full px-2.5 py-[3px] text-xs font-semibold tabular-nums text-muted-foreground" :class="collapsed.has(g.key) ? 'bg-neutral-100' : 'bg-background shadow-sm'" data-testid="offers-group-count">{{ g.offers.length }}</span>
+            <div class="flex-1" />
+            <Button variant="ghost" size="sm" :aria-expanded="!collapsed.has(g.key)" data-testid="offers-group-toggle" @click="toggleGroup(g.key)">
+              {{ collapsed.has(g.key) ? 'Показать' : 'Свернуть' }}
+              <ChevronDown class="size-3.5 transition-transform" :class="{ 'rotate-180': !collapsed.has(g.key) }" />
+            </Button>
+          </div>
+
+          <template v-if="!collapsed.has(g.key)">
+            <!-- Плитка -->
+            <div v-if="view === 'grid'" class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+              <article v-for="o in g.offers" :key="o.id" class="flex min-w-0 flex-col gap-3 p-3" :class="CARD" :data-offer-id="o.id" data-testid="offer-card">
+                <a :href="o.photoUrl ?? o.postUrl" target="_blank" rel="noopener" class="relative block aspect-square overflow-hidden rounded-[14px] border border-neutral-100 bg-white" :aria-label="o.photoUrl ? 'Фото крупно' : 'Пост в Telegram'">
+                  <img v-if="o.photoUrl" :src="o.photoUrl" alt="" loading="lazy" decoding="async" class="h-full w-full object-contain">
+                  <span v-else class="flex h-full items-center justify-center text-muted-foreground">
+                    <ImageOff class="h-6 w-6" />
                   </span>
-                  {{ DEMAND_LEVEL_TEXT[levelOf(o)] }}
-                </span>
-                <span v-if="o.photoCount > 1" class="absolute bottom-1.5 right-1.5 rounded bg-black/60 px-1.5 py-0.5 text-xs text-white">
-                  {{ o.photoCount }} фото
-                </span>
-              </a>
-              <div class="flex flex-1 flex-col gap-2 p-3">
-                <!-- Прочитанное ИИ: цена из подписи главнее цены на фото -->
-                <div v-if="o.items?.length" class="space-y-2" data-testid="offer-items">
-                  <div v-for="(it, i) in o.items.slice(0, 3)" :key="i" class="space-y-0.5 text-sm" data-testid="offer-item">
-                    <p class="line-clamp-2 font-medium leading-snug" data-testid="offer-name">
+                  <span v-if="page.topics" class="absolute left-2.5 top-2.5 shadow-sm" :class="[CHIP, LEVEL_CHIP[levelOf(o)]]" :data-level="levelOf(o)" data-testid="offer-demand-level">
+                    {{ DEMAND_LEVEL_TEXT[levelOf(o)] }}
+                  </span>
+                  <span v-if="o.photoCount > 1" class="absolute bottom-2.5 right-2.5 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
+                    {{ o.photoCount }} фото
+                  </span>
+                </a>
+
+                <!-- Прочитанное ИИ: первый товар крупно, остальные — строками -->
+                <div v-if="o.items?.length" class="flex flex-col gap-3" data-testid="offer-items">
+                  <div v-for="(it, i) in o.items.slice(0, 3)" :key="i" class="flex flex-col gap-1.5" :class="i ? 'border-t border-neutral-100 px-1 pt-3' : 'px-1'" data-testid="offer-item">
+                    <div v-if="it.price != null" class="flex flex-wrap items-baseline gap-x-2">
+                      <span class="whitespace-nowrap font-bold tabular-nums tracking-[-0.01em]" :class="i ? 'text-base' : 'text-xl'" data-testid="offer-price">{{ formatPrice(it.price) }}&nbsp;₸</span>
+                      <span class="text-xs text-muted-foreground" data-testid="offer-price-from">{{ priceFrom(it) }}</span>
+                    </div>
+                    <p class="line-clamp-2 break-words text-sm font-semibold leading-[1.3]" :class="{ 'min-h-[2.6em]': !i }" data-testid="offer-name">
                       {{ it.name }}
                     </p>
-                    <p class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                      <span v-if="it.article" class="break-all font-mono text-xs" data-testid="offer-article">Арт. {{ it.article }}</span>
-                      <span v-if="it.price != null" class="whitespace-nowrap font-semibold tabular-nums" data-testid="offer-price">{{ formatPrice(it.price) }}&nbsp;₸</span>
-                      <span v-if="it.price != null" class="text-xs text-muted-foreground" data-testid="offer-price-from">{{ it.priceFrom === 'text' ? 'в подписи' : 'на фото' }}</span>
+                    <p v-if="it.article || it.priceNote" class="break-words text-xs text-muted-foreground">
+                      <span v-if="it.article" data-testid="offer-article">Арт. {{ it.article }}</span><template v-if="it.article && it.priceNote">
+                        ·
+                      </template>{{ it.priceNote }}
                     </p>
                     <p v-if="it.imagePrice != null" class="text-xs text-amber-700" data-testid="offer-price-conflict">
                       На фото другая: {{ formatPrice(it.imagePrice) }}&nbsp;₸
                     </p>
-                    <p v-if="it.priceNote" class="text-xs text-muted-foreground">
-                      {{ it.priceNote }}
-                    </p>
                     <p v-if="it.confidence !== 'high'" class="text-xs text-amber-700" data-testid="offer-doubt">
                       ИИ не уверен{{ it.doubt ? `: ${it.doubt}` : '' }}
                     </p>
-                    <div class="flex items-center gap-1.5 pt-1">
-                      <template v-if="picks[pickKey(o, i)]">
-                        <Input type="number" min="1" max="9999" inputmode="numeric" class="h-8 w-20" aria-label="Сколько штук" :model-value="picks[pickKey(o, i)]!.quantity" data-testid="offer-order-qty" @update:model-value="setPickQty(pickKey(o, i), $event)" />
-                        <span class="text-xs text-muted-foreground">шт. в заказе</span>
-                        <Button size="sm" variant="ghost" class="h-8 px-2" data-testid="offer-order-remove" @click="removePick(pickKey(o, i))">
-                          Убрать
-                        </Button>
-                      </template>
-                      <Button v-else size="sm" variant="outline" class="h-8 px-2" data-testid="offer-order-add" @click="addPick(o, i)">
-                        В заказ
+                    <!-- У второго и третьего товара поста — свои «На сайт» и «В заказ» -->
+                    <div v-if="i" class="flex flex-wrap items-center gap-2 pt-0.5">
+                      <Button v-if="o.status === 'new'" as-child size="sm" variant="outline" class="max-w-full" data-testid="offer-to-site">
+                        <NuxtLink :to="{ path: '/admin/products/new', query: { offer: o.id, item: i } }">
+                          На сайт
+                        </NuxtLink>
                       </Button>
+                      <Button v-if="picks[pickKey(o, i)]" size="sm" data-testid="offer-order-remove" @click="removePick(pickKey(o, i))">
+                        <Check class="h-4 w-4" /> В заказе
+                      </Button>
+                      <Button v-else size="sm" variant="outline" data-testid="offer-order-add" @click="addPick(o, i)">
+                        <ShoppingCart class="h-4 w-4" /> В заказ
+                      </Button>
+                      <label v-if="picks[pickKey(o, i)]" class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Input type="number" min="1" max="9999" inputmode="numeric" class="h-8 w-16" aria-label="Сколько штук" :model-value="picks[pickKey(o, i)]!.quantity" data-testid="offer-order-qty" @update:model-value="setPickQty(pickKey(o, i), $event)" />
+                        шт.
+                      </label>
                     </div>
                   </div>
-                  <p v-if="o.items.length > 3" class="text-xs text-muted-foreground">
+                  <p v-if="o.items.length > 3" class="px-1 text-xs text-muted-foreground">
                     И ещё {{ count(o.items.length - 3, 'товар', 'товара', 'товаров') }} — в посте
                   </p>
                 </div>
-                <p v-else-if="o.items" class="text-xs text-muted-foreground" data-testid="offer-no-items">
-                  ИИ не нашёл на фото товара
-                </p>
-                <p v-else-if="o.readError" class="text-xs text-destructive" data-testid="offer-read-error">
-                  Не прочитано: {{ o.readError }}
-                </p>
-                <div v-if="!o.items?.length" data-testid="offer-order-post">
-                  <div class="flex items-center gap-1.5 pt-1">
-                    <template v-if="picks[pickKey(o, null)]">
-                      <Input type="number" min="1" max="9999" inputmode="numeric" class="h-8 w-20" aria-label="Сколько штук" :model-value="picks[pickKey(o, null)]!.quantity" data-testid="offer-order-qty" @update:model-value="setPickQty(pickKey(o, null), $event)" />
-                      <span class="text-xs text-muted-foreground">шт. в заказе</span>
-                      <Button size="sm" variant="ghost" class="h-8 px-2" data-testid="offer-order-remove" @click="removePick(pickKey(o, null))">
-                        Убрать
-                      </Button>
-                    </template>
-                    <Button v-else size="sm" variant="outline" class="h-8 px-2" data-testid="offer-order-add" @click="addPick(o, null)">
-                      В заказ
-                    </Button>
-                  </div>
+                <div v-else class="flex flex-col gap-1.5 px-1">
+                  <p class="line-clamp-4 whitespace-pre-line break-words text-sm" :class="{ 'text-muted-foreground': !o.caption }" data-testid="offer-caption">
+                    {{ o.caption || 'Без подписи' }}
+                  </p>
+                  <p v-if="o.items" class="text-xs text-muted-foreground" data-testid="offer-no-items">
+                    ИИ не нашёл на фото товара
+                  </p>
+                  <p v-else-if="o.readError" class="text-xs text-destructive" data-testid="offer-read-error">
+                    Не прочитано: {{ o.readError }}
+                  </p>
                 </div>
+
                 <!-- Спрос: тема «Спроса на рынке», нашедшая товар -->
-                <div v-if="page.topics" class="text-xs" data-testid="offer-demand">
+                <div v-if="page.topics" class="flex flex-col gap-1 rounded-xl bg-neutral-100 px-3 py-2.5 text-xs" data-testid="offer-demand">
                   <template v-if="demandById.get(o.id)">
-                    <p>
-                      <span class="font-medium">Спрос: {{ demandById.get(o.id)!.name }}</span>
-                      ·
-                      <span v-if="demandById.get(o.id)!.volume != null" class="whitespace-nowrap tabular-nums" data-testid="offer-demand-volume">{{ formatVolume(demandById.get(o.id)!.volume) }}/мес</span>
-                      <span v-else class="text-muted-foreground">цифр ещё нет</span>
-                      <span v-if="trendLabel(demandById.get(o.id)!.trendPct)" class="whitespace-nowrap" :class="TREND_TEXT[trendKind(demandById.get(o.id)!.trendPct) as keyof typeof TREND_TEXT]"> {{ trendLabel(demandById.get(o.id)!.trendPct) }}</span>
-                    </p>
-                    <p class="text-muted-foreground" data-testid="offer-demand-ours">
-                      {{ demandById.get(o.id)!.ourTotal ? `на сайте ${demandById.get(o.id)!.ourTotal}, в наличии ${demandById.get(o.id)!.ourInStock}` : 'на сайте такого нет' }}{{ demandById.get(o.id)!.seasonSoon ? ' · скоро сезон' : '' }}
-                    </p>
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="min-w-0 break-words text-[13px] font-semibold">{{ demandById.get(o.id)!.name }}</span>
+                      <span v-if="trendLabel(demandById.get(o.id)!.trendPct)" class="px-[7px] py-0.5 text-[11px]" :class="[CHIP, TREND_CHIP[trendKind(demandById.get(o.id)!.trendPct)!]]">{{ trendLabel(demandById.get(o.id)!.trendPct) }}</span>
+                    </div>
+                    <span v-if="demandById.get(o.id)!.volume != null" class="text-muted-foreground" data-testid="offer-demand-volume">{{ formatVolume(demandById.get(o.id)!.volume) }} поисков в месяц</span>
+                    <span v-else class="text-muted-foreground">цифр спроса ещё нет</span>
+                    <span :class="demandById.get(o.id)!.ourTotal ? 'text-muted-foreground' : 'font-semibold text-red-700'" data-testid="offer-demand-ours">
+                      {{ demandById.get(o.id)!.ourTotal ? `На сайте ${demandById.get(o.id)!.ourTotal}, в наличии ${demandById.get(o.id)!.ourInStock}` : 'На сайте такого нет' }}{{ demandById.get(o.id)!.seasonSoon ? ' · скоро сезон' : '' }}
+                    </span>
                   </template>
                   <p v-else class="text-muted-foreground" data-testid="offer-demand-none">
                     Темы спроса нет ·
-                    <NuxtLink :to="newTopicLink(o)" class="text-primary hover:underline" data-testid="offer-demand-add">
+                    <NuxtLink :to="newTopicLink(o)" class="font-medium text-primary hover:underline" data-testid="offer-demand-add">
                       Добавить тему
                     </NuxtLink>
                   </p>
                 </div>
-                <p class="whitespace-pre-line break-words text-sm" :class="[o.items?.length ? 'line-clamp-3 text-muted-foreground' : 'line-clamp-4', { 'text-muted-foreground': !o.caption }]" data-testid="offer-caption">
-                  {{ o.caption || 'Без подписи' }}
-                </p>
-                <p class="mt-auto text-xs text-muted-foreground">
-                  {{ meta(o) }}
-                </p>
-                <a :href="o.postUrl" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-sm text-primary hover:underline" data-testid="offer-post">
-                  Пост в Telegram <ExternalLink class="h-3 w-3" />
-                </a>
-                <!-- «На сайт»: форма нового товара с прочитанным ИИ и фото поста; товаров в посте
-                     несколько — у каждого своя ссылка -->
-                <div v-if="o.status === 'new' && (o.items?.length ?? 0) > 1" class="flex flex-wrap gap-1.5">
-                  <Button v-for="(it, i) in o.items!.slice(0, 3)" :key="i" as-child size="sm" class="max-w-full px-2" data-testid="offer-to-site">
-                    <NuxtLink :to="{ path: '/admin/products/new', query: { offer: o.id, item: i } }" class="truncate">
-                      На сайт: {{ it.article || it.name }}
-                    </NuxtLink>
+
+                <div class="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
+                  <span>{{ meta(o) }}</span>
+                  <a :href="o.postUrl" target="_blank" rel="noopener" class="inline-flex items-center gap-1 font-medium text-primary hover:underline" data-testid="offer-post">
+                    Пост в Telegram <ExternalLink class="h-3 w-3" />
+                  </a>
+                </div>
+
+                <!-- Разбор: «На сайт» и «В заказ» — первого товара или всего поста, если не прочитан -->
+                <div v-if="o.status === 'new'" class="flex flex-col gap-2">
+                  <div class="flex gap-2" :data-testid="o.items?.length ? undefined : 'offer-order-post'">
+                    <Button as-child class="min-w-0 flex-1" data-testid="offer-to-site">
+                      <NuxtLink :to="{ path: '/admin/products/new', query: o.items && o.items.length > 1 ? { offer: o.id, item: 0 } : { offer: o.id } }">
+                        На сайт
+                      </NuxtLink>
+                    </Button>
+                    <Button v-if="picks[pickKey(o, o.items?.length ? 0 : null)]" data-testid="offer-order-remove" @click="removePick(pickKey(o, o.items?.length ? 0 : null))">
+                      <Check class="h-4 w-4" /> В заказе
+                    </Button>
+                    <Button v-else variant="outline" data-testid="offer-order-add" @click="addPick(o, o.items?.length ? 0 : null)">
+                      <ShoppingCart class="h-4 w-4" /> В заказ
+                    </Button>
+                  </div>
+                  <label v-if="picks[pickKey(o, o.items?.length ? 0 : null)]" class="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
+                    Штук в заказе
+                    <Input type="number" min="1" max="9999" inputmode="numeric" class="h-8 w-20" aria-label="Сколько штук" :model-value="picks[pickKey(o, o.items?.length ? 0 : null)]!.quantity" data-testid="offer-order-qty" @update:model-value="setPickQty(pickKey(o, o.items?.length ? 0 : null), $event)" />
+                  </label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <Button variant="outline" :disabled="busy.has(o.id)" data-testid="offer-added" @click="setStatus(o, 'added')">
+                      <Check class="h-4 w-4" /> Добавил
+                    </Button>
+                    <Button variant="ghost" :disabled="busy.has(o.id)" data-testid="offer-skipped" @click="setStatus(o, 'skipped')">
+                      <X class="h-4 w-4" /> Не брать
+                    </Button>
+                  </div>
+                </div>
+                <div v-else class="flex items-center justify-between gap-2">
+                  <span :class="[CHIP, o.status === 'added' ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-muted-foreground']">{{ o.status === 'added' ? 'Добавлен на сайт' : 'Не берём' }}</span>
+                  <Button variant="ghost" size="sm" :disabled="busy.has(o.id)" data-testid="offer-restore" @click="setStatus(o, 'new')">
+                    <Undo2 class="h-3.5 w-3.5" /> Вернуть
                   </Button>
                 </div>
-                <Button v-else-if="o.status === 'new'" as-child size="sm" data-testid="offer-to-site">
-                  <NuxtLink :to="{ path: '/admin/products/new', query: { offer: o.id } }">
-                    На сайт
-                  </NuxtLink>
-                </Button>
-                <div v-if="o.status === 'new'" class="grid grid-cols-2 gap-1.5">
-                  <Button size="sm" variant="outline" class="px-2" :disabled="busy.has(o.id)" data-testid="offer-added" @click="setStatus(o, 'added')">
+              </article>
+            </div>
+
+            <!-- Список -->
+            <div v-else class="py-1.5" :class="CARD">
+              <div v-for="o in g.offers" :key="o.id" class="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-neutral-100 px-4 py-3 last:border-b-0" :data-offer-id="o.id" data-testid="offer-row">
+                <a :href="o.photoUrl ?? o.postUrl" target="_blank" rel="noopener" class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-100 bg-white" :aria-label="o.photoUrl ? 'Фото крупно' : 'Пост в Telegram'">
+                  <img v-if="o.photoUrl" :src="o.photoUrl" alt="" loading="lazy" decoding="async" class="h-full w-full object-contain">
+                  <ImageOff v-else class="h-5 w-5 text-muted-foreground" />
+                </a>
+                <div class="flex min-w-0 flex-[1_1_220px] flex-col gap-1">
+                  <span class="line-clamp-2 break-words text-sm font-semibold">{{ o.items?.[0]?.name || o.caption.split('\n').find(l => l.trim()) || 'Без подписи' }}</span>
+                  <span class="break-words text-xs text-muted-foreground">
+                    <template v-if="o.items?.[0]?.article">Арт. {{ o.items[0].article }} · </template><template v-if="o.items?.[0]?.priceNote">{{ o.items[0].priceNote }} · </template><template v-if="(o.items?.length ?? 0) > 1">товаров в посте: {{ o.items!.length }} · </template>{{ meta(o) }} ·
+                    <a :href="o.postUrl" target="_blank" rel="noopener" class="text-primary hover:underline">пост</a>
+                  </span>
+                </div>
+                <div class="flex w-24 shrink-0 flex-col gap-0.5">
+                  <template v-if="o.items?.[0]?.price != null">
+                    <span class="whitespace-nowrap text-base font-bold tabular-nums">{{ formatPrice(o.items[0].price) }}&nbsp;₸</span>
+                    <span class="text-[11px] text-muted-foreground">{{ priceFrom(o.items[0]) }}</span>
+                  </template>
+                  <span v-else class="text-xs text-muted-foreground">цены нет</span>
+                </div>
+                <div v-if="page.topics" class="flex min-w-0 flex-[0_1_190px] flex-col items-start gap-1">
+                  <span :class="[CHIP, levelChipFlat(o)]">{{ DEMAND_LEVEL_TEXT[levelOf(o)] }}</span>
+                  <span v-if="demandById.get(o.id)" class="text-xs" :class="demandById.get(o.id)!.ourTotal ? 'text-muted-foreground' : 'font-semibold text-red-700'">
+                    {{ demandById.get(o.id)!.ourTotal ? `На сайте ${demandById.get(o.id)!.ourTotal}, в наличии ${demandById.get(o.id)!.ourInStock}` : 'На сайте такого нет' }}
+                  </span>
+                  <span v-else class="text-xs text-muted-foreground">Темы спроса нет</span>
+                </div>
+                <div v-if="o.status === 'new'" class="flex gap-2">
+                  <Button variant="outline" size="sm" :disabled="busy.has(o.id)" @click="setStatus(o, 'added')">
                     Добавил
                   </Button>
-                  <Button size="sm" variant="ghost" class="px-2" :disabled="busy.has(o.id)" data-testid="offer-skipped" @click="setStatus(o, 'skipped')">
+                  <Button variant="ghost" size="sm" :disabled="busy.has(o.id)" @click="setStatus(o, 'skipped')">
                     Не брать
                   </Button>
                 </div>
-                <Button v-else size="sm" variant="ghost" :disabled="busy.has(o.id)" data-testid="offer-restore" @click="setStatus(o, 'new')">
-                  Вернуть в новые
-                </Button>
+                <div v-else class="flex items-center gap-2">
+                  <span :class="[CHIP, o.status === 'added' ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-muted-foreground']">{{ o.status === 'added' ? 'Добавлен на сайт' : 'Не берём' }}</span>
+                  <Button variant="ghost" size="sm" :disabled="busy.has(o.id)" @click="setStatus(o, 'new')">
+                    Вернуть
+                  </Button>
+                </div>
               </div>
-            </article>
-          </div>
+            </div>
+          </template>
         </section>
 
         <p v-if="page.counts[status] > page.offers.length" class="text-center text-xs text-muted-foreground" data-testid="offers-truncated">

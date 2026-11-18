@@ -32,7 +32,8 @@
  *     читаются; без ключа ИИ — подсказка и кнопка «Модели ИИ»;
  *  5) повторный сбор — ничего нового; новые посты — только они;
  *  6) старше 30 дней — удалены вместе с фото; фото удалённого канала — тоже;
- *  7) группировка: по поставщикам, по дням, списком; запоминается;
+ *  7) группировка: по поставщикам, по дням, списком; запоминается; вид
+ *     «Плитка / Список» запоминается; группа сворачивается; «Разобрано N из M»;
  *  8) разбор: «Не брать» и «Отменить», «Добавил», «Вернуть в новые»;
  *     счётчики; в базе — кто и когда;
  *  9) без ключа ИИ товары собираются без чтения; «Прочитать» берёт фото из
@@ -450,7 +451,8 @@ try {
   const sp = s => (s ?? '').replace(/\s+/g, ' ').trim()
   const cards = page => page.locator('[data-testid=offer-card]')
   const statusCount = async (page, id) => Number((await page.locator(`[data-testid=offers-status-${id}] span`).textContent()).trim())
-  const groupTitles = page => page.locator('[data-testid=offers-group] h2').evaluateAll(hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()))
+  // Заголовок группы — «Поставщик · 12»: название и счётчик (макет 18.11 — счётчик пилюлей рядом)
+  const groupTitles = page => page.locator('[data-testid=offers-group-title]').evaluateAll(hs => hs.map(h => `${h.textContent.trim()} · ${h.parentElement.querySelector('[data-testid=offers-group-count]').textContent.trim()}`))
   const noScroll = page => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
   // Список перечитывается после сбора, смены отбора и перезагрузки — ждать сам ответ:
   // networkidle на этой странице уже наступал, и waitForLoadState вернётся сразу
@@ -512,7 +514,7 @@ try {
   check(channelRows.length === 3 && channelRows.every(r => r.endsWith('ещё не собирали')), `каналы — «ещё не собирали»: ${channelRows.join(' | ')}`)
   check(await page.locator('[data-testid=offers-channel] [aria-label="Закрытый канал"]').count() === 2, 'у закрытых каналов — замок')
   check(await page.locator('[data-testid=offers-no-account] a[href="/admin/telegram"]').count() === 1, 'закрытые каналы без аккаунта — подсказка и кнопка «Аккаунт Telegram»')
-  check(sp(await page.locator('[data-testid=offers-empty]').textContent()).startsWith('Нажмите «Собрать новые»'), 'пусто — что нажать')
+  check(sp(await page.locator('[data-testid=offers-empty]').innerText()).includes('Нажмите «Собрать новые»'), 'пусто — что нажать')
   const keyless = await readLine(page)
   check(keyless.includes('задайте ключ для Claude Haiku 5.5') && await page.locator('[data-testid=offers-reading] a[href="/admin/ai"]').count() === 1 && await page.locator('[data-testid=offers-reread]').count() === 0, `без ключа ИИ — «${keyless}», кнопка «Модели ИИ»`)
 
@@ -567,8 +569,10 @@ try {
   await shown.scrollIntoViewIfNeeded()
   check(await shown.evaluate(img => img.decode().then(() => img.naturalWidth > 0, () => false)), 'фото на карточке загрузилось')
   check(await page.locator('[data-testid=offer-card]', { hasText: 'PO-1020' }).locator('text=2 фото').count() === 1, 'на карточке альбома — «2 фото»')
-  if (SHOTS)
+  if (SHOTS) {
+    await page.evaluate(() => window.scrollTo(0, 0))
     await page.screenshot({ path: `${SHOTS}/offers-1366.png` })
+  }
 
   console.log('\n== чтение ИИ при сборе')
   const read = JSON.parse(psql(`SELECT json_agg(json_build_object('m', message_id, 'items', read_items, 'error', read_error, 'model', read_model, 'at', read_at, 'in', read_input_tokens, 'out', read_output_tokens, 'path', photo_path, 'caption', caption)) FROM public.supplier_offers WHERE channel_id IN ('${openId}', '${memberId}');`))
@@ -586,11 +590,11 @@ try {
   check(ai.retrieved <= 1, `справка о модели — не больше одной на сервер: ${ai.retrieved}`)
 
   const c13 = await cardOf(page, 'PO-1013')
-  check(c13.names[0] === 'Игрушка PO-1013' && c13.articles[0] === 'Арт. PO-1013' && c13.prices[0] === '1 013 ₸' && c13.from[0] === 'в подписи', `карточка: название, артикул без второй «Арт.», цена из подписи — ${c13.names[0]} · ${c13.articles[0]} · ${c13.prices[0]} ${c13.from[0]}`)
+  check(c13.names[0] === 'Игрушка PO-1013' && c13.articles[0] === 'Арт. PO-1013' && c13.prices[0] === '1 013 ₸' && c13.from[0] === 'цена из подписи', `карточка: название, артикул без второй «Арт.», цена из подписи — ${c13.names[0]} · ${c13.articles[0]} · ${c13.prices[0]} ${c13.from[0]}`)
   const c14 = await cardOf(page, 'PO-1014')
-  check(c14.prices[0] === '2 500 ₸' && c14.from[0] === 'на фото', `в подписи цены нет — с фото: ${c14.prices[0]} ${c14.from[0]}`)
+  check(c14.prices[0] === '2 500 ₸' && c14.from[0] === 'цена с фото', `в подписи цены нет — с фото: ${c14.prices[0]} ${c14.from[0]}`)
   const c16 = await cardOf(page, 'PO-1016')
-  check(c16.prices[0] === '1 016 ₸' && c16.from[0] === 'в подписи' && c16.conflict[0] === 'На фото другая: 1 200 ₸', `цены расходятся — главная из подписи, с фото рядом: ${c16.prices[0]} · ${c16.conflict[0]}`)
+  check(c16.prices[0] === '1 016 ₸' && c16.from[0] === 'цена из подписи' && c16.conflict[0] === 'На фото другая: 1 200 ₸', `цены расходятся — главная из подписи, с фото рядом: ${c16.prices[0]} · ${c16.conflict[0]}`)
   const c18 = await cardOf(page, 'PO-1018')
   check(c18.doubt[0] === 'ИИ не уверен: последняя цифра артикула не читается', `сомнение модели — на карточке: ${c18.doubt[0]}`)
   const c19 = await cardOf(page, 'PO-1019')
@@ -606,7 +610,7 @@ try {
   const c30 = await cardOf(page, 'PO-1030')
   check(!c30.items && !c30.none.length && !c30.error.length, 'товар без фото — без чтения и без ошибки')
   const line = await readLine(page)
-  check(line.startsWith('Артикул и цену с фото читает Claude Haiku 5.5 — при «Собрать новые».') && line.includes('Не прочлось: 2 — причина на карточке.') && await page.locator('[data-testid=offers-reread]').isVisible(), `строка чтения — модель и непрочитанное: «${line}»`)
+  check(line.startsWith('Артикул и цену с фото читает Claude Haiku 5.5 при «Собрать новые».') && line.includes('Не прочлось: 2 — причина на карточке.') && await page.locator('[data-testid=offers-reread]').isVisible(), `строка чтения — модель и непрочитанное: «${line}»`)
   if (SHOTS) {
     await page.locator('[data-testid=offer-card]', { hasText: 'PO-1016' }).scrollIntoViewIfNeeded()
     await page.screenshot({ path: `${SHOTS}/offers-1366-items.png` })
@@ -643,16 +647,35 @@ try {
   check(await page.locator('[data-testid=offers-group-none]').getAttribute('aria-pressed') === 'true', 'выбор группировки — запомнен')
   await page.locator('[data-testid=offers-group-supplier]').click()
 
+  console.log('\n== вид, свёрнутые группы, «Разобрано» (макет 18.11.2026)')
+  const gridCount = await cards(page).count()
+  await page.locator('[data-testid=offers-view-list]').click()
+  check(await page.locator('[data-testid=offer-row]').count() === gridCount && await cards(page).count() === 0, `«Список» — те же ${gridCount} товаров строками`)
+  if (SHOTS)
+    await page.screenshot({ path: `${SHOTS}/offers-1366-list.png` })
+  await reload(page)
+  check(await page.locator('[data-testid=offers-view-list]').getAttribute('aria-pressed') === 'true', 'вид — запомнен')
+  await page.locator('[data-testid=offers-view-grid]').click()
+  const firstGroup = page.locator('[data-testid=offers-group]').first()
+  const inFirst = await firstGroup.locator('[data-testid=offer-card]').count()
+  await firstGroup.locator('[data-testid=offers-group-toggle]').click()
+  check(inFirst > 0 && await firstGroup.locator('[data-testid=offer-card]').count() === 0 && await cards(page).count() === gridCount - inFirst && sp(await firstGroup.locator('[data-testid=offers-group-toggle]').textContent()) === 'Показать', 'свернуть группу — её карточки скрыты, остальные на месте')
+  await firstGroup.locator('[data-testid=offers-group-toggle]').click()
+  check(await cards(page).count() === gridCount, '«Показать» — группа снова развёрнута')
+  const [nNew, nAdded, nSkipped] = [await statusCount(page, 'new'), await statusCount(page, 'added'), await statusCount(page, 'skipped')]
+  const progress = sp(await page.locator('[data-testid=offers-progress]').innerText())
+  check(progress.includes(`${nAdded + nSkipped} из ${nNew + nAdded + nSkipped}`) && progress.endsWith(`Осталось ${nNew}`), `«Разобрано»: ${progress}`)
+
   console.log('\n== разбор')
   const newTotal = total + 2
   const firstCard = cards(page).first()
-  const firstCaption = sp(await firstCard.locator('[data-testid=offer-caption]').textContent())
+  const firstId = await firstCard.getAttribute('data-offer-id')
   await firstCard.locator('[data-testid=offer-skipped]').click()
   await toastWith(page, 'Отмечено: не брать').waitFor({ timeout: 15000 })
   check(await statusCount(page, 'new') === newTotal - 1 && await statusCount(page, 'skipped') === 1 && await cards(page).count() === newTotal - 1, '«Не брать» — карточка ушла, счётчики сдвинулись')
   await toastWith(page, 'Отмечено: не брать').getByRole('button', { name: 'Отменить' }).click()
   await page.waitForFunction(n => document.querySelectorAll('[data-testid=offer-card]').length === n, newTotal, { timeout: 15000 })
-  check(await statusCount(page, 'skipped') === 0 && sp(await cards(page).first().locator('[data-testid=offer-caption]').textContent()) === firstCaption, '«Отменить» — карточка вернулась на место')
+  check(await statusCount(page, 'skipped') === 0 && await cards(page).first().getAttribute('data-offer-id') === firstId, '«Отменить» — карточка вернулась на место')
   await cards(page).first().locator('[data-testid=offer-added]').click()
   await toastWith(page, 'Отмечено: добавил на сайт').waitFor({ timeout: 15000 })
   const marked = JSON.parse(psql(`SELECT json_agg(json_build_object('status', status, 'by', status_by, 'at', status_at)) FROM public.supplier_offers WHERE status <> 'new' AND channel_id IN ('${openId}', '${memberId}');`))
@@ -719,11 +742,11 @@ try {
 INSERT INTO public.market_demand_keywords (keyword, search_volume) VALUES ('проверка спроса po-1016', 2400);
 INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 'проверка спроса po-1016', m::date, 2400 FROM generate_series('2026-08-01'::date, '2026-10-01', interval '1 month') m;`)
   await reload(page)
-  const demandOf = article => page.locator('[data-testid=offer-card]', { hasText: article }).locator('[data-testid=offer-demand]').textContent().then(sp)
+  const demandOf = article => page.locator('[data-testid=offer-card]', { hasText: article }).locator('[data-testid=offer-demand]').innerText().then(sp)
   const d16 = await demandOf('PO-1016')
-  check(d16.startsWith('Спрос: Проверка спроса · 2 400/мес') && d16.includes('на сайте такого нет'), `тема нашла товар по прочитанному ИИ: «${d16}»`)
+  check(d16.startsWith('Проверка спроса 2 400 поисков в месяц') && d16.includes('На сайте такого нет'), `тема нашла товар по прочитанному ИИ: «${d16}»`)
   const d18 = await demandOf('PO-1018')
-  check(d18.startsWith('Спрос: Проверка спроса без цифр · цифр ещё нет'), `тема без цифр — так и сказано: «${d18}»`)
+  check(d18.startsWith('Проверка спроса без цифр цифр спроса ещё нет'), `тема без цифр — так и сказано: «${d18}»`)
   if (SHOTS) {
     await page.locator('[data-testid=offer-card]', { hasText: 'PO-1016' }).screenshot({ path: `${SHOTS}/offer-demand.png` })
     await page.locator('[data-testid=offer-card]', { hasText: 'PO-1020' }).screenshot({ path: `${SHOTS}/offer-no-demand.png` })
@@ -915,7 +938,7 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   const phone = await newPage({ width: 390, height: 844 })
   check(await noScroll(phone), 'без горизонтальной прокрутки')
   const box = await cards(phone).first().boundingBox()
-  check(box && box.width > 150 && box.width < 200, `карточки в два столбца: ${Math.round(box?.width ?? 0)} px`)
+  check(box && box.width > 300 && box.width < 370, `карточки в один столбец, как в макете: ${Math.round(box?.width ?? 0)} px`)
   const buttons = await cards(phone).locator('button, a[data-testid=offer-to-site]').evaluateAll(bs => bs.slice(0, 24).map(b => b.scrollWidth <= b.clientWidth + 1))
   check(buttons.length === 24 && buttons.every(Boolean), `надписи кнопок помещаются — «На сайт», «В заказ», «Добавил», «Не брать»: ${buttons.filter(Boolean).length} из ${buttons.length}`)
   const prices = await cards(phone).locator('[data-testid=offer-price]').evaluateAll(ps => ps.slice(0, 12).map(p => p.getClientRects().length === 1 && p.getBoundingClientRect().right <= p.closest('[data-testid=offer-card]').getBoundingClientRect().right + 0.5))
