@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import type { OfferDemandFilter, OfferDemandTopic } from '@/utils/offerDemand'
+import type { OfferNarrow, OfferNarrowSummary } from '@/utils/offerQueries'
 import type { OrderSheetLine } from '@/utils/orderSheet'
 import type { Offer, OfferChannel, OfferGrouping, OfferReading, OfferStatus } from '@/utils/supplierOfferList'
 import { useLocalStorage } from '@vueuse/core'
-import { Check, ChevronDown, Download, ExternalLink, ImageOff, Inbox, ListChecks, Lock, RefreshCw, Send, ShoppingCart, Sparkles, Undo2, X } from 'lucide-vue-next'
+import { Check, ChevronDown, Download, ExternalLink, ImageOff, Inbox, ListChecks, Lock, RefreshCw, Search, Send, ShoppingCart, Sparkles, Undo2, X } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { jpegForSheet, saveOrderFile } from '@/composables/useOrderSheetFile'
 import { formatPrice } from '@/utils/formatPrice'
-import { formatVolume, trendKind, trendLabel } from '@/utils/marketDemand'
+import { DEMAND_REFRESH_COST, formatUsd, formatVolume, trendKind, trendLabel } from '@/utils/marketDemand'
 import { DEMAND_LEVEL_TEXT, demandLevel, demandLevelBounds, filterByDemand, OFFER_DEMAND_FILTERS, offerDemand, topicDraft } from '@/utils/offerDemand'
+import { narrowLevel, narrowLevelBounds, offerNarrow } from '@/utils/offerQueries'
 import { buildOrderWorkbook, groupOrderLines, orderFileName } from '@/utils/orderSheet'
 import { plural } from '@/utils/restockOrder'
 import { collectedText, dayTitle, groupOffers, modelLabel, offerOrderLine, timeOf } from '@/utils/supplierOfferList'
@@ -38,6 +40,8 @@ interface PageData {
   reading: OfferReading | null
   /** Темы «Спроса на рынке»; null — нет миграции спроса */
   topics: OfferDemandTopic[] | null
+  /** Точный спрос по запросам товаров; null — нет миграции 20261118120000 */
+  narrow: OfferNarrowSummary | null
 }
 
 /** Чтение ИИ за запрос сбора или «Прочитать» */
@@ -87,22 +91,54 @@ const demandFilter = useLocalStorage<OfferDemandFilter>('admin-supplier-offers-d
 if (!OFFER_DEMAND_FILTERS.some(f => f.id === demandFilter.value))
   demandFilter.value = 'all'
 const demandById = computed(() => new Map((page.value?.offers ?? []).map(o => [o.id, page.value?.topics ? offerDemand(o, page.value.topics) : null])))
+/*
+ * Точный спрос (18.11.2026, владелец: «работает слишком широко, типа по
+ * запросу «куклы»»): у товара — запросы покупателя, подобранные ИИ, и ответ
+ * DataForSEO по ним. Есть — уровень и «Высокий спрос» по ним; тема остаётся
+ * фоном. Нет миграции 20261118120000 — по темам, как прежде.
+ */
+// Пока DataForSEO не ответил ни на одну фразу — по темам: иначе сразу после миграции у всех «нет данных»
+const volumes = computed(() => {
+  const v = page.value?.narrow?.volumes
+  return v && Object.keys(v).length ? v : null
+})
+const narrowById = computed(() => new Map((page.value?.offers ?? []).map(o => [o.id, volumes.value ? offerNarrow(o.queries, volumes.value) : null])))
+const narrowBounds = computed(() => volumes.value ? narrowLevelBounds(volumes.value) : null)
 const groups = computed(() => {
   const p = page.value
   if (!p)
     return []
   const filter = p.topics ? demandFilter.value : 'all'
-  const list = groupOffers(filterByDemand(p.offers, p.topics ?? [], filter), p.channels, grouping.value)
+  const list = groupOffers(filterByDemand(p.offers, p.topics ?? [], filter, volumes.value), p.channels, grouping.value)
   // «Высокий спрос» — внутри группы сверху больший спрос (groupOffers ставит по времени)
   if (filter === 'high') {
+    const volumeOf = (o: Offer) => volumes.value ? narrowById.value.get(o.id)?.volume ?? 0 : demandById.value.get(o.id)?.volume ?? 0
     for (const g of list)
-      g.offers.sort((a, b) => (demandById.value.get(b.id)?.volume ?? 0) - (demandById.value.get(a.id)?.volume ?? 0))
+      g.offers.sort((a, b) => volumeOf(b) - volumeOf(a))
   }
   return list
 })
-// Уровень спроса — метка в углу фото: трети своих тем по запросам в месяц
+// Уровень спроса — метка в углу фото: трети своих фраз (или тем) по запросам в месяц
 const levelBounds = computed(() => demandLevelBounds(page.value?.topics ?? []))
-const levelOf = (o: Offer) => demandLevel(demandById.value.get(o.id) ?? null, levelBounds.value)
+function levelOf(o: Offer) {
+  return volumes.value
+    ? narrowLevel(narrowById.value.get(o.id) ?? null, narrowBounds.value)
+    : demandLevel(demandById.value.get(o.id) ?? null, levelBounds.value)
+}
+const itemNarrow = (o: Offer, i: number) => volumes.value ? offerNarrow(o.queries, volumes.value, i) : null
+// Пробел в начале <template> Vue съедает («купить»560) — строки собираются здесь
+const narrowPhrase = (n: OfferNarrow) => n.phrase ?? n.phrases[0]!.phrase
+function narrowOthers(n: OfferNarrow) {
+  return n.phrases
+    .filter(p => p.phrase !== narrowPhrase(n))
+    .map(p => `«${p.phrase}»${p.checked ? ` ${p.volume ? formatVolume(p.volume) : '—'}` : ''}`)
+    .join(', ')
+}
+function itemNarrowText(o: Offer, i: number) {
+  const n = itemNarrow(o, i)!
+  return `Ищут «${narrowPhrase(n)}»${n.checked ? ` — ${n.volume ? `${formatVolume(n.volume)} в месяц` : 'редко'}` : ''}`
+}
+const listNarrowText = (n: OfferNarrow) => `«${narrowPhrase(n)}»${n.volume ? ` · ${formatVolume(n.volume)}` : ''}`
 // Пилюли по макету «Товары поставщиков» (Claude Design, 18.11.2026)
 const CARD = 'rounded-[20px] bg-background shadow-sm'
 const CHIP = 'inline-flex items-center whitespace-nowrap rounded-full px-2 py-[3px] text-xs font-semibold'
@@ -214,6 +250,7 @@ async function collectAll() {
   else
     toast.success(added ? `Новых товаров: ${added}${ai ? ` · ${ai}` : ''}` : 'Новых товаров нет')
   await refresh()
+  await fillQueries(true)
 }
 
 // --- Чтение ИИ ---
@@ -250,6 +287,85 @@ async function rereadAll() {
   finally {
     rereading.value = null
     await refresh()
+  }
+  await fillQueries(true)
+}
+
+// --- Точный спрос (18.11.2026) ---
+/** Подобрано запросов за проход; null — не подбираем */
+const querying = ref<number | null>(null)
+
+/*
+ * Запросы покупателя к прочитанным товарам — порциями, пока сервер отвечает
+ * `more`. После сбора и «Прочитать» — сами (`quiet`: без уведомления, если
+ * подбирать было нечего); кнопкой — с уведомлением.
+ */
+async function fillQueries(quiet = false) {
+  if (querying.value !== null || !page.value?.narrow)
+    return
+  if (quiet && !page.value.narrow.withoutQueries)
+    return
+  querying.value = 0
+  let failure: string | null = null
+  let off: string | null = null
+  try {
+    for (let i = 0; i < 20; i++) {
+      const res = await adminFetch<{ done: number, more: boolean, off: 'migration' | 'key' | null, error: string | null }>('/api/admin/supplier-offers/queries', { method: 'POST' })
+      querying.value += res.done
+      failure = res.error
+      off = res.off
+      if (!res.more)
+        break
+    }
+  }
+  catch (e) {
+    failure = errorText(e, 'Не удалось подобрать запросы')
+  }
+  const done = querying.value
+  querying.value = null
+  // Без ключа после сбора молчим: строка чтения ИИ выше уже зовёт на «Модели ИИ»
+  if (off === 'key' && !quiet)
+    toast.error('Запросы подбирает ИИ — задайте ключ на странице «Модели ИИ»')
+  else if (failure)
+    toast.error(`Запросы подобраны у ${count(done, 'товара', 'товаров', 'товаров')}, дальше — ошибка: ${failure}`)
+  else if (done || !quiet)
+    toast.success(done ? `Запросы покупателей подобраны: ${count(done, 'товар', 'товара', 'товаров')}` : 'Подбирать нечего')
+  await refresh()
+}
+
+const checking = ref(false)
+
+/**
+ * «Узнать спрос»: непроверенные запросы — одной задачей в DataForSEO, потом
+ * забираем ответ, как «Спрос на рынке»: каждые 4 с, до 3 минут.
+ */
+async function checkDemand() {
+  if (checking.value)
+    return
+  checking.value = true
+  try {
+    const run = await adminFetch<{ run: number, phrases: number }>('/api/admin/supplier-offers/demand', { method: 'POST' })
+    toast.info(`Спрос по ${count(run.phrases, 'запросу', 'запросам', 'запросам')} спрошен у DataForSEO — ответ обычно за минуту`)
+    for (let i = 0; i < 45; i++) {
+      await new Promise(r => setTimeout(r, 4000))
+      const res = await adminFetch<{ pending: number }>('/api/admin/demand/collect', { method: 'POST' })
+      if (!res.pending)
+        break
+    }
+    await refresh()
+    const last = page.value?.narrow?.last
+    if (last?.status === 'failed')
+      toast.error(last.error ?? 'DataForSEO не ответил')
+    else if (last?.status === 'done')
+      toast.success(`DataForSEO ответил: ${count(last.items ?? 0, 'запрос', 'запроса', 'запросов')}`)
+    else
+      toast.info('Ответа ещё нет — обновите страницу через пару минут')
+  }
+  catch (e) {
+    toast.error(errorText(e, 'Не удалось спросить DataForSEO'))
+  }
+  finally {
+    checking.value = false
   }
 }
 
@@ -488,6 +604,44 @@ async function downloadOrder() {
                   {{ rereading !== null ? `Читаю… ${rereading}` : 'Прочитать' }}
                 </Button>
               </div>
+              <!-- Точный спрос: запросы покупателя к товарам и ответ DataForSEO -->
+              <div v-if="page.narrow" class="flex flex-col gap-2 pt-2.5 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between" data-testid="offers-narrow">
+                <p class="flex items-start gap-2">
+                  <Search class="mt-0.5 size-4 shrink-0 text-primary" />
+                  <span>
+                    Точный спрос: ИИ подбирает товару запросы покупателей, DataForSEO отвечает, сколько их ищут.
+                    <span v-if="querying !== null" data-testid="offers-narrow-state">Подбираю запросы… {{ querying }}</span>
+                    <span v-else-if="page.narrow.pending || checking" data-testid="offers-narrow-state">Ждём ответа DataForSEO…</span>
+                    <template v-else>
+                      <span v-if="page.narrow.withoutQueries" data-testid="offers-narrow-state">Без запросов: {{ count(page.narrow.withoutQueries, 'товар', 'товара', 'товаров') }}.</span>
+                      <span v-if="page.narrow.unchecked" data-testid="offers-narrow-unchecked">Не проверено: {{ count(page.narrow.unchecked, 'запрос', 'запроса', 'запросов') }}.</span>
+                      <span v-else-if="!page.narrow.withoutQueries && Object.keys(page.narrow.volumes).length" data-testid="offers-narrow-state">Все запросы проверены.</span>
+                      <span v-if="page.narrow.last?.status === 'failed'" class="text-destructive" data-testid="offers-narrow-error">Последняя проверка: {{ page.narrow.last.error }}</span>
+                    </template>
+                  </span>
+                </p>
+                <div class="flex shrink-0 gap-2">
+                  <Button
+                    v-if="page.narrow.withoutQueries && querying === null"
+                    variant="outline"
+                    size="sm"
+                    :disabled="!!collecting || rereading !== null"
+                    data-testid="offers-queries"
+                    @click="fillQueries()"
+                  >
+                    Подобрать запросы
+                  </Button>
+                  <Button
+                    v-if="page.narrow.unchecked"
+                    size="sm"
+                    :disabled="checking || page.narrow.pending || querying !== null"
+                    data-testid="offers-check-demand"
+                    @click="checkDemand"
+                  >
+                    {{ checking ? 'Спрашиваю…' : `Узнать спрос · ≈ ${formatUsd(DEMAND_REFRESH_COST / 2)}` }}
+                  </Button>
+                </div>
+              </div>
             </template>
           </section>
         </div>
@@ -654,6 +808,9 @@ async function downloadOrder() {
                     <p v-if="it.confidence !== 'high'" class="text-xs text-amber-700" data-testid="offer-doubt">
                       ИИ не уверен{{ it.doubt ? `: ${it.doubt}` : '' }}
                     </p>
+                    <p v-if="i && itemNarrow(o, i)" class="break-words text-xs text-muted-foreground" data-testid="offer-item-narrow">
+                      {{ itemNarrowText(o, i) }}
+                    </p>
                     <!-- У второго и третьего товара поста — свои «На сайт» и «В заказ» -->
                     <div v-if="i" class="flex flex-wrap items-center gap-2 pt-0.5">
                       <Button v-if="o.status === 'new'" as-child size="sm" variant="outline" class="max-w-full" data-testid="offer-to-site">
@@ -689,25 +846,41 @@ async function downloadOrder() {
                   </p>
                 </div>
 
-                <!-- Спрос: тема «Спроса на рынке», нашедшая товар -->
-                <div v-if="page.topics" class="flex flex-col gap-1 rounded-xl bg-neutral-100 px-3 py-2.5 text-xs" data-testid="offer-demand">
-                  <template v-if="demandById.get(o.id)">
-                    <div class="flex items-center justify-between gap-2">
-                      <span class="min-w-0 break-words text-[13px] font-semibold">{{ demandById.get(o.id)!.name }}</span>
-                      <span v-if="trendLabel(demandById.get(o.id)!.trendPct)" class="px-[7px] py-0.5 text-[11px]" :class="[CHIP, TREND_CHIP[trendKind(demandById.get(o.id)!.trendPct)!]]">{{ trendLabel(demandById.get(o.id)!.trendPct) }}</span>
+                <!-- Спрос: точный — по запросам покупателя к товару; тема «Спроса на рынке» — фоном -->
+                <div v-if="page.topics || volumes" class="flex flex-col gap-1 rounded-xl bg-neutral-100 px-3 py-2.5 text-xs" data-testid="offer-demand">
+                  <template v-if="volumes">
+                    <div v-if="narrowById.get(o.id)" class="flex flex-col gap-0.5" data-testid="offer-narrow">
+                      <span class="break-words text-[13px] font-semibold" data-testid="offer-narrow-phrase">«{{ narrowPhrase(narrowById.get(o.id)!) }}»</span>
+                      <span class="text-muted-foreground" data-testid="offer-narrow-volume">
+                        {{ !narrowById.get(o.id)!.checked ? 'спрос по запросам ещё не проверен' : narrowById.get(o.id)!.volume > 0 ? `${formatVolume(narrowById.get(o.id)!.volume)} поисков в месяц` : 'ищут слишком редко — цифр нет' }}
+                      </span>
+                      <span v-if="narrowById.get(o.id)!.phrases.length > 1" class="break-words text-[11px] text-muted-foreground" data-testid="offer-narrow-more">
+                        ещё: {{ narrowOthers(narrowById.get(o.id)!) }}
+                      </span>
                     </div>
-                    <span v-if="demandById.get(o.id)!.volume != null" class="text-muted-foreground" data-testid="offer-demand-volume">{{ formatVolume(demandById.get(o.id)!.volume) }} поисков в месяц</span>
-                    <span v-else class="text-muted-foreground">цифр спроса ещё нет</span>
-                    <span :class="demandById.get(o.id)!.ourTotal ? 'text-muted-foreground' : 'font-semibold text-red-700'" data-testid="offer-demand-ours">
-                      {{ demandById.get(o.id)!.ourTotal ? `На сайте ${demandById.get(o.id)!.ourTotal}, в наличии ${demandById.get(o.id)!.ourInStock}` : 'На сайте такого нет' }}{{ demandById.get(o.id)!.seasonSoon ? ' · скоро сезон' : '' }}
+                    <span v-else class="text-muted-foreground" data-testid="offer-narrow-none">
+                      {{ o.items?.length ? 'Запросы покупателей ещё не подобраны' : 'Запросов нет — товар не прочитан' }}
                     </span>
                   </template>
-                  <p v-else class="text-muted-foreground" data-testid="offer-demand-none">
-                    Темы спроса нет ·
-                    <NuxtLink :to="newTopicLink(o)" class="font-medium text-primary hover:underline" data-testid="offer-demand-add">
-                      Добавить тему
-                    </NuxtLink>
-                  </p>
+                  <div v-if="page.topics" :class="volumes ? 'mt-1 flex flex-col gap-0.5 border-t border-neutral-200 pt-1.5' : 'flex flex-col gap-1'" data-testid="offer-topic">
+                    <template v-if="demandById.get(o.id)">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="min-w-0 break-words" :class="volumes ? 'text-muted-foreground' : 'text-[13px] font-semibold'">{{ volumes ? `Тема «${demandById.get(o.id)!.name}»` : demandById.get(o.id)!.name }}</span>
+                        <span v-if="trendLabel(demandById.get(o.id)!.trendPct)" class="px-[7px] py-0.5 text-[11px]" :class="[CHIP, TREND_CHIP[trendKind(demandById.get(o.id)!.trendPct)!]]">{{ trendLabel(demandById.get(o.id)!.trendPct) }}</span>
+                      </div>
+                      <span v-if="demandById.get(o.id)!.volume != null" class="text-muted-foreground" data-testid="offer-demand-volume">{{ formatVolume(demandById.get(o.id)!.volume) }} поисков в месяц{{ volumes ? ' по теме' : '' }}</span>
+                      <span v-else class="text-muted-foreground">цифр спроса ещё нет</span>
+                      <span :class="demandById.get(o.id)!.ourTotal ? 'text-muted-foreground' : 'font-semibold text-red-700'" data-testid="offer-demand-ours">
+                        {{ demandById.get(o.id)!.ourTotal ? `На сайте ${demandById.get(o.id)!.ourTotal}, в наличии ${demandById.get(o.id)!.ourInStock}` : 'На сайте такого нет' }}{{ demandById.get(o.id)!.seasonSoon ? ' · скоро сезон' : '' }}
+                      </span>
+                    </template>
+                    <p v-else class="text-muted-foreground" data-testid="offer-demand-none">
+                      Темы спроса нет ·
+                      <NuxtLink :to="newTopicLink(o)" class="font-medium text-primary hover:underline" data-testid="offer-demand-add">
+                        Добавить тему
+                      </NuxtLink>
+                    </p>
+                  </div>
                 </div>
 
                 <div class="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
@@ -775,9 +948,13 @@ async function downloadOrder() {
                   </template>
                   <span v-else class="text-xs text-muted-foreground">цены нет</span>
                 </div>
-                <div v-if="page.topics" class="flex min-w-0 flex-[0_1_190px] flex-col items-start gap-1">
+                <div v-if="page.topics || volumes" class="flex min-w-0 flex-[0_1_190px] flex-col items-start gap-1">
                   <span :class="[CHIP, levelChipFlat(o)]">{{ DEMAND_LEVEL_TEXT[levelOf(o)] }}</span>
-                  <span v-if="demandById.get(o.id)" class="text-xs" :class="demandById.get(o.id)!.ourTotal ? 'text-muted-foreground' : 'font-semibold text-red-700'">
+                  <span v-if="narrowById.get(o.id)" class="break-words text-xs text-muted-foreground">
+                    {{ listNarrowText(narrowById.get(o.id)!) }}
+                  </span>
+                  <span v-if="!page.topics" />
+                  <span v-else-if="demandById.get(o.id)" class="text-xs" :class="demandById.get(o.id)!.ourTotal ? 'text-muted-foreground' : 'font-semibold text-red-700'">
                     {{ demandById.get(o.id)!.ourTotal ? `На сайте ${demandById.get(o.id)!.ourTotal}, в наличии ${demandById.get(o.id)!.ourInStock}` : 'На сайте такого нет' }}
                   </span>
                   <span v-else class="text-xs text-muted-foreground">Темы спроса нет</span>

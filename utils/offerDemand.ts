@@ -1,5 +1,6 @@
 import type { DemandTopic } from './marketDemand'
 import type { Offer } from './supplierOfferList'
+import { narrowLevel, narrowLevelBounds, offerNarrow } from './offerQueries'
 
 /**
  * Спрос у товаров поставщиков (6 ноября 2026). Владелец 4.11: «нейронка
@@ -84,13 +85,26 @@ export const OFFER_DEMAND_FILTERS: { id: OfferDemandFilter, label: string }[] = 
 
 /**
  * Отбор и порядок по спросу: «Высокий спрос» (владелец 18.11.2026, по
- * макету) — уровень «высокий», как метка на фото: верхняя треть своих тем,
- * сверху самый большой спрос; «Темы нет» — ни одна тема не нашла товар.
- * «Все» — порядок не меняется (по времени поста).
+ * макету) — уровень «высокий», как метка на фото, сверху самый большой
+ * спрос; «Темы нет» — ни одна тема не нашла товар. «Все» — порядок не
+ * меняется (по времени поста).
+ *
+ * `volumes` — точный спрос (18.11.2026: «работает слишком широко»): ответы
+ * DataForSEO на запросы покупателя к товарам (utils/offerQueries.ts). Есть —
+ * «высокий» считается по ним, нет (миграции 20261118120000 ещё нет) — по
+ * темам: верхняя треть своих тем.
  */
-export function filterByDemand<T extends Pick<Offer, 'caption' | 'items'>>(offers: T[], topics: OfferDemandTopic[], filter: OfferDemandFilter): T[] {
+export function filterByDemand<T extends Pick<Offer, 'caption' | 'items'> & { queries?: string[][] | null }>(offers: T[], topics: OfferDemandTopic[], filter: OfferDemandFilter, volumes?: Record<string, number | null> | null): T[] {
   if (filter === 'all')
     return offers
+  if (filter === 'high' && volumes) {
+    const bounds = narrowLevelBounds(volumes)
+    return offers
+      .map(o => ({ o, n: offerNarrow(o.queries, volumes) }))
+      .filter(x => narrowLevel(x.n, bounds) === 'high')
+      .sort((a, b) => b.n!.volume - a.n!.volume)
+      .map(x => x.o)
+  }
   const withDemand = offers.map(o => ({ o, d: offerDemand(o, topics) }))
   if (filter === 'none')
     return withDemand.filter(x => !x.d).map(x => x.o)
