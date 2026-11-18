@@ -927,7 +927,7 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   psql(`DELETE FROM public.supplier_channels WHERE id = '${floodId}'; DELETE FROM public.service_meters WHERE key = 'telegram_flood';`)
   check((await battery('dataforseo')).value === 'ключа нет', 'DataForSEO без ключа — «ключа нет»')
   if (SHOTS)
-    await page.locator('[data-testid=batteries]').screenshot({ path: `${SHOTS}/batteries-1366.png` })
+    await page.locator('[data-testid=usage-card]').screenshot({ path: `${SHOTS}/batteries-1366.png` })
   await page.locator('[data-testid=budget-edit]').click()
   await page.locator('[data-testid=budget-remove]').click()
   await toastWith(page, 'Бюджет ИИ убран').waitFor({ timeout: 15000 })
@@ -951,10 +951,10 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
     await phone.screenshot({ path: `${SHOTS}/offers-390-cards.png` })
   }
   await phone.goto(`${BASE}/admin/purchasing`, { waitUntil: 'load', timeout: 120000 })
-  await phone.locator('[data-testid=batteries] [data-testid=battery-ai_limits]').waitFor({ timeout: 30000 })
+  await phone.locator('[data-testid=usage-card] [data-testid=battery-ai_limits]').waitFor({ timeout: 30000 })
   check(await noScroll(phone), 'дашборд с батарейками на телефоне — без горизонтальной прокрутки')
   if (SHOTS)
-    await phone.locator('[data-testid=batteries]').screenshot({ path: `${SHOTS}/batteries-390.png` })
+    await phone.locator('[data-testid=usage-card]').screenshot({ path: `${SHOTS}/batteries-390.png` })
   await phone.context().close()
 
   console.log('\n== секреты')
