@@ -73,6 +73,12 @@ const WEB_PORT = 3199
 const WEB = `http://127.0.0.1:${WEB_PORT}`
 const AI_PORT = 8788
 const AI_WEB = `http://127.0.0.1:${AI_PORT}`
+// Заглушка DataForSEO — база зовёт её из контейнера через pg_net (как в check-admin-demand.mjs)
+const DFS_PORT = 8790
+const DFS_LOGIN = 'offers_stub_login'
+const DFS_PASSWORD = 'offers-stub-PassWord9'
+const REST_CONTAINER = 'supabase_rest_gvsdevsvzgcivpphcuai'
+const sleep = ms => new Promise(r => setTimeout(r, ms))
 const SUPA = 'http://127.0.0.1:54321'
 const DB_CONTAINER = 'supabase_db_gvsdevsvzgcivpphcuai'
 // Стандартные демо-ключи локального Supabase — публичные
@@ -211,7 +217,7 @@ await new Promise(r => server.listen(WEB_PORT, '127.0.0.1', r))
  * провайдер отвечает 429, 'down' — рвёт соединение. Фото в журнал не пишется —
  * только тип и совпало ли с отданным заглушкой t.me и подделкой Telegram.
  */
-const ai = { mode: 'ok', requests: [], retrieved: 0, tries: new Map() }
+const ai = { mode: 'ok', requests: [], queries: [], retrieved: 0, tries: new Map() }
 function aiAnswer(article, caption) {
   const price = Number(/Цена (\d+)/.exec(caption)?.[1]) || null
   const item = patch => ({ name: `Игрушка ${article}`, article, brand: null, price_text: price, price_image: null, price_note: null, age: '3+', confidence: 'high', doubt: null, ...patch })
@@ -254,6 +260,14 @@ const aiServer = http.createServer((req, res) => {
     if (req.method !== 'POST' || pathname !== '/v1/messages')
       return send(404, { type: 'error', error: { type: 'not_found_error', message: pathname } })
     const body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+    // Подбор запросов покупателя (18.11.2026) — текстом, без фото; режимы сбоев его не касаются
+    if (typeof body.system === 'string' && body.system.startsWith('Ты помогаешь закупщику')) {
+      const text = typeof body.messages?.[0]?.content === 'string' ? body.messages[0].content : ''
+      const list = JSON.parse(text.slice(text.indexOf('[')))
+      ai.queries.push({ model: body.model, format: body.output_config?.format?.type, items: list.length, images: JSON.stringify(body.messages).includes('"image"') })
+      const items = list.map(it => ({ id: it.id, queries: [`${it.name} точно`, `${it.name} купить`, 'кукла'] }))
+      return send(200, { id: `msg_q_${ai.queries.length}`, type: 'message', role: 'assistant', model: body.model, content: [{ type: 'text', text: JSON.stringify({ items }) }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 800, output_tokens: 400 } })
+    }
     const content = body.messages?.[0]?.content ?? []
     const caption = content.find(b => b.type === 'text')?.text ?? ''
     const article = /(?:PO|ЗК)-\d+/.exec(caption)?.[0] ?? null
@@ -292,6 +306,43 @@ const aiServer = http.createServer((req, res) => {
   })
 })
 await new Promise(r => aiServer.listen(AI_PORT, '127.0.0.1', r))
+
+// ---------- заглушка DataForSEO ----------
+
+/*
+ * Спрос по номеру из фразы: «игрушка po 1016 точно» — 5 000 (верхняя треть),
+ * po 1013 — 30, po 1018 — «данных нет» (null), остальные — номер × 10.
+ */
+const dfs = { requests: [] }
+function dfsVolume(keyword) {
+  const n = Number(/po (\d+)/.exec(keyword)?.[1])
+  if (n === 1016)
+    return 5000
+  if (n === 1013)
+    return 30
+  if (n === 1018)
+    return null
+  return n ? (n - 1000) * 10 : 70
+}
+const dfsServer = http.createServer((req, res) => {
+  let raw = ''
+  req.on('data', c => raw += c)
+  req.on('end', () => {
+    res.setHeader('Content-Type', 'application/json')
+    if (req.url === '/ping')
+      return res.end('{"pong":true}')
+    const good = req.headers.authorization === `Basic ${Buffer.from(`${DFS_LOGIN}:${DFS_PASSWORD}`).toString('base64')}`
+    const task = raw ? JSON.parse(raw)?.[0] ?? {} : {}
+    dfs.requests.push({ url: req.url, good, task })
+    if (!good) {
+      res.statusCode = 401
+      return res.end(JSON.stringify({ status_code: 40100, status_message: 'You are not authorized.', cost: 0, tasks: [] }))
+    }
+    const result = (task.keywords ?? []).map(keyword => ({ keyword, search_volume: dfsVolume(keyword), monthly_searches: dfsVolume(keyword) == null ? null : [{ year: 2026, month: 10, search_volume: dfsVolume(keyword) }] }))
+    res.end(JSON.stringify({ version: '0.1', status_code: 20000, status_message: 'Ok.', cost: 0.09, tasks_count: 1, tasks_error: 0, tasks: [{ id: 'stub', status_code: 20000, status_message: 'Ok.', cost: 0.09, result_count: result.length, result }] }))
+  })
+})
+await new Promise(r => dfsServer.listen(DFS_PORT, '0.0.0.0', r))
 
 // ---------- данные ----------
 
@@ -335,6 +386,10 @@ async function cleanup() {
   for (const id of new Set([...channelIds, ...ids.split(',').filter(Boolean), ORPHAN]))
     await removeFiles(await bucketFiles(id))
   psql(`DELETE FROM public.suppliers WHERE name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
+  // Фразы стража — «игрушка po 1016 точно», «игрушка зк 10 купить», «набор b 2 точно»
+  psql(`DELETE FROM public.market_demand_monthly WHERE keyword ~ '^(игрушка|набор) .+ (точно|купить)$'; DELETE FROM public.market_demand_keywords WHERE keyword ~ '^(игрушка|набор) .+ (точно|купить)$';`)
+  if (started && psql(`SELECT to_regproc('public.market_demand_request_offers') IS NOT NULL;`) === 't')
+    psql(`DELETE FROM public.market_demand_runs WHERE kind = 'offers'; DELETE FROM vault.secrets WHERE name = 'dataforseo_credentials';`)
   if (started)
     psql(`DELETE FROM public.ai_usage_daily; DELETE FROM public.service_meters; DELETE FROM public.ai_settings WHERE key = 'ai_budget';`)
   if (started)
@@ -352,7 +407,35 @@ COMMIT;
 NOTIFY pgrst, 'reload schema';`)
 }
 
+function psqlSuper(sql) {
+  return execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=postgres', DB_CONTAINER, 'psql', '-w', '-h', '127.0.0.1', '-U', 'supabase_admin', '-d', 'postgres', '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1'], { input: sql, encoding: 'utf8' }).trim()
+}
+async function restartRest() {
+  execFileSync('docker', ['restart', REST_CONTAINER], { encoding: 'utf8' })
+  for (let i = 0; i < 60; i++) {
+    if (await fetch(`${SUPA}/rest/v1/suppliers?select=id&limit=1`, { headers: serviceHeaders }).then(r => r.ok).catch(() => false))
+      return
+    await sleep(1000)
+  }
+  throw new Error('PostgREST не поднялся после перезапуска')
+}
+async function dfsPing() {
+  for (let t = 0; t < 10; t++) {
+    const id = psql(`SELECT net.http_get('http://host.docker.internal:${DFS_PORT}/ping')`)
+    for (let i = 0; i < 10; i++) {
+      await sleep(500)
+      const row = psql(`SELECT coalesce(status_code, 0) FROM net._http_response WHERE id = ${id}`)
+      if (row === '200')
+        return true
+      if (row)
+        break
+    }
+  }
+  return false
+}
+
 const browser = await chromium.launch()
+let gucSet = false
 let renamed = false
 let readRenamed = false
 try {
@@ -366,6 +449,10 @@ try {
     throw new Error('На локальной базе уже есть расход ИИ, показания или бюджет — страж их не трогает')
   if (aiKeyNames())
     throw new Error(`На локальной базе уже есть ключи ИИ (${aiKeyNames()}) — страж их не трогает`)
+  if (psql(`SELECT count(*) FROM vault.secrets WHERE name = 'dataforseo_credentials';`) !== '0')
+    throw new Error('На локальной базе уже есть ключ DataForSEO — страж его не трогает')
+  if (psql(`SELECT to_regproc('public.market_demand_request_offers') IS NOT NULL;`) === 't' && psql(`SELECT count(*) FROM public.market_demand_runs WHERE kind = 'offers';`) !== '0')
+    throw new Error('На локальной базе уже есть проверки фраз товаров — страж их не трогает')
   started = true
   await cleanup()
   const adminId = await createUser(emails.admin)
@@ -396,6 +483,8 @@ try {
     ['POST', '/api/admin/supplier-offers/collect', { channelId: openId }],
     ['POST', '/api/admin/supplier-offers/status', { ids: [openId], status: 'skipped' }],
     ['POST', '/api/admin/supplier-offers/read', { before: new Date().toISOString() }],
+    ['POST', '/api/admin/supplier-offers/queries', {}],
+    ['POST', '/api/admin/supplier-offers/demand', {}],
   ]
   for (const [method, path, body] of routes) {
     const guest = await api(path, null, body, method)
@@ -791,6 +880,76 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   await page.goto(`${BASE}/admin/supplier-offers`, { waitUntil: 'networkidle', timeout: 120000 })
   await painted(page)
 
+  console.log('\n== точный спрос: запросы покупателя и DataForSEO')
+  // Запросы подобраны сами после сбора и «Прочитать»: текстом, без фото, пачками
+  const ownQueries = () => JSON.parse(psql(`SELECT json_build_object('with', count(*) FILTER (WHERE o.search_queries IS NOT NULL), 'read', count(*) FILTER (WHERE jsonb_typeof(o.read_items) = 'array' AND jsonb_array_length(o.read_items) > 0), 'sample', (SELECT o2.search_queries FROM public.supplier_offers o2 WHERE o2.post_url LIKE '%/1023' AND o2.channel_id = :'c' LIMIT 1)) FROM public.supplier_offers o JOIN public.supplier_channels c ON c.id = o.channel_id JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}') AND o.status = 'new';`, { c: openId }))
+  const q0 = ownQueries()
+  check(q0.with > 0 && q0.with >= q0.read && ai.queries.length > 0 && ai.queries.every(r => r.model === VISION && r.format === 'json_schema' && !r.images && r.items <= 40), `запросы подобраны у прочитанных: ${q0.with} из ${q0.read}, запросов к модели ${ai.queries.length}, без фото, по схеме`)
+  check(JSON.stringify(q0.sample) === JSON.stringify([['игрушка po 1023 точно', 'игрушка po 1023 купить'], ['набор b 2 точно', 'набор b 2 купить'], ['набор b 3 точно', 'набор b 3 купить'], ['набор b 4 точно', 'набор b 4 купить']]), `фразы по товарам поста, в их порядке, «кукла» одним словом — мимо: ${JSON.stringify(q0.sample)}`)
+  const narrowLine = async () => sp(await page.locator('[data-testid=offers-narrow]').innerText())
+  const before = await narrowLine()
+  check(/Не проверено: \d+ запрос/.test(before) && await page.locator('[data-testid=offers-check-demand]').count() === 1 && sp(await page.locator('[data-testid=offers-check-demand]').innerText()).startsWith('Узнать спрос · ≈ $'), `до проверки — «${before}», кнопка «Узнать спрос» с ценой`)
+  check(await page.locator('[data-testid=offer-narrow]').count() === 0 && await page.locator('[data-testid=offer-topic]').count() > 0, 'пока DataForSEO не ответил — спрос по темам, как прежде')
+  // Без ключа DataForSEO — отказ базы текстом
+  await noToasts(page)
+  await page.locator('[data-testid=offers-check-demand]').click()
+  await toastWith(page, 'Ключ DataForSEO не задан').waitFor({ timeout: 30000 })
+  check(!dfs.requests.length, 'без ключа — в DataForSEO не ходили, «Ключ DataForSEO не задан»')
+
+  psqlSuper(`ALTER ROLE authenticator IN DATABASE postgres SET app.market_demand_api = 'http://host.docker.internal:${DFS_PORT}';`)
+  gucSet = true
+  await restartRest()
+  if (!(await dfsPing()))
+    throw new Error('база не достучалась до заглушки DataForSEO через host.docker.internal')
+  psql(`SELECT vault.create_secret(:'s', 'dataforseo_credentials');`, { s: JSON.stringify({ login: DFS_LOGIN, password: DFS_PASSWORD }) })
+  const phrases = psql(`SELECT cardinality(public.supplier_offer_phrases(1000));`)
+  await noToasts(page)
+  const relisted = listed(page)
+  await page.locator('[data-testid=offers-check-demand]').click()
+  const doneToast = toastWith(page, 'DataForSEO ответил').last()
+  await doneToast.waitFor({ timeout: 200000 })
+  await relisted
+  await painted(page)
+  const sent = dfs.requests.filter(r => r.url === '/v3/keywords_data/google_ads/search_volume/live')
+  check(sent.length === 1 && sent[0].good && sent[0].task.location_code === 2398 && sent[0].task.language_code === 'ru' && sent[0].task.keywords.length === Number(phrases) && !sent[0].task.keywords.includes('кукла'), `одна задача search_volume по Казахстану: ${sent[0]?.task.keywords.length} фраз из ${phrases}, «кукла» не ушла`)
+  check(sp(await doneToast.textContent()) === `DataForSEO ответил: ${phrases} ${Number(phrases) % 10 === 1 && Number(phrases) % 100 !== 11 ? 'запрос' : [2, 3, 4].includes(Number(phrases) % 10) && ![12, 13, 14].includes(Number(phrases) % 100) ? 'запроса' : 'запросов'}`, `уведомление: «${sp(await doneToast.textContent())}»`)
+  const after = await narrowLine()
+  check(after.includes('Все запросы проверены') && await page.locator('[data-testid=offers-check-demand]').count() === 0, `после ответа — «${after}», кнопки нет`)
+  const narrowOf = article => page.locator('[data-testid=offer-card]', { hasText: article }).evaluate(el => ({
+    level: el.querySelector('[data-testid=offer-demand-level]')?.dataset.level,
+    phrase: el.querySelector('[data-testid=offer-narrow-phrase]')?.textContent.trim(),
+    volume: el.querySelector('[data-testid=offer-narrow-volume]')?.textContent.replace(/\s+/g, ' ').trim(),
+    topic: el.querySelector('[data-testid=offer-topic]')?.textContent.replace(/\s+/g, ' ').trim(),
+    more: el.querySelector('[data-testid=offer-narrow-more]')?.textContent.replace(/\s+/g, ' ').trim(),
+    items: [...el.querySelectorAll('[data-testid=offer-item-narrow]')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
+  }))
+  const n16 = await narrowOf('PO-1016')
+  const n13 = await narrowOf('PO-1013')
+  const n18 = await narrowOf('PO-1018')
+  check(n16.level === 'high' && n16.phrase === '«игрушка po 1016 точно»' && n16.volume === '5 000 поисков в месяц' && n16.topic.startsWith('Тема «Проверка спроса»'), `PO-1016 — высокий по своей фразе, тема фоном: ${JSON.stringify(n16)}`)
+  const n23 = await narrowOf('PO-1023')
+  check(n16.more === 'ещё: «игрушка po 1016 купить» 5 000', `у товара — и другие фразы с цифрами: «${n16.more}»`)
+  check(JSON.stringify(n23.items) === JSON.stringify(['Ищут «набор b 2 точно» — 70 в месяц', 'Ищут «набор b 3 точно» — 70 в месяц']), `второй и третий товар поста — свой спрос: ${JSON.stringify(n23.items)}`)
+  check(n13.level === 'low' && n13.volume === '30 поисков в месяц', `PO-1013 — тема «средняя», а фраза — низкий: ${JSON.stringify(n13)}`)
+  check(n18.level === 'none' && n18.volume === 'ищут слишком редко — цифр нет', `PO-1018 — DataForSEO «данных нет»: ${JSON.stringify(n18)}`)
+  await page.locator('[data-testid=offers-demand-high]').click()
+  await painted(page)
+  const hiNames = await cards(page).locator('[data-testid=offer-name]').evaluateAll(ns => ns.map(n => n.textContent.trim()))
+  const hiLevels = await cards(page).locator('[data-testid=offer-demand-level]').evaluateAll(ls => ls.map(l => l.dataset.level))
+  check(hiNames[0] === 'Игрушка PO-1016' && hiLevels.length > 0 && hiLevels.every(l => l === 'high') && !hiNames.some(n => /PO-101[38]$/.test(n)), `«Высокий спрос» — по фразам товара: ${hiNames.join(', ')}`)
+  if (SHOTS)
+    await page.screenshot({ path: `${SHOTS}/narrow-high-1366.png`, fullPage: true })
+  await page.locator('[data-testid=offers-demand-all]').click()
+  await painted(page)
+  if (SHOTS)
+    await page.screenshot({ path: `${SHOTS}/narrow-all-1366.png`, fullPage: true })
+  await noToasts(page)
+  const resend = await api('/api/admin/supplier-offers/demand', adminToken, {})
+  // Отказ «ключ не задан» выше — ожидаемый, не сбой страницы; ключ DataForSEO дальше не нужен («батарейки» ждут «ключа нет»)
+  failedResponses.splice(0, failedResponses.length, ...failedResponses.filter(r => r !== '400 /api/admin/supplier-offers/demand'))
+  psql(`DELETE FROM vault.secrets WHERE name = 'dataforseo_credentials';`)
+  check(resend.status === 400 && resend.json?.message?.startsWith('Проверять нечего') && sent.length === dfs.requests.filter(r => r.url.endsWith('/live')).length, `повторно — «проверять нечего», в DataForSEO не ходили: ${resend.status}`)
+
   console.log('\n== «На сайт»')
   const offerIdOf = m => psql(`SELECT id FROM public.supplier_offers WHERE channel_id = :'c' AND message_id = ${m};`, { c: openId })
   check(await page.locator('[data-testid=offer-card]', { hasText: 'PO-1023' }).locator('[data-testid=offer-to-site]').count() === 3, 'несколько товаров в посте — «На сайт» у каждого из показанных')
@@ -899,7 +1058,8 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   }, id)
   const usage = JSON.parse(psql(`SELECT json_build_object('posts', coalesce(sum(posts), 0), 'in', coalesce(sum(input_tokens), 0), 'out', coalesce(sum(output_tokens), 0), 'rows', count(*)) FROM public.ai_usage_daily;`))
   const readNow = Number(psql(`SELECT count(*) FROM public.supplier_offers WHERE read_items IS NOT NULL;`))
-  check(usage.posts === readNow && usage.in === readNow * 2000 && usage.out === readNow * 300 && usage.rows === 1, `журнал расхода — все удачные чтения, одной строкой за день: ${usage.posts} из ${readNow}, токены ${usage.in}/${usage.out}`)
+  // Подбор запросов покупателя (18.11) — в тот же журнал, постов не прибавляет: 800/400 токенов на запрос заглушки
+  check(usage.posts === readNow && usage.in === readNow * 2000 + ai.queries.length * 800 && usage.out === readNow * 300 + ai.queries.length * 400 && usage.rows === 1, `журнал расхода — все удачные чтения и подборы запросов (${ai.queries.length}), одной строкой за день: ${usage.posts} из ${readNow}, токены ${usage.in}/${usage.out}`)
   const lim = await battery('ai_limits')
   check(lim.state === 'ok' && lim.value === '40 000 из 50 000 токенов входа' && lim.now === '80' && /^сброс в \d\d:\d\d$/.test(lim.reset ?? ''), `лимит ИИ — по слабому месту, со сбросом: ${lim.value} · ${lim.reset} · ${lim.now}%`)
   const noBudget = await battery('ai_budget')
@@ -1019,6 +1179,11 @@ finally {
   await browser.close()
   server.close()
   aiServer.close()
+  dfsServer.close()
+  if (gucSet) {
+    psqlSuper(`ALTER ROLE authenticator IN DATABASE postgres RESET app.market_demand_api;`)
+    await restartRest()
+  }
   if (renamed) {
     psql(`ALTER TABLE public.supplier_offers_check_off RENAME TO supplier_offers;
 NOTIFY pgrst, 'reload schema';`)

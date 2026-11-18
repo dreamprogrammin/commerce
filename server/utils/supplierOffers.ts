@@ -4,6 +4,7 @@ import type { VisionReader } from './supplierVision'
 import type { ChannelPost, ReadOptions } from './telegramAccount'
 import type { DemandTopic } from '~/utils/marketDemand'
 import type { OfferDemandTopic } from '~/utils/offerDemand'
+import type { OfferNarrowSummary } from '~/utils/offerQueries'
 import type { Offer, OfferChannel, OfferReading, OfferStatus } from '~/utils/supplierOfferList'
 import type { PreviewPost } from '~/utils/telegramPreview'
 import { Buffer } from 'node:buffer'
@@ -61,6 +62,8 @@ const READ_BUDGET_MS = 120_000
 const OFFER_COLUMNS = 'id, channel_id, posted_at, caption, post_url, photo_url, photo_count, status, status_at'
 /** Колонки чтения ИИ — миграция 20261105120000 */
 const READ_COLUMNS = 'read_items, read_error'
+/** Запросы покупателя к товарам — миграция 20261118120000 */
+const QUERY_COLUMNS = 'search_queries'
 
 interface OfferRow {
   id: string
@@ -74,6 +77,14 @@ interface OfferRow {
   status_at: string | null
   read_items?: unknown
   read_error?: string | null
+  search_queries?: unknown
+}
+
+/** Фразы товаров поста из базы: массив массивов строк, иначе null */
+function queriesOf(raw: unknown): string[][] | null {
+  if (!Array.isArray(raw))
+    return null
+  return raw.map(list => Array.isArray(list) ? list.filter((q): q is string => typeof q === 'string') : [])
 }
 
 /** Миграции 20261104160000 (или 20261105120000 — чтения ИИ) ещё нет: таблицы, функции или колонки */
@@ -98,17 +109,20 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
     .gte('posted_at', since)
     .order('posted_at', { ascending: false })
     .limit(LIST_LIMIT)
-  const [channels, withRead, summary, secrets, readSummary, model, aiKeys, demand] = await Promise.all([
+  const [channels, withQueries, summary, secrets, readSummary, model, aiKeys, demand, narrowSummary] = await Promise.all([
     db.from('supplier_channels').select('id, title, invite_hash, collected_at, suppliers(name)').order('created_at'),
-    listOffers(`${OFFER_COLUMNS}, ${READ_COLUMNS}`),
+    listOffers(`${OFFER_COLUMNS}, ${READ_COLUMNS}, ${QUERY_COLUMNS}`),
     db.rpc('supplier_offers_summary'),
     db.rpc('telegram_secrets_status'),
     db.rpc('supplier_offers_read_summary'),
     visionModel(db),
     db.rpc('ai_keys_status'),
     db.rpc('market_demand_summary'),
+    db.rpc('supplier_offer_demand'),
   ])
-  // Миграции чтения ИИ ещё нет — товары без прочитанного, как до 5.11
+  // Миграции точного спроса ещё нет — без запросов; чтения ИИ — и без прочитанного, как до 5.11
+  const narrowInstalled = !narrowSummary.error && withQueries.error?.code !== '42703'
+  const withRead = narrowInstalled ? withQueries : await listOffers(`${OFFER_COLUMNS}, ${READ_COLUMNS}`)
   const readInstalled = !supplierOffersNotInstalled(readSummary.error) && withRead.error?.code !== '42703'
   const offers = readInstalled ? withRead : await listOffers(OFFER_COLUMNS)
   if ([channels, offers, summary].some(r => supplierOffersNotInstalled(r.error)))
@@ -144,9 +158,20 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
         our_total: t.our_total,
         our_in_stock: t.our_in_stock,
       }))
+  if (narrowSummary.error && !supplierOffersNotInstalled(narrowSummary.error))
+    throw dbError(narrowSummary.error)
+  const n = narrowInstalled ? narrowSummary.data as { volumes: Record<string, number | null>, unchecked: number, without_queries: number, pending: boolean, last: { status: 'pending' | 'done' | 'failed', error: string | null, items: number | null, sent: number, finished_at: string | null } | null } : null
+  const narrow: OfferNarrowSummary | null = n && {
+    volumes: n.volumes ?? {},
+    unchecked: n.unchecked,
+    withoutQueries: n.without_queries,
+    pending: n.pending,
+    last: n.last && { status: n.last.status, error: n.last.error, items: n.last.items, sent: n.last.sent, finishedAt: n.last.finished_at },
+  }
   return {
     installed: true as const,
     topics,
+    narrow,
     // Страж check-admin-supplier-offers.mjs не собирает, пока не увидит подделку Telegram и заглушки t.me и ИИ
     ...(process.env.TELEGRAM_FAKE === '1' ? { fake: true as const, web: telegramWebBase(), aiStub: aiStubBase() } : {}),
     reading,
@@ -173,6 +198,7 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
       statusAt: o.status_at,
       items: items(o.read_items),
       readError: o.read_error ?? null,
+      queries: queriesOf(o.search_queries),
     })),
   }
 }
