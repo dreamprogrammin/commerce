@@ -330,7 +330,7 @@ async function removeProbeProducts() {
 
 async function cleanup() {
   await removeProbeProducts()
-  psql(`DELETE FROM public.market_demand_topics WHERE name LIKE 'Проверка спроса%'; DELETE FROM public.market_demand_keywords WHERE keyword = 'проверка спроса po-1016';`)
+  psql(`DELETE FROM public.market_demand_topics WHERE name LIKE 'Проверка спроса%'; DELETE FROM public.market_demand_keywords WHERE keyword IN ('проверка спроса po-1016', 'проверка спроса po-1013', 'проверка спроса po-1014');`)
   const ids = psql(`SELECT coalesce(string_agg(c.id::text, ','), '') FROM public.supplier_channels c JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
   for (const id of new Set([...channelIds, ...ids.split(',').filter(Boolean), ORPHAN]))
     await removeFiles(await bucketFiles(id))
@@ -761,10 +761,20 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   check(await page.locator('[data-testid=offer-card]').count() === await page.locator('[data-testid=offer-demand-level]').count(), 'уровень — на каждой карточке')
   const d20 = await demandOf('PO-1020')
   check(d20 === 'Темы спроса нет · Добавить тему', `темы нет — предложение добавить: «${d20}»`)
-  await page.locator('[data-testid=offers-demand-demand]').click()
+  // «Высокий спрос» (18.11.2026) — уровень «высокий», как метка на фото. Тема с цифрами пока одна —
+  // делить на трети не на что, высокого нет ни у кого
+  await page.locator('[data-testid=offers-demand-high]').click()
   await painted(page)
-  const withDemand = await cards(page).locator('[data-testid=offer-name]').first().textContent().then(sp)
-  check(await cards(page).count() === 1 && withDemand === 'Игрушка PO-1016', `«Есть спрос» — только товары темы с цифрами: ${await cards(page).count()} — ${withDemand}`)
+  check(await cards(page).count() === 0 && sp(await page.locator('[data-testid=offers-empty]').innerText()).includes('Высокого спроса нет ни у одного товара'), '«Высокий спрос» при одной теме с цифрами — пусто, так и сказано')
+  // Ещё две темы с меньшим спросом: 2 400 у PO-1016 — верхняя треть
+  psql(`INSERT INTO public.market_demand_topics (name, kind, keywords, match_terms) VALUES ('Проверка спроса низкий', 'type', '{"проверка спроса po-1013"}', '{"po-1013"}'), ('Проверка спроса средний', 'type', '{"проверка спроса po-1014"}', '{"po-1014"}');
+INSERT INTO public.market_demand_keywords (keyword, search_volume) VALUES ('проверка спроса po-1013', 100), ('проверка спроса po-1014', 900);
+INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT k, m::date, v FROM (VALUES ('проверка спроса po-1013', 100), ('проверка спроса po-1014', 900)) x(k, v), generate_series('2026-08-01'::date, '2026-10-01', interval '1 month') m;`)
+  await reload(page)
+  check(await page.locator('[data-testid=offers-demand-high]').getAttribute('aria-pressed') === 'true', '«Высокий спрос» — запомнен')
+  const highNames = await cards(page).locator('[data-testid=offer-name]').evaluateAll(ns => ns.map(n => n.textContent.trim()))
+  const highLevels = await cards(page).locator('[data-testid=offer-demand-level]').evaluateAll(ls => ls.map(l => l.dataset.level))
+  check(highNames.length >= 1 && highNames[0] === 'Игрушка PO-1016' && highLevels.every(l => l === 'high') && !highNames.some(n => /PO-101[34]$/.test(n)), `«Высокий спрос» — только с меткой «высокий»: ${highNames.join(', ')}`)
   await page.locator('[data-testid=offers-demand-none]').click()
   await painted(page)
   const noneCount = await cards(page).count()

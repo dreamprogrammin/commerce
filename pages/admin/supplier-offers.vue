@@ -83,6 +83,9 @@ const { data, pending, error, refresh } = useAsyncData(
 const page = computed(() => data.value?.installed ? data.value : null)
 // Спрос (6.11.2026): у каждого товара — тема «Спроса на рынке», если нашлась
 const demandFilter = useLocalStorage<OfferDemandFilter>('admin-supplier-offers-demand', 'all')
+// До 18.11 был «Есть спрос» ('demand') — в браузере мог остаться
+if (!OFFER_DEMAND_FILTERS.some(f => f.id === demandFilter.value))
+  demandFilter.value = 'all'
 const demandById = computed(() => new Map((page.value?.offers ?? []).map(o => [o.id, page.value?.topics ? offerDemand(o, page.value.topics) : null])))
 const groups = computed(() => {
   const p = page.value
@@ -90,8 +93,8 @@ const groups = computed(() => {
     return []
   const filter = p.topics ? demandFilter.value : 'all'
   const list = groupOffers(filterByDemand(p.offers, p.topics ?? [], filter), p.channels, grouping.value)
-  // «Есть спрос» — внутри группы сверху больший спрос (groupOffers ставит по времени)
-  if (filter === 'demand') {
+  // «Высокий спрос» — внутри группы сверху больший спрос (groupOffers ставит по времени)
+  if (filter === 'high') {
     for (const g of list)
       g.offers.sort((a, b) => (demandById.value.get(b.id)?.volume ?? 0) - (demandById.value.get(a.id)?.volume ?? 0))
   }
@@ -582,7 +585,7 @@ async function downloadOrder() {
           <span class="text-[15px] font-semibold">{{ page.offers.length ? 'Таких товаров нет' : 'Пока пусто' }}</span>
           <span class="max-w-md text-[13px] text-muted-foreground text-pretty">
             <template v-if="page.offers.length && page.topics && demandFilter !== 'all'">
-              {{ demandFilter === 'demand' ? 'Ни у одного товара нет темы со спросом — посмотрите «Все» или добавьте темы на «Спросе на рынке».' : 'У всех товаров нашлась тема спроса.' }}
+              {{ demandFilter === 'high' ? 'Высокого спроса нет ни у одного товара — посмотрите «Все» или добавьте темы на «Спросе на рынке».' : 'У всех товаров нашлась тема спроса.' }}
             </template>
             <template v-else-if="status !== 'new'">
               {{ status === 'added' ? 'Здесь будут товары, которые вы выложили на сайт.' : 'Здесь будут товары, которые вы решили не брать.' }}

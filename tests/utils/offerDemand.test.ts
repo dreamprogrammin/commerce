@@ -60,13 +60,23 @@ describe('offerDemand', () => {
 })
 
 describe('filterByDemand', () => {
-  const topics = [topic({ topic_id: 'a', match_terms: ['лабубу'], volume_avg3: 2400 }), topic({ topic_id: 'b', match_terms: ['кукл'], volume_avg3: 900 }), topic({ topic_id: 'c', match_terms: ['пазл'], volume_avg3: null })]
-  const list = [offer('кукла'), offer('машинка'), offer('лабубу'), offer('пазл')]
+  const topics = [
+    topic({ topic_id: 'a', match_terms: ['лабубу'], volume_avg3: 2400 }),
+    topic({ topic_id: 'b', match_terms: ['кукл'], volume_avg3: 900 }),
+    topic({ topic_id: 'c', match_terms: ['пазл'], volume_avg3: null }),
+    topic({ topic_id: 'd', match_terms: ['мяч'], volume_avg3: 300 }),
+    topic({ topic_id: 'e', match_terms: ['робот'], volume_avg3: 5000 }),
+  ]
+  const list = [offer('кукла'), offer('машинка'), offer('лабубу'), offer('пазл'), offer('мяч'), offer('робот')]
   it('«Все» — как было', () => {
     expect(filterByDemand(list, topics, 'all')).toEqual(list)
   })
-  it('«Есть спрос» — с цифрами больше нуля, сверху больший', () => {
-    expect(filterByDemand(list, topics, 'demand').map(o => o.caption)).toEqual(['лабубу', 'кукла'])
+  it('«Высокий спрос» — уровень «высокий», как метка на фото; сверху больший', () => {
+    // Темы с цифрами 300, 900, 2400, 5000 — верхняя треть от 2400
+    expect(filterByDemand(list, topics, 'high').map(o => o.caption)).toEqual(['робот', 'лабубу'])
+  })
+  it('«Высокий спрос» — тем с цифрами меньше трёх: высокого нет ни у кого', () => {
+    expect(filterByDemand(list, topics.slice(0, 3), 'high')).toEqual([])
   })
   it('«Темы нет» — ни одна тема не нашла', () => {
     expect(filterByDemand(list, topics, 'none').map(o => o.caption)).toEqual(['машинка'])
