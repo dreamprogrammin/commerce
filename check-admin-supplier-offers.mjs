@@ -508,6 +508,14 @@ try {
   async function newPage(viewport, path = '/admin/supplier-offers') {
     const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2 })
     await ctx.addInitScript(() => localStorage.setItem('tg_modal_dismissed_at', String(Date.now())))
+    // «Показать ещё N» в группе (макет) — раскрывать сразу: проверки ниже считают все карточки.
+    // Саму кнопку проверяет отдельный блок, выключая это флагом manualMore в sessionStorage
+    await ctx.addInitScript(() => {
+      if (sessionStorage.getItem('manualMore'))
+        return
+      new MutationObserver(() => document.querySelectorAll('[data-testid=offers-group-more]').forEach(b => b.click()))
+        .observe(document, { childList: true, subtree: true })
+    })
     const page = await ctx.newPage()
     page.on('pageerror', e => errors.push(e.message))
     page.on('console', m => m.type() === 'error' && !m.text().startsWith('Failed to load resource') && !m.text().includes('[nuxt-gtag]') && errors.push(m.text()))
@@ -630,6 +638,34 @@ try {
   check(errorsUnder.length === 1 && /Приглашение в канал устарело/.test(errorsUnder[0]), `причина — у канала: «${errorsUnder[0]}»`)
   const total = openPosts.length + closedCount
   check(await statusCount(page, 'new') === total && await cards(page).count() === total, `«Новые» — ${total}, карточек столько же`)
+
+  // В группе сначала 12 товаров, остальные — «Показать ещё N» (макет «Товары поставщиков»)
+  await page.evaluate(() => sessionStorage.setItem('manualMore', '1'))
+  await page.reload({ waitUntil: 'networkidle' })
+  await cards(page).first().waitFor()
+  const bigIdx = await page.locator('[data-testid=offers-group]').evaluateAll(gs => gs.findIndex(g => g.querySelector('[data-testid=offers-group-more]')))
+  const big = page.locator('[data-testid=offers-group]').nth(bigIdx)
+  const bigTotal = Number(sp(await big.locator('[data-testid=offers-group-count]').textContent()))
+  const moreText = bigIdx >= 0 ? sp(await big.locator('[data-testid=offers-group-more]').textContent()) : ''
+  check(bigIdx >= 0 && await big.locator('[data-testid=offer-card]').count() === 12 && moreText === `Показать ещё ${bigTotal - 12}`, `большая группа — 12 карточек и «${moreText}» (всего ${bigTotal})`)
+  if (SHOTS && bigIdx >= 0) {
+    await page.locator('[data-testid=offers-status-new]').scrollIntoViewIfNeeded()
+    await page.mouse.move(5, 5)
+    await page.screenshot({ path: `${SHOTS}/offers-tabs-1366.png` })
+    await big.locator('[data-testid=offers-group-more]').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: `${SHOTS}/offers-more-1366.png` })
+  }
+  if (bigIdx >= 0) {
+    await big.locator('[data-testid=offers-group-more]').click()
+    check(await big.locator('[data-testid=offer-card]').count() === bigTotal && await big.locator('[data-testid=offers-group-more]').count() === 0, `«Показать ещё» — все ${bigTotal}, кнопки больше нет`)
+    await page.locator('[data-testid=offers-view-list]').click()
+    check(await big.locator('[data-testid=offer-row]').count() === bigTotal, 'в «Списке» группа тоже раскрыта')
+    await page.locator('[data-testid=offers-view-grid]').click()
+  }
+  await page.evaluate(() => sessionStorage.removeItem('manualMore'))
+  await page.reload({ waitUntil: 'networkidle' })
+  await cards(page).first().waitFor()
+  check(await cards(page).count() === total, `дальше — все ${total} карточек раскрыты`)
   const pages = stub.requests.filter(r => r.startsWith('/s/'))
   check(pages.some(r => r.includes('before=')) && pages.some(r => r.includes('after=')), `открытый канал — назад до 3 дней (?before=), дальше от прочитанного (?after=): ${pages.join(' ')}`)
 
