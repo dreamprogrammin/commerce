@@ -76,6 +76,16 @@ function toggleGroup(key: string) {
     next.add(key)
   collapsed.value = next
 }
+// В группе сначала GROUP_SHOW товаров, остальное — «Показать ещё N» (макет «Товары поставщиков»).
+// Раскрытая группа остаётся раскрытой при смене статуса и фильтра — ключ группы тот же
+const GROUP_SHOW = 12
+const opened = ref(new Set<string>())
+function openGroup(key: string) {
+  opened.value = new Set(opened.value).add(key)
+}
+function shownOf<T>(g: { key: string, offers: T[] }): T[] {
+  return opened.value.has(g.key) ? g.offers : g.offers.slice(0, GROUP_SHOW)
+}
 // Группировка запоминается в этом браузере
 const grouping = useLocalStorage<OfferGrouping>('admin-supplier-offers-grouping', 'supplier')
 
@@ -138,12 +148,13 @@ function itemNarrowText(o: Offer, i: number) {
   const n = itemNarrow(o, i)!
   return `Ищут «${narrowPhrase(n)}»${n.checked ? ` — ${n.volume ? `${formatVolume(n.volume)} в месяц` : 'редко'}` : ''}`
 }
+const moreLabel = (n: number) => `Показать ещё ${n}`
 const listNarrowText = (n: OfferNarrow) => `«${narrowPhrase(n)}»${n.volume ? ` · ${formatVolume(n.volume)}` : ''}`
 // Пилюли по макету «Товары поставщиков» (Claude Design, 18.11.2026)
 const CARD = 'rounded-[20px] bg-background shadow-sm'
 const CHIP = 'inline-flex items-center whitespace-nowrap rounded-full px-2 py-[3px] text-xs font-semibold'
-const SEGMENTS = 'inline-flex flex-wrap gap-1 rounded-lg bg-muted p-1'
-const segment = (on: boolean) => ['rounded-md px-3 py-1 text-sm font-medium transition-colors', on ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']
+const SEGMENTS = 'inline-flex flex-wrap gap-0.5 rounded-lg bg-muted p-[3px]'
+const segment = (on: boolean) => ['rounded-md px-3 py-1.5 text-sm font-medium transition-colors', on ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']
 // На фото — белая подложка у «низкого» и «нет данных»; в списке — серая
 const LEVEL_CHIP = {
   high: 'bg-green-100 text-green-700',
@@ -520,7 +531,7 @@ async function downloadOrder() {
               <span class="text-[30px] font-bold leading-none tracking-[-0.02em] tabular-nums">{{ decided }}</span>
               <span class="text-[15px] text-muted-foreground">из {{ total }}</span>
             </div>
-            <Progress :model-value="total ? decided / total * 100 : 0" class="h-2" :aria-label="`Разобрано ${decided} из ${total}`" />
+            <Progress :model-value="total ? decided / total * 100 : 0" class="h-2 bg-muted" :aria-label="`Разобрано ${decided} из ${total}`" />
             <span class="text-[13px] text-muted-foreground">Осталось {{ page.counts.new }}</span>
           </section>
 
@@ -773,7 +784,7 @@ async function downloadOrder() {
           <template v-if="!collapsed.has(g.key)">
             <!-- Плитка -->
             <div v-if="view === 'grid'" class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
-              <article v-for="o in g.offers" :key="o.id" class="flex min-w-0 flex-col gap-3 p-3" :class="CARD" :data-offer-id="o.id" data-testid="offer-card">
+              <article v-for="o in shownOf(g)" :key="o.id" class="flex min-w-0 flex-col gap-3 p-3" :class="CARD" :data-offer-id="o.id" data-testid="offer-card">
                 <a :href="o.photoUrl ?? o.postUrl" target="_blank" rel="noopener" class="relative block aspect-square overflow-hidden rounded-[14px] border border-neutral-100 bg-white" :aria-label="o.photoUrl ? 'Фото крупно' : 'Пост в Telegram'">
                   <img v-if="o.photoUrl" :src="o.photoUrl" alt="" loading="lazy" decoding="async" class="h-full w-full object-contain">
                   <span v-else class="flex h-full items-center justify-center text-muted-foreground">
@@ -929,7 +940,7 @@ async function downloadOrder() {
 
             <!-- Список -->
             <div v-else class="py-1.5" :class="CARD">
-              <div v-for="o in g.offers" :key="o.id" class="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-neutral-100 px-4 py-3 last:border-b-0" :data-offer-id="o.id" data-testid="offer-row">
+              <div v-for="o in shownOf(g)" :key="o.id" class="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-neutral-100 px-4 py-3 last:border-b-0" :data-offer-id="o.id" data-testid="offer-row">
                 <a :href="o.photoUrl ?? o.postUrl" target="_blank" rel="noopener" class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-100 bg-white" :aria-label="o.photoUrl ? 'Фото крупно' : 'Пост в Telegram'">
                   <img v-if="o.photoUrl" :src="o.photoUrl" alt="" loading="lazy" decoding="async" class="h-full w-full object-contain">
                   <ImageOff v-else class="h-5 w-5 text-muted-foreground" />
@@ -974,6 +985,12 @@ async function downloadOrder() {
                   </Button>
                 </div>
               </div>
+            </div>
+
+            <div v-if="g.offers.length > GROUP_SHOW && !opened.has(g.key)" class="flex justify-center">
+              <Button variant="outline" data-testid="offers-group-more" @click="openGroup(g.key)">
+                {{ moreLabel(g.offers.length - GROUP_SHOW) }}
+              </Button>
             </div>
           </template>
         </section>
