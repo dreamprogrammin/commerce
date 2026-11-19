@@ -619,7 +619,8 @@ async function downloadOrder() {
               <div v-if="page.narrow" class="flex flex-col gap-2 pt-2.5 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between" data-testid="offers-narrow">
                 <p class="flex items-start gap-2">
                   <Search class="mt-0.5 size-4 shrink-0 text-primary" />
-                  <span>
+                  <!-- Пробелы между соседними пилюлями-фразами Vue выкидывает при сборке — отступ стилем -->
+                  <span class="[&>span+span]:ml-1">
                     Точный спрос: ИИ подбирает товару запросы покупателей, DataForSEO отвечает, сколько их ищут.
                     <span v-if="querying !== null" data-testid="offers-narrow-state">Подбираю запросы… {{ querying }}</span>
                     <span v-else-if="page.narrow.pending || checking" data-testid="offers-narrow-state">Ждём ответа DataForSEO…</span>

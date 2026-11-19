@@ -550,6 +550,21 @@ try {
   const statusCount = async (page, id) => Number((await page.locator(`[data-testid=offers-status-${id}] span`).textContent()).trim())
   // Заголовок группы — «Поставщик · 12»: название и счётчик (макет 18.11 — счётчик пилюлей рядом)
   const groupTitles = page => page.locator('[data-testid=offers-group-title]').evaluateAll(hs => hs.map(h => `${h.textContent.trim()} · ${h.parentElement.querySelector('[data-testid=offers-group-count]').textContent.trim()}`))
+  // Соседние фразы строки «Точный спрос» не слипаются («62 товара.Не проверено»): между ними — зазор
+  const narrowGaps = page => page.locator('[data-testid=offers-narrow] p > span').evaluate((box) => {
+    const spans = [...box.querySelectorAll(':scope > span')]
+    const out = []
+    for (let i = 1; i < spans.length; i++) {
+      const a = spans[i - 1].getClientRects()
+      const b = spans[i].getClientRects()
+      if (!a.length || !b.length)
+        continue
+      const end = a[a.length - 1]
+      if (Math.abs(end.top - b[0].top) < 2)
+        out.push(Math.round(b[0].left - end.right))
+    }
+    return out
+  })
   const noScroll = page => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
   // Список перечитывается после сбора, смены отбора и перезагрузки — ждать сам ответ:
   // networkidle на этой странице уже наступал, и waitForLoadState вернётся сразу
@@ -662,6 +677,8 @@ try {
     check(await big.locator('[data-testid=offer-row]').count() === bigTotal, 'в «Списке» группа тоже раскрыта')
     await page.locator('[data-testid=offers-view-grid]').click()
   }
+  const gaps = await narrowGaps(page)
+  check(gaps.length > 0 && gaps.every(g => g >= 3), `«Точный спрос» — фразы не слипаются, зазоры ${JSON.stringify(gaps)} px`)
   await page.evaluate(() => sessionStorage.removeItem('manualMore'))
   await page.reload({ waitUntil: 'networkidle' })
   await cards(page).first().waitFor()
