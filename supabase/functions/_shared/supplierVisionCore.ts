@@ -35,8 +35,16 @@ export interface PostImage {
   data: string
 }
 
+/**
+ * Картинка по адресу — её скачивает сам провайдер ИИ, не наш сервер
+ * (картинки выдачи Kaspi при сверке по фото, 20.11.2026)
+ */
+export interface UrlImage {
+  url: string
+}
+
 export interface SupplierPost {
-  images: PostImage[]
+  images: (PostImage | UrlImage)[]
   /** Подпись к посту или соседнее текстовое сообщение — может не быть */
   caption: string | null
 }
@@ -412,7 +420,9 @@ async function callAnthropic(client: AnthropicClient, post: SupplierPost, model:
       content: [
         ...post.images.map(img => ({
           type: 'image' as const,
-          source: { type: 'base64' as const, media_type: img.mediaType as 'image/jpeg', data: img.data },
+          source: 'url' in img
+            ? { type: 'url' as const, url: img.url }
+            : { type: 'base64' as const, media_type: img.mediaType as 'image/jpeg', data: img.data },
         })),
         { type: 'text' as const, text: task.user(post.caption) },
       ],
@@ -436,7 +446,7 @@ async function callOpenAICompatible(post: SupplierPost, model: string, apiKey: s
   const user = {
     role: 'user',
     content: [
-      ...post.images.map(img => ({ type: 'image_url', image_url: { url: `data:${img.mediaType};base64,${img.data}` } })),
+      ...post.images.map(img => ({ type: 'image_url', image_url: { url: 'url' in img ? img.url : `data:${img.mediaType};base64,${img.data}` } })),
       { type: 'text', text: task.user(post.caption) },
     ],
   }

@@ -63,7 +63,7 @@ describe('часть адреса после «#»', () => {
     const raw = { url: 'https://kaspi.kz/shop/p/x/', title: 'Кукла «Лол»', ld: ['{"a":1}'], text: '12 990 ₸' }
     const hash = encodeKaspiHash(raw)
     expect(hash).toMatch(/^kaspi=[\w-]+$/)
-    expect(decodeKaspiHash(`#${hash}`)).toEqual(raw)
+    expect(decodeKaspiHash(`#${hash}`)).toEqual({ ...raw, cards: [] })
     expect(decodeKaspiHash('#other=1')).toBeNull()
     expect(decodeKaspiHash('#kaspi=@@@')).toBeNull()
   })
@@ -140,5 +140,6 @@ describe('kaspiLineParts', () => {
       .toEqual(['12\u00A0990\u00A0₸', '1\u00A0234\u00A0отзыва (+80 за\u00A014\u00A0дн.)', '★\u00A04,8', '21\u00A0продавец'])
     expect(kaspiLineParts({ last: { ...last, price: null, rating: null, sellers: 11, reviews: 5 }, reviewsGrowth: null, growthDays: null, count: 1 }))
       .toEqual(['5\u00A0отзывов', '11\u00A0продавцов'])
+    expect(kaspiLineParts({ last: { ...last, price: null, reviews: null, rating: null, sellers: 0 }, reviewsGrowth: null, growthDays: null, count: 1 })).toEqual(['нет на Kaspi'])
   })
 })
