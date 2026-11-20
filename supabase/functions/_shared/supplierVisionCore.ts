@@ -286,6 +286,29 @@ export type CreateAnthropic = (options: { apiKey: string, baseURL?: string }) =>
  * `createAnthropic` — клиент SDK, нужен только моделям Anthropic.
  */
 export async function readSupplierPost(post: SupplierPost, spec: string, env: Env, createAnthropic: CreateAnthropic): Promise<ReadResult> {
+  const out = await askVision(post, spec, env, createAnthropic, POST_TASK)
+  return { ...out, items: parseItems(out.raw) }
+}
+
+/**
+ * Что спросить у модели про картинки: промпт, схема ответа и текст к фото.
+ * Чтение постов — POST_TASK; скриншоты Kaspi (20.11.2026) — своя задача на
+ * тех же провайдерах, ключах и правилах.
+ */
+export interface VisionTask {
+  system: string
+  schema: object
+  /** Имя схемы для OpenAI-совместимых */
+  name: string
+  user: (caption: string | null) => string
+  /** Текст ошибки, если модель отказалась отвечать */
+  refusal: string
+}
+
+export const POST_TASK: VisionTask = { system: SYSTEM_PROMPT, schema: READ_SCHEMA, name: 'supplier_post', user: USER_TEXT, refusal: 'Модель отказалась читать пост' }
+
+/** Спросить модель про картинки поста задачей `task`; ответ — сырым текстом */
+export async function askVision(post: SupplierPost, spec: string, env: Env, createAnthropic: CreateAnthropic, task: VisionTask): Promise<Omit<ReadResult, 'items'>> {
   if (!post.images.length)
     throw new Error('В посте нет фото')
   const { provider, model, config } = parseModelSpec(spec)
@@ -301,9 +324,9 @@ export async function readSupplierPost(post: SupplierPost, spec: string, env: En
 
   const started = Date.now()
   const out = config.kind === 'anthropic'
-    ? await callAnthropic(createAnthropic({ apiKey, baseURL }), post, model)
-    : await callOpenAICompatible(post, model, apiKey, baseURL!, config.maxTokensParam ?? 'max_tokens', Number(env('VISION_TIMEOUT_MS')) || RESPONSE_TIMEOUT_MS)
-  return { model: spec, ...out, items: parseItems(out.raw), ms: Date.now() - started }
+    ? await callAnthropic(createAnthropic({ apiKey, baseURL }), post, model, task)
+    : await callOpenAICompatible(post, model, apiKey, baseURL!, config.maxTokensParam ?? 'max_tokens', Number(env('VISION_TIMEOUT_MS')) || RESPONSE_TIMEOUT_MS, task)
+  return { model: spec, ...out, ms: Date.now() - started }
 }
 
 /**
@@ -377,13 +400,13 @@ function supportsEffort(client: AnthropicClient, model: string): Promise<boolean
   return asked
 }
 
-async function callAnthropic(client: AnthropicClient, post: SupplierPost, model: string) {
+async function callAnthropic(client: AnthropicClient, post: SupplierPost, model: string, task: VisionTask) {
   const effort = await supportsEffort(client, model)
   const call = client.messages.create({
     model,
     max_tokens: MAX_OUTPUT_TOKENS,
-    system: SYSTEM_PROMPT,
-    output_config: { format: { type: 'json_schema', schema: READ_SCHEMA }, ...(effort ? { effort: EFFORT } : {}) },
+    system: task.system,
+    output_config: { format: { type: 'json_schema', schema: task.schema }, ...(effort ? { effort: EFFORT } : {}) },
     messages: [{
       role: 'user',
       content: [
@@ -391,7 +414,7 @@ async function callAnthropic(client: AnthropicClient, post: SupplierPost, model:
           type: 'image' as const,
           source: { type: 'base64' as const, media_type: img.mediaType as 'image/jpeg', data: img.data },
         })),
-        { type: 'text' as const, text: USER_TEXT(post.caption) },
+        { type: 'text' as const, text: task.user(post.caption) },
       ],
     }],
   })
@@ -399,7 +422,7 @@ async function callAnthropic(client: AnthropicClient, post: SupplierPost, model:
   const limits = rateLimits(http?.headers)
   // Причина остановки — до чтения текста: отказ приходит с кодом 200
   if (response.stop_reason === 'refusal')
-    throw new Error('Модель отказалась читать пост')
+    throw new Error(task.refusal)
   if (response.stop_reason === 'max_tokens')
     throw new Error(`Ответ не поместился в ${MAX_OUTPUT_TOKENS} токенов`)
   // Блоки ответа в AnthropicReply не описаны — форма здесь
@@ -409,12 +432,12 @@ async function callAnthropic(client: AnthropicClient, post: SupplierPost, model:
   return { raw: block.text, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, limits }
 }
 
-async function callOpenAICompatible(post: SupplierPost, model: string, apiKey: string, baseURL: string, maxTokensParam: 'max_tokens' | 'max_completion_tokens', timeoutMs: number) {
+async function callOpenAICompatible(post: SupplierPost, model: string, apiKey: string, baseURL: string, maxTokensParam: 'max_tokens' | 'max_completion_tokens', timeoutMs: number, task: VisionTask) {
   const user = {
     role: 'user',
     content: [
       ...post.images.map(img => ({ type: 'image_url', image_url: { url: `data:${img.mediaType};base64,${img.data}` } })),
-      { type: 'text', text: USER_TEXT(post.caption) },
+      { type: 'text', text: task.user(post.caption) },
     ],
   }
   // Что снимается, если модель ответила 400. Строгую схему понимают не все —
@@ -434,11 +457,11 @@ async function callOpenAICompatible(post: SupplierPost, model: string, apiKey: s
       [maxTokensParam]: MAX_OUTPUT_TOKENS,
       ...(effort ? { reasoning_effort: EFFORT } : {}),
       messages: [
-        { role: 'system', content: strict ? SYSTEM_PROMPT : `${SYSTEM_PROMPT}\n\nОтветь только JSON по схеме:\n${JSON.stringify(READ_SCHEMA)}` },
+        { role: 'system', content: strict ? task.system : `${task.system}\n\nОтветь только JSON по схеме:\n${JSON.stringify(task.schema)}` },
         user,
       ],
       response_format: strict
-        ? { type: 'json_schema', json_schema: { name: 'supplier_post', strict: true, schema: READ_SCHEMA } }
+        ? { type: 'json_schema', json_schema: { name: task.name, strict: true, schema: task.schema } }
         : { type: 'json_object' },
     }),
   })

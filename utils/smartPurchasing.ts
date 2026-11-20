@@ -21,6 +21,7 @@ export const PURCHASING_PAGES = [
   { to: '/admin/telegram', label: 'Аккаунт Telegram' },
   { to: '/admin/supplier-offers', label: 'Товары поставщиков' },
   { to: '/admin/demand', label: 'Спрос на рынке' },
+  { to: '/admin/kaspi', label: 'Цифры Kaspi' },
   { to: '/admin/ai', label: 'Модели ИИ' },
   { to: '/admin/restock', label: 'К закупке' },
 ] as const

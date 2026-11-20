@@ -168,10 +168,14 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
     pending: n.pending,
     last: n.last && { status: n.last.status, error: n.last.error, items: n.last.items, sent: n.last.sent, finishedAt: n.last.finished_at },
   }
+  const offerRows = (offers.data ?? []) as unknown as OfferRow[]
+  // Цифры Kaspi по товарам (20.11.2026); миграции нет — null
+  const kaspi = await kaspiSummariesFor(db, 'offer', offerRows.map(o => o.id))
   return {
     installed: true as const,
     topics,
     narrow,
+    kaspi,
     // Страж check-admin-supplier-offers.mjs не собирает, пока не увидит подделку Telegram и заглушки t.me и ИИ
     ...(process.env.TELEGRAM_FAKE === '1' ? { fake: true as const, web: telegramWebBase(), aiStub: aiStubBase() } : {}),
     reading,
@@ -186,7 +190,7 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
       closed: !!c.invite_hash,
       collectedAt: c.collected_at,
     })),
-    offers: ((offers.data ?? []) as unknown as OfferRow[]).map((o): Offer => ({
+    offers: offerRows.map((o): Offer => ({
       id: o.id,
       channelId: o.channel_id,
       postedAt: o.posted_at,

@@ -63,9 +63,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const runRows = runs.data ?? []
+  const topicRows = (summary.data ?? []) as { topic_id: string }[]
   return {
     installed: true as const,
     topics: summary.data ?? [],
+    // Цифры Kaspi по темам (20.11.2026); миграции нет — null
+    kaspi: await kaspiSummariesFor(db, 'topic', topicRows.map(t => t.topic_id)),
     candidates: candidates.data ?? [],
     runs: runRows,
     pending: runRows.some(r => r.status === 'pending'),
