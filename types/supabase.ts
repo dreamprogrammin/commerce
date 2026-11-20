@@ -919,6 +919,76 @@ export interface Database {
         }
         Relationships: []
       }
+      kaspi_snapshots: {
+        Row: {
+          created_by: string | null
+          id: number
+          kaspi_url: string | null
+          offer_id: string | null
+          offer_item: number | null
+          price: number | null
+          rating: number | null
+          reviews: number | null
+          sellers: number | null
+          source: string
+          taken_at: string
+          title: string
+          topic_id: string | null
+        }
+        Insert: {
+          id?: never
+          created_by?: string | null
+          kaspi_url?: string | null
+          offer_id?: string | null
+          offer_item?: number | null
+          price?: number | null
+          rating?: number | null
+          reviews?: number | null
+          sellers?: number | null
+          source: string
+          taken_at?: string
+          title?: string
+          topic_id?: string | null
+        }
+        Update: {
+          id?: never
+          created_by?: string | null
+          kaspi_url?: string | null
+          offer_id?: string | null
+          offer_item?: number | null
+          price?: number | null
+          rating?: number | null
+          reviews?: number | null
+          sellers?: number | null
+          source?: string
+          taken_at?: string
+          title?: string
+          topic_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'kaspi_snapshots_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'kaspi_snapshots_offer_id_fkey'
+            columns: ['offer_id']
+            isOneToOne: false
+            referencedRelation: 'supplier_offers'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'kaspi_snapshots_topic_id_fkey'
+            columns: ['topic_id']
+            isOneToOne: false
+            referencedRelation: 'market_demand_topics'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       magic_links: {
         Row: {
           created_at: string | null

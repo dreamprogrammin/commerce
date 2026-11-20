@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { KaspiSummary } from '@/utils/kaspiSnapshot'
 import type { DemandCandidate, DemandFilter, DemandSource, DemandTopic, YandexProgress } from '@/utils/marketDemand'
 import { ExternalLink, KeyRound, Pencil, Plus, RefreshCw, Search, Sparkles, TrendingUp } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
+import KaspiLine from '@/components/admin/purchasing/KaspiLine.vue'
 import {
   dataUntilLabel,
   DEMAND_FILTERS,
@@ -79,6 +81,8 @@ type DemandData
       collectError: string | null
       credentials: Credentials | null
       yandex?: YandexData
+      /** Цифры Kaspi по темам; null — нет миграции 20261120120000 */
+      kaspi?: Record<string, KaspiSummary> | null
     }
 
 const { data, pending, error, refresh }
@@ -886,6 +890,11 @@ const selectClass = 'h-10 w-full rounded-md border border-input bg-background px
                   <p class="truncate text-xs text-muted-foreground">
                     {{ source === 'yandex' && t.y_phrase ? `Вордстат: ${t.y_phrase}` : t.keywords.join(' · ') }}
                   </p>
+                  <KaspiLine
+                    v-if="ready.kaspi"
+                    :summary="ready.kaspi[t.topic_id]"
+                    :to="`/admin/kaspi?topic=${t.topic_id}`"
+                  />
                 </div>
 
                 <div class="flex items-center gap-3 sm:justify-end">
