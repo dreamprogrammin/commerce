@@ -657,3 +657,19 @@ export async function collectSupplierOffers(db: SupabaseClient, channelId: strin
   }), started + READ_BUDGET_MS)
   return { added: fresh.length, more: read.more, collectedAt, read: ai }
 }
+
+/**
+ * Фото товара поставщика из закрытого бакета — base64 для модели ИИ (сверка
+ * с выдачей Kaspi по фото, 20.11.2026); фото нет или не скачалось — null.
+ */
+export async function supplierOfferPhoto(db: SupabaseClient, offerId: string): Promise<{ mediaType: string, data: string } | null> {
+  const { data: row } = await db.from('supplier_offers').select('photo_path').eq('id', offerId).maybeSingle()
+  if (!row?.photo_path)
+    return null
+  const { data: blob, error } = await db.storage.from(BUCKET).download(row.photo_path)
+  if (error || !blob)
+    return null
+  const ext = row.photo_path.split('.').pop()!
+  const mediaType = EXT[blob.type] ? blob.type : Object.keys(EXT).find(t => EXT[t] === ext) ?? 'image/jpeg'
+  return { mediaType, data: Buffer.from(await blob.arrayBuffer()).toString('base64') }
+}

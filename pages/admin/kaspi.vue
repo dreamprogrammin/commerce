@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import type { KaspiFields, KaspiSnapshot, KaspiSource } from '@/utils/kaspiSnapshot'
+import type { KaspiCandidate, KaspiFields, KaspiSnapshot, KaspiSource, KaspiSummary } from '@/utils/kaspiSnapshot'
 import { StorageSerializers, useLocalStorage } from '@vueuse/core'
-import { Bookmark, ClipboardPaste, ExternalLink, ImageUp, Sparkles, Trash2 } from 'lucide-vue-next'
+import { Bookmark, ClipboardPaste, ExternalLink, Flame, ImageUp, ListChecks, Sparkles, Trash2, Trophy } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
+import KaspiLine from '@/components/admin/purchasing/KaspiLine.vue'
 import {
   decodeKaspiHash,
+  isKaspiProductUrl,
   KASPI_WINDOW,
   kaspiBookmarklet,
   kaspiLineParts,
   kaspiSearchUrl,
   kaspiSummaries,
+  parseKaspiCards,
   parseKaspiPage,
 } from '@/utils/kaspiSnapshot'
+import { formatVolume } from '@/utils/marketDemand'
 
 /*
  * «Цифры Kaspi» (20 ноября 2026). Владелец 19.11: «по мимо гугла главный
@@ -21,6 +25,13 @@ import {
  *  - скриншот: его читает модель со страницы «Модели ИИ».
  * Сервер на kaspi.kz не ходит. Каждый замер хранится с датой: по двум замерам
  * одного товара видно, сколько отзывов добавилось — так оценивают продажи.
+ *
+ * Тот же день, следом: «сканирует товары которые есть у поставщиков отбирает
+ * их по артикулам и картинкам … выдвигает в топ спрос товара». Очередь —
+ * товары поставщиков без замера; «Найти на Kaspi» открывает поиск во вкладке
+ * Kaspi, закладка на выдаче приносит все товары страницы, сервер сверяет по
+ * артикулу, названию и фото (utils/kaspiMatch.ts) и сохраняет найденное сам.
+ * Топ — Kaspi весит больше Google («на каспи больше»).
  */
 definePageMeta({ layout: 'admin' })
 
@@ -41,6 +52,26 @@ const query = computed(() => ({
   offer: typeof route.query.offer === 'string' ? route.query.offer : '',
   item: Number(route.query.item) || 0,
 }))
+
+interface BoardRow {
+  key: string
+  offerId: string
+  item: number
+  name: string
+  article: string | null
+  photoUrl: string | null
+  postUrl: string
+  supplier: string
+  google: number | null
+  kaspi: KaspiSummary | null
+  score: number
+  hit: boolean
+  absent: boolean
+}
+type Board = { installed: false } | { installed: true, queue: BoardRow[], top: BoardRow[], left: number }
+
+const { data: board, refresh: refreshBoard } = useAsyncData('admin-kaspi-board', () => adminFetch<Board>('/api/admin/kaspi/board'), { server: false })
+const boardReady = computed(() => (board.value?.installed ? board.value : null))
 
 const { data, pending, error, refresh } = useAsyncData(
   'admin-kaspi',
@@ -83,6 +114,10 @@ const hasTarget = computed(() => !!data.value && (!!data.value.offer || !!data.v
 // --- Цифры ---
 const form = reactive({ url: '', title: '', price: '', reviews: '', rating: '', sellers: '', source: 'manual' as KaspiSource })
 const fromPage = ref<{ found: number } | null>(null)
+/** Выдача поиска от закладки */
+const results = ref<KaspiCandidate[] | null>(null)
+/** Для какого товара уже сверяли эту выдачу: «offer:item» */
+const resultsFor = ref('')
 const shot = reactive({ preview: '', reading: false, items: [] as KaspiFields[], error: '' })
 const saving = ref(false)
 
@@ -102,6 +137,14 @@ function takeHash() {
   const raw = decodeKaspiHash(window.location.hash)
   if (!raw)
     return
+  // Выдача поиска — товары страницы; страница товара — его цифры, как раньше
+  const cards = isKaspiProductUrl(raw.url) ? [] : parseKaspiCards(raw)
+  if (cards.length) {
+    results.value = cards
+    resultsFor.value = ''
+    history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}`)
+    return
+  }
   const parsed = parseKaspiPage(raw)
   fill(parsed, 'page')
   // Название со страницы Kaspi — целиком, даже если в форме было другое
@@ -110,6 +153,127 @@ function takeHash() {
   fromPage.value = { found: parsed.found.filter(k => k !== 'title').length }
   // Сырьё в адресе больше не нужно: перезагрузка не должна заполнять форму снова
   history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}`)
+}
+
+// --- Выдача поиска: сверка и сохранение ---
+interface MatchOutcome {
+  pick: number | null
+  by: 'article' | 'name' | 'photo' | null
+  ranked: number[]
+  photo: string
+}
+const matching = ref(false)
+const outcome = ref<MatchOutcome | null>(null)
+/** Сохранённый из выдачи замер: номер в выдаче и id — «Не то» его заменит */
+const saved = ref<{ index: number, id: number } | null>(null)
+const BY_TEXT: Record<'article' | 'name' | 'photo' | 'manual', string> = { article: 'по артикулу', name: 'по названию', photo: 'по фото', manual: 'выбрано вами' }
+const savedBy = ref<keyof typeof BY_TEXT | null>(null)
+const PHOTO_TEXT: Record<string, string> = {
+  'key': 'по фото не сверял — нет ключа ИИ',
+  'no-photo': 'по фото не сверял — у товара поставщика нет фото',
+  'no-images': 'по фото не сверял — в выдаче нет картинок',
+}
+
+const orderedResults = computed(() => {
+  const list = results.value ?? []
+  const order = outcome.value?.ranked ?? list.map((_, i) => i)
+  return order.filter(i => list[i]).map(i => ({ index: i, c: list[i]! }))
+})
+
+async function saveCandidate(index: number, by: keyof typeof BY_TEXT) {
+  const c = results.value?.[index]
+  if (!c)
+    return
+  if (!query.value.offer) {
+    // Тема — цифры в форму, сохраняет владелец
+    fill(c, 'page')
+    form.title = c.title
+    form.url = c.url
+    return
+  }
+  saving.value = true
+  try {
+    if (saved.value)
+      await adminFetch(`/api/admin/kaspi/snapshots/${saved.value.id}`, { method: 'DELETE' })
+    const snap = await adminFetch<KaspiSnapshot>('/api/admin/kaspi/snapshots', {
+      method: 'POST',
+      body: { offerId: query.value.offer, offerItem: query.value.item, url: c.url, title: c.title, price: c.price, reviews: c.reviews, rating: c.rating, sellers: c.sellers, source: 'page' },
+    })
+    saved.value = { index, id: snap.id }
+    savedBy.value = by
+    toast.success(`Kaspi: «${c.title}» — ${BY_TEXT[by]}`)
+    await Promise.all([refresh(), refreshBoard()])
+  }
+  catch (e) {
+    toast.error(errorText(e, 'Не удалось сохранить'))
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+async function runMatch() {
+  const list = results.value
+  const key = `${query.value.offer}:${query.value.item}`
+  if (!list?.length || !query.value.offer || resultsFor.value === key || matching.value)
+    return
+  resultsFor.value = key
+  outcome.value = null
+  saved.value = null
+  savedBy.value = null
+  matching.value = true
+  try {
+    const res = await adminFetch<MatchOutcome>('/api/admin/kaspi/match', {
+      method: 'POST',
+      body: { offerId: query.value.offer, item: query.value.item, candidates: list },
+    })
+    outcome.value = res
+    if (res.pick != null && res.by)
+      await saveCandidate(res.pick, res.by)
+  }
+  catch (e) {
+    toast.error(errorText(e, 'Не удалось сверить с выдачей'))
+  }
+  finally {
+    matching.value = false
+  }
+}
+watch([results, () => query.value.offer, () => query.value.item], runMatch)
+
+/** Нет на Kaspi: замер «0 продавцов» — товар уходит из очереди */
+async function markAbsent() {
+  if (!query.value.offer || saving.value)
+    return
+  saving.value = true
+  try {
+    await adminFetch('/api/admin/kaspi/snapshots', {
+      method: 'POST',
+      body: { offerId: query.value.offer, offerItem: query.value.item, title: 'Нет на Kaspi', sellers: 0, source: 'manual' },
+    })
+    toast.success('Отмечено: на Kaspi такого нет')
+    results.value = null
+    await Promise.all([refresh(), refreshBoard()])
+  }
+  catch (e) {
+    toast.error(errorText(e, 'Не удалось сохранить'))
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+// --- Очередь ---
+const KASPI_SEARCH_WINDOW = 'uhti-kaspi-search'
+const currentKey = computed(() => (query.value.offer ? `${query.value.offer}:${query.value.item}` : ''))
+const nextInQueue = computed(() => boardReady.value?.queue.find(r => r.key !== currentKey.value) ?? null)
+
+/** Взять товар из очереди и открыть его поиск во вкладке Kaspi — по нажатию, иначе браузер не откроет */
+function openFor(row: BoardRow) {
+  results.value = null
+  outcome.value = null
+  saved.value = null
+  router.replace({ query: { offer: row.offerId, item: String(row.item) } })
+  window.open(kaspiSearchUrl(row.name), KASPI_SEARCH_WINDOW)
 }
 
 const origin = ref('')
@@ -292,6 +456,133 @@ useHead({ title: 'Цифры Kaspi' })
           Сохранять пока некуда: миграцию 20261120120000 применяют кнопкой в CI («Миграции Supabase», APPLY).
         </p>
 
+        <!-- Выдача поиска от закладки -->
+        <Card v-if="results" data-testid="kaspi-results">
+          <CardHeader>
+            <CardTitle>Выдача Kaspi: {{ results.length }} {{ results.length === 1 ? 'товар' : results.length < 5 ? 'товара' : 'товаров' }}</CardTitle>
+            <CardDescription v-if="!query.offer">
+              Выберите товар — его цифры встанут в форму ниже.
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-3">
+            <p v-if="matching" class="text-sm text-muted-foreground" data-testid="kaspi-matching">
+              Сверяю по артикулу, названию и фото…
+            </p>
+            <p v-else-if="saved && savedBy" class="rounded-md bg-green-50 p-3 text-sm text-green-900" data-testid="kaspi-match-saved">
+              Сохранено {{ BY_TEXT[savedBy] }}: «{{ results[saved.index]?.title }}». Не тот товар — выберите другой ниже.
+            </p>
+            <p v-else-if="outcome && outcome.pick == null" class="rounded-md bg-amber-50 p-3 text-sm text-amber-900" data-testid="kaspi-match-none">
+              Уверенно не нашёл{{ PHOTO_TEXT[outcome.photo] ? ` (${PHOTO_TEXT[outcome.photo]})` : outcome.photo !== 'done' && outcome.photo !== 'skipped' ? ` (фото: ${outcome.photo})` : '' }}. Выберите тот же товар или отметьте, что на Kaspi его нет.
+            </p>
+            <div class="max-h-[28rem] divide-y overflow-y-auto rounded-md border">
+              <button
+                v-for="{ index, c } in orderedResults"
+                :key="c.url"
+                type="button"
+                class="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-muted"
+                :class="{ 'bg-green-50': saved?.index === index }"
+                :disabled="saving"
+                data-testid="kaspi-result"
+                @click="saveCandidate(index, 'manual')"
+              >
+                <img v-if="c.image" :src="c.image" alt="" loading="lazy" referrerpolicy="no-referrer" class="size-10 shrink-0 rounded border object-contain">
+                <span class="min-w-0 flex-1">
+                  <span class="line-clamp-2 font-medium">{{ c.title }}</span>
+                  <span class="text-xs text-muted-foreground">{{ fieldsLine(c) }}</span>
+                </span>
+              </button>
+            </div>
+            <div v-if="query.offer" class="flex flex-wrap gap-2">
+              <Button v-if="!saved" variant="outline" size="sm" :disabled="saving" data-testid="kaspi-absent" @click="markAbsent">
+                На Kaspi такого нет
+              </Button>
+              <Button v-if="nextInQueue && (saved || !results)" size="sm" data-testid="kaspi-next" @click="openFor(nextInQueue)">
+                Следующий: найти «{{ nextInQueue.name }}» на Kaspi
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- Очередь -->
+        <Card v-if="boardReady" data-testid="kaspi-queue">
+          <CardHeader>
+            <CardTitle class="flex items-center gap-2">
+              <ListChecks class="h-5 w-5" /> Проверить на Kaspi
+            </CardTitle>
+            <CardDescription>
+              Новые товары поставщиков без цифр Kaspi, сначала с большим поиском в Google. «Найти» открывает поиск во вкладке Kaspi — там нажмите закладку «Uhti ← Kaspi», остальное сделается само.
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-2">
+            <p v-if="!boardReady.queue.length" class="text-sm text-muted-foreground">
+              Все товары проверены.
+            </p>
+            <div v-else class="divide-y">
+              <div
+                v-for="r in boardReady.queue.slice(0, 8)"
+                :key="r.key"
+                class="flex items-center gap-3 py-2"
+                :class="{ 'rounded-md bg-muted/60 px-2': r.key === currentKey }"
+                data-testid="kaspi-queue-row"
+              >
+                <img v-if="r.photoUrl" :src="r.photoUrl" alt="" loading="lazy" class="size-10 shrink-0 rounded border object-contain">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium">
+                    {{ r.name }}
+                  </p>
+                  <p class="truncate text-xs text-muted-foreground">
+                    {{ r.supplier }}<template v-if="r.article">
+                      · арт. {{ r.article }}
+                    </template><template v-if="r.google != null">
+                      · Google {{ formatVolume(r.google) }}/мес.
+                    </template>
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" class="shrink-0" data-testid="kaspi-queue-find" @click="openFor(r)">
+                  Найти
+                </Button>
+              </div>
+            </div>
+            <p v-if="boardReady.left > 8" class="text-xs text-muted-foreground">
+              И ещё {{ boardReady.left - 8 }} в очереди.
+            </p>
+          </CardContent>
+        </Card>
+
+        <!-- Топ -->
+        <Card v-if="boardReady && boardReady.top.length" data-testid="kaspi-top">
+          <CardHeader>
+            <CardTitle class="flex items-center gap-2">
+              <Trophy class="h-5 w-5" /> Топ спроса
+            </CardTitle>
+            <CardDescription>
+              Kaspi весит больше Google: отзывы — это уже покупки, а прирост отзывов между замерами — продажи сейчас.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ol class="divide-y">
+              <li v-for="(r, n) in boardReady.top.slice(0, 20)" :key="r.key" class="flex items-center gap-3 py-2" data-testid="kaspi-top-row">
+                <span class="w-5 shrink-0 text-right text-sm tabular-nums text-muted-foreground">{{ n + 1 }}</span>
+                <img v-if="r.photoUrl" :src="r.photoUrl" alt="" loading="lazy" class="size-10 shrink-0 rounded border object-contain">
+                <div class="min-w-0 flex-1">
+                  <p class="flex items-center gap-2 text-sm font-medium">
+                    <span class="truncate">{{ r.name }}</span>
+                    <span v-if="r.hit" class="inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800" data-testid="kaspi-hit">
+                      <Flame class="h-3 w-3" /> Хит Kaspi
+                    </span>
+                  </p>
+                  <KaspiLine :summary="r.kaspi" :to="`/admin/kaspi?offer=${r.offerId}&item=${r.item}`" />
+                  <p class="truncate text-xs text-muted-foreground">
+                    {{ r.supplier }}<template v-if="r.google != null">
+                      · Google {{ formatVolume(r.google) }}/мес.
+                    </template>
+                  </p>
+                </div>
+              </li>
+            </ol>
+          </CardContent>
+        </Card>
+
         <!-- Куда -->
         <Card>
           <CardHeader>
@@ -343,7 +634,7 @@ useHead({ title: 'Цифры Kaspi' })
             <a
               v-if="targetName"
               :href="kaspiSearchUrl(targetName)"
-              target="_blank"
+              :target="KASPI_SEARCH_WINDOW"
               rel="opener"
               class="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
               data-testid="kaspi-search"
@@ -500,9 +791,9 @@ useHead({ title: 'Цифры Kaspi' })
               <Bookmark class="h-4 w-4" /> Uhti ← Kaspi
             </a>
             <ol class="list-decimal space-y-1 pl-5 text-muted-foreground">
-              <li>Выберите выше тему или товар и нажмите «Найти на Kaspi».</li>
-              <li>Откройте нужный товар на Kaspi и нажмите закладку «Uhti ← Kaspi».</li>
-              <li>Цифры появятся на этой странице — проверьте и сохраните.</li>
+              <li>В «Проверить на Kaspi» нажмите «Найти» — поиск откроется во вкладке Kaspi.</li>
+              <li>На выдаче поиска Kaspi (или на странице товара) нажмите закладку «Uhti ← Kaspi».</li>
+              <li>Товар поставщика найдётся в выдаче сам — по артикулу, названию или фото — и сохранится; если не уверен, выберете вы.</li>
             </ol>
             <p class="text-xs text-muted-foreground">
               Закладка читает только открытую вами страницу и передаёт её сюда, в ваш же браузер. Если цифры не пришли — пришлите скриншот.

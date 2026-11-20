@@ -10,6 +10,7 @@ import { toast } from 'vue-sonner'
 import KaspiLine from '@/components/admin/purchasing/KaspiLine.vue'
 import { jpegForSheet, saveOrderFile } from '@/composables/useOrderSheetFile'
 import { formatPrice } from '@/utils/formatPrice'
+import { rankTop } from '@/utils/kaspiMatch'
 import { offerKaspiKey } from '@/utils/kaspiSnapshot'
 import { DEMAND_REFRESH_COST, formatUsd, formatVolume, trendKind, trendLabel } from '@/utils/marketDemand'
 import { DEMAND_LEVEL_TEXT, demandLevel, demandLevelBounds, filterByDemand, OFFER_DEMAND_FILTERS, offerDemand, topicDraft } from '@/utils/offerDemand'
@@ -158,6 +159,11 @@ const moreLabel = (n: number) => `Показать ещё ${n}`
 // Цифры Kaspi у товара (20.11.2026): строка ведёт на страницу «Kaspi» с этим товаром
 const kaspiOf = (o: Offer, i: number) => page.value?.kaspi?.[offerKaspiKey(o.id, i)]
 const kaspiTo = (o: Offer, i: number) => `/admin/kaspi?offer=${o.id}&item=${i}`
+// «Хит Kaspi» — верхняя треть по отзывам среди товаров с замером (utils/kaspiMatch.ts)
+const kaspiHits = computed(() => new Set(rankTop(Object.entries(page.value?.kaspi ?? {}).map(([key, kaspi]) => ({ key, google: null, kaspi })))
+  .filter(t => t.hit)
+  .map(t => t.key)))
+const kaspiHit = (o: Offer, i: number) => kaspiHits.value.has(offerKaspiKey(o.id, i))
 const listNarrowText = (n: OfferNarrow) => `«${narrowPhrase(n)}»${n.volume ? ` · ${formatVolume(n.volume)}` : ''}`
 // Пилюли по макету «Товары поставщиков» (Claude Design, 18.11.2026)
 const CARD = 'rounded-[20px] bg-background shadow-sm'
@@ -823,7 +829,7 @@ async function downloadOrder() {
                         ·
                       </template>{{ it.priceNote }}
                     </p>
-                    <KaspiLine v-if="page.kaspi" :summary="kaspiOf(o, i)" :to="kaspiTo(o, i)" />
+                    <KaspiLine v-if="page.kaspi" :summary="kaspiOf(o, i)" :to="kaspiTo(o, i)" :hit="kaspiHit(o, i)" />
                     <p v-if="it.imagePrice != null" class="text-xs text-amber-700" data-testid="offer-price-conflict">
                       На фото другая: {{ formatPrice(it.imagePrice) }}&nbsp;₸
                     </p>
@@ -860,7 +866,7 @@ async function downloadOrder() {
                   <p class="line-clamp-4 whitespace-pre-line break-words text-sm" :class="{ 'text-muted-foreground': !o.caption }" data-testid="offer-caption">
                     {{ o.caption || 'Без подписи' }}
                   </p>
-                  <KaspiLine v-if="page.kaspi" :summary="kaspiOf(o, 0)" :to="kaspiTo(o, 0)" />
+                  <KaspiLine v-if="page.kaspi" :summary="kaspiOf(o, 0)" :to="kaspiTo(o, 0)" :hit="kaspiHit(o, 0)" />
                   <p v-if="o.items" class="text-xs text-muted-foreground" data-testid="offer-no-items">
                     ИИ не нашёл на фото товара
                   </p>
@@ -963,7 +969,7 @@ async function downloadOrder() {
                     <template v-if="o.items?.[0]?.article">Арт. {{ o.items[0].article }} · </template><template v-if="o.items?.[0]?.priceNote">{{ o.items[0].priceNote }} · </template><template v-if="(o.items?.length ?? 0) > 1">товаров в посте: {{ o.items!.length }} · </template>{{ meta(o) }} ·
                     <a :href="o.postUrl" target="_blank" rel="noopener" class="text-primary hover:underline">пост</a>
                   </span>
-                  <KaspiLine v-if="page.kaspi" :summary="kaspiOf(o, 0)" :to="kaspiTo(o, 0)" />
+                  <KaspiLine v-if="page.kaspi" :summary="kaspiOf(o, 0)" :to="kaspiTo(o, 0)" :hit="kaspiHit(o, 0)" />
                 </div>
                 <div class="flex w-24 shrink-0 flex-col gap-0.5">
                   <template v-if="o.items?.[0]?.price != null">

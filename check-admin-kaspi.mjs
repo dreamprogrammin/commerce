@@ -106,7 +106,7 @@ async function api(path, token, body, method = body ? 'POST' : 'GET') {
 
 // ---------- заглушка ИИ ----------
 
-const ai = { kaspi: [], mode: 'one' }
+const ai = { kaspi: [], photo: [], mode: 'one' }
 const aiServer = http.createServer((req, res) => {
   const { pathname } = new URL(req.url, AI_WEB)
   const send = (status, body) => {
@@ -127,6 +127,13 @@ const aiServer = http.createServer((req, res) => {
       return send(404, { type: 'error', error: { type: 'not_found_error', message: pathname } })
     const body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
     const content = body.messages?.[0]?.content ?? []
+    // Сверка с выдачей по фото: «Конструктор» — второй из списка, «Пазл» — ни один
+    if (typeof body.system === 'string' && body.system.startsWith('Ты сверяешь товар')) {
+      const text = content.find(b => b.type === 'text')?.text ?? ''
+      ai.photo.push({ model: body.model, format: body.output_config?.format?.type, text, images: content.filter(b => b.type === 'image').map(b => b.source?.type === 'url' ? b.source.url : `${b.source?.type}:${b.source?.media_type}`) })
+      const answer = text.includes('Конструктор') ? { match: 2, confidence: 'high' } : { match: null, confidence: 'low' }
+      return send(200, { id: `msg_p_${ai.photo.length}`, type: 'message', role: 'assistant', model: body.model, content: [{ type: 'text', text: JSON.stringify(answer) }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 3000, output_tokens: 20 } })
+    }
     ai.kaspi.push({
       model: body.model,
       effort: body.output_config?.effort,
@@ -153,7 +160,17 @@ const KASPI_PAGES = {
   '/shop/p/probe-mashinka-200600/': `<!doctype html><meta charset="utf-8"><title>Машинка проверочная | Kaspi</title>
 <body><h1>Машинка проверочная</h1><div>4,6 (2 045 отзывов)</div><div>812 ₸ × 24</div><div>Цена 19 490 ₸</div><div>Продавцы (12)</div></body>`,
 }
+// Выдача поиска: карточка — ссылка-картинка, ссылка-название, отзывы, цена (вёрстка придумана)
+const CDN = 'https://resources.cdn-kaspi.kz/img/probe'
+const card = (slug, title, reviews, price) => `<div class="card"><a href="/shop/p/${slug}/?c=750000000"><img src="${CDN}/${slug}.jpg" alt=""></a><a href="/shop/p/${slug}/?c=750000000">${title}</a><div>4,7 (${reviews} отзывов)</div><div>${price} ₸</div></div>`
+const SEARCH = {
+  'Кукла проверочная': [card('kukla-hasbro-1', 'Кукла Hasbro принцесса KP 7731 розовая', '1 234', '12 990'), card('kukla-2', 'Кукла модница', '15', '4 990'), card('kukla-3', 'Кукла малышка', '8', '3 490')],
+  'Конструктор проверочный': [card('konstr-red', 'Конструктор проверочный красный', '40', '9 990'), card('konstr-blue', 'Конструктор проверочный синий', '640', '9 490')],
+  'Пазл проверочный': [card('myach', 'Мяч футбольный', '300', '2 990'), card('samokat', 'Самокат детский', '90', '19 990')],
+}
+const searchPage = text => `<!doctype html><meta charset="utf-8"><title>${text} — Kaspi</title><body><h1>Результаты</h1><section>${SEARCH[text].join('')}</section></body>`
 const kaspiRequests = []
+const cdnRequests = []
 
 // ---------- данные ----------
 
@@ -162,6 +179,7 @@ const emails = { admin: `kaspi-admin-${stamp}@example.test`, buyer: `kaspi-buyer
 const users = []
 const aiKeyNames = () => psql(`SELECT coalesce(string_agg(name, ',' ORDER BY name), '') FROM vault.secrets WHERE name LIKE 'ai\\_key\\_%';`)
 let started = false
+const photoPaths = []
 
 function makeAdmin(adminId) {
   psql(`
@@ -173,6 +191,11 @@ UPDATE public.profiles SET role = 'admin' WHERE id = :'admin';
 ALTER TABLE public.profiles ENABLE TRIGGER :"t";
 COMMIT;
 `, { admin: adminId })
+}
+
+async function removePhotos() {
+  if (photoPaths.length)
+    await fetch(`${SUPA}/storage/v1/object/supplier-photos`, { method: 'DELETE', headers: serviceHeaders, body: JSON.stringify({ prefixes: photoPaths }) })
 }
 
 function cleanup() {
@@ -226,7 +249,15 @@ try {
   const hasRead = psql(`SELECT count(*) FROM information_schema.columns WHERE table_name = 'supplier_offers' AND column_name = 'read_items';`) === '1'
   if (!hasRead)
     throw new Error('Нет миграции чтения ИИ (20261105120000) — товары поста не проверить')
-  const offerId = psql(`INSERT INTO public.supplier_offers (channel_id, message_id, posted_at, post_url, caption, read_items, read_at, read_model) VALUES ('${chId}', 1, now() - interval '1 hour', 'https://t.me/probe_kaspi/1', 'Пост', '[{"name":"Кукла проверочная","price_text":9000,"confidence":"high"},{"name":"Машинка проверочная","price_text":3000,"confidence":"high"}]', now(), 'anthropic/${VISION}') RETURNING id;`)
+  const offerId = psql(`INSERT INTO public.supplier_offers (channel_id, message_id, posted_at, post_url, caption, read_items, read_at, read_model) VALUES ('${chId}', 1, now() - interval '1 hour', 'https://t.me/probe_kaspi/1', 'Пост', '[{"name":"Кукла проверочная","article":"KP-7731","price_text":9000,"confidence":"high"},{"name":"Машинка проверочная","price_text":3000,"confidence":"high"},{"name":"Конструктор проверочный","price_text":5000,"confidence":"high"},{"name":"Пазл проверочный","price_text":1000,"confidence":"high"}]', now(), 'anthropic/${VISION}') RETURNING id;`)
+
+  // Фото товара поставщика — в закрытом бакете, как после сбора: по нему сверка с выдачей
+  const photoPath = `${chId}/kaspi-probe.png`
+  const up = await fetch(`${SUPA}/storage/v1/object/supplier-photos/${photoPath}`, { method: 'POST', headers: { 'apikey': SERVICE, 'Authorization': `Bearer ${SERVICE}`, 'Content-Type': 'image/png', 'x-upsert': 'true' }, body: PNG })
+  if (!up.ok)
+    throw new Error(`фото в бакет: ${up.status}`)
+  photoPaths.push(photoPath)
+  psql(`UPDATE public.supplier_offers SET photo_path = '${photoPath}', photo_url = 'data:image/png;base64,${PNG.toString('base64')}' WHERE id = '${offerId}';`)
 
   // 1) маршруты
   check((await api('/api/admin/kaspi', null)).status === 401, 'гость — 401')
@@ -261,8 +292,14 @@ try {
     await ctx.route('https://kaspi.kz/**', (route) => {
       const { pathname } = new URL(route.request().url())
       kaspiRequests.push(pathname)
-      const html = KASPI_PAGES[pathname]
+      const text = new URL(route.request().url()).searchParams.get('text')
+      const html = pathname === '/shop/search/' && SEARCH[text] ? searchPage(text) : KASPI_PAGES[pathname]
       return html ? route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html }) : route.fulfill({ status: 404, body: 'nope' })
+    })
+    // Картинки выдачи с CDN Kaspi — тоже подставные
+    await ctx.route('https://resources.cdn-kaspi.kz/**', (route) => {
+      cdnRequests.push(new URL(route.request().url()).pathname)
+      return route.fulfill({ status: 200, contentType: 'image/png', body: PNG })
     })
     ctx.on('page', (page) => {
       page.on('pageerror', e => page.url().startsWith(BASE) && errors.push(`${page.url().replace(BASE, '')}: ${e.message}`))
@@ -412,11 +449,94 @@ try {
   const card = page.locator(`[data-offer-id="${offerId}"]`)
   await card.first().waitFor({ timeout: 20000 })
   const lines = card.first().locator('[data-testid=kaspi-line]')
-  check(await lines.count() === 2, `карточка поста: строка «Kaspi» у каждого товара (${await lines.count()})`)
+  check(await lines.count() === 3, `карточка поста: строка «Kaspi» у каждого показанного товара (${await lines.count()})`)
   check(sp(await lines.nth(0).textContent()).includes('добавить цифры') && await lines.nth(0).getAttribute('href') === `/admin/kaspi?offer=${offerId}&item=0`, 'у первого товара замеров нет — «добавить цифры»')
   check(sp(await lines.nth(1).textContent()).includes('19 490') && await lines.nth(1).getAttribute('href') === `/admin/kaspi?offer=${offerId}&item=1`, `у второго — его цифры: «${sp(await lines.nth(1).textContent())}»`)
   if (SHOTS)
     await card.first().screenshot({ path: `${SHOTS}/kaspi-offer-card.png` })
+
+  // 9) очередь: выдача поиска → сверка → сохранение само
+  const board0 = await api('/api/admin/kaspi/board', adminToken)
+  const queueKeys = board0.json?.queue?.map(r => r.key) ?? []
+  check(board0.status === 200 && queueKeys.includes(`${offerId}:0`) && queueKeys.includes(`${offerId}:2`) && !queueKeys.includes(`${offerId}:1`), `очередь: товары без замера, с замером — нет (${queueKeys.filter(k => k.startsWith(offerId)).join(', ')})`)
+  check((await api('/api/admin/kaspi/board', buyerToken)).status === 403, 'очередь покупателю — 403')
+  check((await api('/api/admin/kaspi/match', adminToken, { offerId, item: 0, candidates: [] })).status === 400, 'сверка без выдачи — 400')
+  check((await api('/api/admin/kaspi/match', buyerToken, { offerId, item: 0, candidates: [{ url: 'https://kaspi.kz/shop/p/x/', title: 'x' }] })).status === 403, 'сверка покупателю — 403')
+
+  await page.goto(`${BASE}/admin/kaspi`, { waitUntil: 'networkidle' })
+  const findRow = name => page.locator('[data-testid=kaspi-queue-row]', { hasText: name }).locator('[data-testid=kaspi-queue-find]')
+  async function bookmarkOn(tab) {
+    await tab.waitForLoadState('load')
+    await tab.evaluate(src => (0, eval)(src), bookmarkSrc)
+  }
+  const offerRows = () => rows().filter(r => r.offer_id === offerId)
+
+  // а) артикул
+  // Вкладка поиска Kaspi уже открыта ссылкой «Найти на Kaspi» выше — «Найти» ведёт в неё же
+  const searchTab = kaspiTab
+  const tabsBefore = ctx.pages().length
+  await findRow('Кукла проверочная').click()
+  check(await searchTab.waitForURL(u => new URL(u).searchParams.get('text') === 'Кукла проверочная', { timeout: 15000 }).then(() => true, () => false), '«Найти» открыл поиск Kaspi по названию товара')
+  check(ctx.pages().length === tabsBefore, `«Найти» — в той же вкладке Kaspi, новой нет (${ctx.pages().length})`)
+  await bookmarkOn(searchTab)
+  await page.locator('[data-testid=kaspi-match-saved]').waitFor({ timeout: 20000 })
+  check(sp(await page.locator('[data-testid=kaspi-match-saved]').textContent()).includes('по артикулу'), `найден по артикулу: «${sp(await page.locator('[data-testid=kaspi-match-saved]').textContent())}»`)
+  let mine = offerRows().filter(r => r.offer_item === 0)
+  check(mine.length === 1 && mine[0].kaspi_url === 'https://kaspi.kz/shop/p/kukla-hasbro-1/' && mine[0].reviews === 1234 && mine[0].price === 12990 && mine[0].source === 'page', `в базе — товар с артикулом, его цифры (${JSON.stringify(mine[0] ?? null)})`)
+  check(await page.locator('[data-testid=kaspi-result]').count() === 3, 'выдача: три товара на выбор')
+  check(ai.photo.length === 0, 'по артикулу — к модели не ходили')
+
+  // «Не то» — выбрать другой: прежний замер заменён
+  await page.locator('[data-testid=kaspi-result]', { hasText: 'Кукла модница' }).click()
+  await toastWith(page, 'выбрано вами').first().waitFor({ timeout: 10000 })
+  mine = offerRows().filter(r => r.offer_item === 0)
+  check(mine.length === 1 && mine[0].kaspi_url === 'https://kaspi.kz/shop/p/kukla-2/', `выбран другой — замер заменён, не добавлен (${mine.map(r => r.kaspi_url).join(', ')})`)
+  await page.locator('[data-testid=kaspi-result]', { hasText: 'Кукла Hasbro' }).click()
+  await toastWith(page, 'выбрано вами').nth(1).waitFor({ timeout: 10000 })
+
+  // б) фото: два одинаковых названия — решает модель
+  const nextBtn = page.locator('[data-testid=kaspi-next]')
+  check(sp(await nextBtn.textContent()).includes('Конструктор проверочный'), `«Следующий» — следующий в очереди: «${sp(await nextBtn.textContent())}»`)
+  await nextBtn.click()
+  await searchTab.waitForURL(u => new URL(u).searchParams.get('text') === 'Конструктор проверочный', { timeout: 15000 })
+  check(ctx.pages().length === tabsBefore, `поиск открылся в той же вкладке Kaspi (вкладок ${ctx.pages().length})`)
+  await bookmarkOn(searchTab)
+  await page.locator('[data-testid=kaspi-match-saved]').waitFor({ timeout: 20000 })
+  check(sp(await page.locator('[data-testid=kaspi-match-saved]').textContent()).includes('по фото') && sp(await page.locator('[data-testid=kaspi-match-saved]').textContent()).includes('синий'), `найден по фото: «${sp(await page.locator('[data-testid=kaspi-match-saved]').textContent())}»`)
+  const pc = ai.photo.at(-1)
+  check(ai.photo.length === 1 && pc.model === VISION && pc.format === 'json_schema' && pc.images[0] === 'base64:image/png' && pc.images.slice(1).join() === `${CDN}/konstr-red.jpg,${CDN}/konstr-blue.jpg` && pc.text.includes('1. Конструктор проверочный красный'),
+    `модель: фото поставщика из бакета и картинки выдачи по адресу (${JSON.stringify(pc)})`)
+  check(offerRows().find(r => r.offer_item === 2)?.kaspi_url === 'https://kaspi.kz/shop/p/konstr-blue/', 'в базе — товар, выбранный по фото')
+
+  // в) не нашлось — «На Kaspi такого нет»
+  await page.locator('[data-testid=kaspi-next]').click()
+  await searchTab.waitForURL(u => new URL(u).searchParams.get('text') === 'Пазл проверочный', { timeout: 15000 })
+  await bookmarkOn(searchTab)
+  await page.locator('[data-testid=kaspi-match-none]').waitFor({ timeout: 20000 })
+  check(offerRows().filter(r => r.offer_item === 3).length === 0, 'не нашлось — ничего не сохранено само')
+  await page.click('[data-testid=kaspi-absent]')
+  await toastWith(page, 'на Kaspi такого нет').waitFor({ timeout: 10000 })
+  const absent = offerRows().find(r => r.offer_item === 3)
+  check(absent?.sellers === 0 && absent.price == null && absent.source === 'manual', `«нет на Kaspi» — замер «0 продавцов» (${JSON.stringify(absent ?? null)})`)
+  check(cdnRequests.length > 0 && kaspiRequests.every(p => p in KASPI_PAGES || p === '/shop/search/'), 'картинки и страницы Kaspi — только подставные')
+
+  // г) топ и «Хит Kaspi»
+  const board1 = (await api('/api/admin/kaspi/board', adminToken)).json
+  const myTop = board1.top.filter(r => r.offerId === offerId)
+  check(!board1.queue.some(r => r.offerId === offerId), 'все товары поста проверены — в очереди их нет')
+  // Машинка — 2 045 отзывов (шаг 3), кукла — 1 234, конструктор — 640; хит — верхняя треть: машинка
+  check(myTop.map(r => r.item).join() === '1,0,2' && myTop[0].hit && !myTop[1].hit && !myTop.some(r => r.item === 3), `топ: больше отзывов — выше, «нет на Kaspi» — не в топе (${myTop.map(r => `${r.item}:${r.kaspi?.last.reviews}${r.hit ? ' хит' : ''}`).join(', ')})`)
+  await page.reload({ waitUntil: 'networkidle' })
+  check(await page.locator('[data-testid=kaspi-top-row]', { hasText: 'Машинка проверочная' }).locator('[data-testid=kaspi-hit]').count() >= 1
+    && await page.locator('[data-testid=kaspi-top-row]', { hasText: 'Кукла проверочная' }).locator('[data-testid=kaspi-hit]').count() === 0, 'страница: «Хит Kaspi» у машинки, у куклы — нет')
+  if (SHOTS)
+    await page.screenshot({ path: `${SHOTS}/kaspi-board-1366.png`, fullPage: true })
+  await page.goto(`${BASE}/admin/supplier-offers`, { waitUntil: 'networkidle' })
+  const card2 = page.locator(`[data-offer-id="${offerId}"]`).first()
+  await card2.waitFor({ timeout: 20000 })
+  check(await card2.locator('[data-testid=kaspi-line]').nth(1).locator('[data-testid=kaspi-hit]').count() === 1 && await card2.locator('[data-testid=kaspi-hit]').count() === 1, 'карточка поставщика: «Хит Kaspi» только у машинки')
+  if (SHOTS)
+    await card2.screenshot({ path: `${SHOTS}/kaspi-offer-card-hit.png` })
 
   // 8) телефон
   const { ctx: phone, page: phonePage } = await newContext({ width: 390, height: 844 })
@@ -462,6 +582,7 @@ finally {
   if (renamed)
     renameTable(true)
   cleanup()
+  await removePhotos()
   for (const id of users)
     await fetch(`${SUPA}/auth/v1/admin/users/${id}`, { method: 'DELETE', headers: serviceHeaders })
   await browser.close()

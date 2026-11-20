@@ -27,7 +27,29 @@ export interface KaspiPageRaw {
   ld: string[]
   /** document.body.innerText, обрезанный закладкой */
   text: string
+  /** Карточки товаров со страницы поиска (с 20.11.2026; у старой закладки — нет) */
+  cards?: KaspiCardRaw[]
 }
+
+/** Карточка товара в выдаче: ссылка, название, текст карточки, картинка */
+export interface KaspiCardRaw {
+  href: string
+  title: string
+  text: string
+  img: string
+}
+
+/** Товар выдачи Kaspi после разбора */
+export interface KaspiCandidate extends KaspiFields {
+  url: string
+  /** Картинка товара на CDN Kaspi; null — не нашлась или чужой адрес */
+  image: string | null
+  /** Текст карточки — в нём ищется артикул */
+  text: string
+}
+
+/** Карточек с одной страницы — не больше */
+export const KASPI_CARDS_LIMIT = 60
 
 export interface KaspiParsed extends KaspiFields {
   url: string | null
@@ -128,6 +150,42 @@ function ldProduct(ld: string[]): Record<string, any> | null {
 /** Число с разрядами через пробел; без переноса строки — иначе склеиваются соседние числа */
 const NUM = String.raw`(?<!\d)(?:\d{1,3}(?:[ \u00A0\u202F]\d{3})+|\d+)`
 
+/** Цифры по видимому тексту страницы или карточки */
+function numbersFromText(text: string): Omit<KaspiFields, 'title'> {
+  // Первая цена, за которой не идёт «× 12» — то рассрочка
+  const price = int(new RegExp(`(${NUM})\\s*₸(?!\\s*[x×х]\\s*\\d)`).exec(text)?.[1])
+  const reviews = int(new RegExp(`(${NUM})\\s*отзыв`, 'i').exec(text)?.[1])
+  const rate = rating(num(/\b([0-5][.,]\d)[\s(]+\d[\d \u00A0\u202F]*отзыв/i.exec(text)?.[1]))
+  const m = new RegExp(`(${NUM})\\s*продав`, 'i').exec(text)
+    ?? /продав\S*\s*\(\s*(\d+)\s*\)/i.exec(text)
+  return { price, reviews, rating: rate, sellers: int(m?.[1]) }
+}
+
+const KASPI_IMAGE = /^https:\/\/(?:[a-z0-9-]+\.)*(?:kaspi\.kz|cdn-kaspi\.kz)\/\S+$/i
+
+/**
+ * Карточки выдачи поиска → товары. Карточку закладка находит без знания
+ * вёрстки: ссылка на /shop/p/ и ближайший её предок с ценой «₸».
+ */
+export function parseKaspiCards(raw: KaspiPageRaw): KaspiCandidate[] {
+  const seen = new Set<string>()
+  const out: KaspiCandidate[] = []
+  for (const c of (Array.isArray(raw.cards) ? raw.cards : []).slice(0, KASPI_CARDS_LIMIT)) {
+    const url = normalizeKaspiUrl(c?.href)
+    const title = typeof c?.title === 'string' ? c.title.replace(/\s+/g, ' ').trim().slice(0, 300) : ''
+    if (!url || !url.includes('/shop/p/') || !title || seen.has(url))
+      continue
+    seen.add(url)
+    const nums = numbersFromText(typeof c.text === 'string' ? c.text : '')
+    const image = typeof c.img === 'string' && KASPI_IMAGE.test(c.img) ? c.img : null
+    out.push({ url, title, image, text: typeof c.text === 'string' ? c.text.slice(0, 400) : '', ...nums })
+  }
+  return out
+}
+
+/** Страница товара Kaspi, а не выдача */
+export const isKaspiProductUrl = (url: string) => /^https:\/\/kaspi\.kz\/shop\/p\//.test(url)
+
 /**
  * Разбор сырья со страницы Kaspi. Сначала JSON-LD — разметка для поисковиков,
  * она стабильнее вёрстки; чего в ней нет — по видимому тексту. Вёрстку Kaspi
@@ -141,28 +199,11 @@ export function parseKaspiPage(raw: KaspiPageRaw): KaspiParsed {
   const agg = p?.aggregateRating ?? null
   const text = typeof raw.text === 'string' ? raw.text : ''
 
-  let price = num(offers?.price) ?? num(offers?.lowPrice)
-  if (price == null) {
-    // Первая цена, за которой не идёт «× 12» — то рассрочка
-    price = int(new RegExp(`(${NUM})\\s*₸(?!\\s*[x×х]\\s*\\d)`).exec(text)?.[1])
-  }
-
-  let reviews = num(agg?.reviewCount) ?? num(agg?.ratingCount)
-  if (reviews == null)
-    reviews = int(new RegExp(`(${NUM})\\s*отзыв`, 'i').exec(text)?.[1])
-
-  let rate = rating(num(agg?.ratingValue))
-  if (rate == null) {
-    const m = /\b([0-5][.,]\d)[\s(]+\d[\d \u00A0\u202F]*отзыв/i.exec(text)
-    rate = rating(num(m?.[1]))
-  }
-
-  let sellers = num(offers?.offerCount)
-  if (sellers == null) {
-    const m = new RegExp(`(${NUM})\\s*продав`, 'i').exec(text)
-      ?? /продав\S*\s*\(\s*(\d+)\s*\)/i.exec(text)
-    sellers = int(m?.[1])
-  }
+  const t = numbersFromText(text)
+  const price = num(offers?.price) ?? num(offers?.lowPrice) ?? t.price
+  const reviews = num(agg?.reviewCount) ?? num(agg?.ratingCount) ?? t.reviews
+  const rate = rating(num(agg?.ratingValue)) ?? t.rating
+  const sellers = num(offers?.offerCount) ?? t.sellers
 
   const title = String(p?.name ?? raw.title ?? '').replace(/\s*[|–—-]\s*Kaspi.*$/i, '').trim().slice(0, 300)
   const fields: KaspiFields = { title, price: price == null ? null : Math.round(price), reviews: reviews == null ? null : Math.round(reviews), rating: rate, sellers: sellers == null ? null : Math.round(sellers) }
@@ -194,6 +235,14 @@ export function decodeKaspiHash(hash: string): KaspiPageRaw | null {
       title: typeof raw.title === 'string' ? raw.title : '',
       ld: Array.isArray(raw.ld) ? raw.ld.filter((s: unknown) => typeof s === 'string') : [],
       text: typeof raw.text === 'string' ? raw.text.slice(0, KASPI_TEXT_LIMIT) : '',
+      cards: Array.isArray(raw.cards)
+        ? raw.cards.slice(0, KASPI_CARDS_LIMIT).filter((c: unknown) => c && typeof c === 'object').map((c: Record<string, unknown>) => ({
+            href: typeof c.href === 'string' ? c.href : '',
+            title: typeof c.title === 'string' ? c.title : '',
+            text: typeof c.text === 'string' ? c.text.slice(0, 1000) : '',
+            img: typeof c.img === 'string' ? c.img : '',
+          }))
+        : [],
     }
   }
   catch {
@@ -208,7 +257,13 @@ export function decodeKaspiHash(hash: string): KaspiPageRaw | null {
 export function kaspiBookmarklet(origin: string): string {
   const src = `(function(){var d={url:location.href,title:document.title,`
     + `ld:Array.prototype.map.call(document.querySelectorAll('script[type="application/ld+json"]'),function(s){return s.textContent||''}),`
-    + `text:(document.body.innerText||'').slice(0,${KASPI_TEXT_LIMIT})};`
+    + `text:(document.body.innerText||'').slice(0,${KASPI_TEXT_LIMIT}),cards:[]};`
+    // Карточки выдачи: ссылка на товар и ближайший предок с ценой «₸»; ссылка-картинка без текста — пропуск
+    + `var seen={};Array.prototype.forEach.call(document.querySelectorAll('a[href*="/shop/p/"]'),function(a){`
+    + `if(d.cards.length>=${KASPI_CARDS_LIMIT})return;var h=a.href.split('#')[0].split('?')[0];if(seen[h])return;`
+    + `var el=a,n=0;while(el.parentElement&&n<8&&(el.innerText||'').indexOf('\u20B8')<0){el=el.parentElement;n++}`
+    + `var im=el.querySelector('img'),t=(a.innerText||a.title||'').trim();if(!t)return;seen[h]=1;`
+    + `d.cards.push({href:h,title:t.slice(0,300),text:(el.innerText||'').slice(0,1000),img:im?(im.currentSrc||im.src||im.getAttribute('data-src')||''):''})});`
     + `var b=new TextEncoder().encode(JSON.stringify(d)),s='';for(var i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);`
     + `window.open(${JSON.stringify(`${origin.replace(/\/$/, '')}/admin/kaspi#kaspi=`)}+btoa(s).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,''),${JSON.stringify(KASPI_WINDOW)})})()`
   return `javascript:${encodeURIComponent(src)}`
@@ -356,6 +411,9 @@ function plural(n: number, one: string, few: string, many: string) {
 /** Части строки «Kaspi» на карточке: цена, отзывы с приростом, рейтинг, продавцы */
 export function kaspiLineParts(s: KaspiSummary): string[] {
   const l = s.last
+  // Владелец отметил «На Kaspi такого нет» — замер «0 продавцов» без цены и отзывов
+  if (l.sellers === 0 && l.price == null && !l.reviews)
+    return ['нет на Kaspi']
   const parts: string[] = []
   if (l.price != null)
     parts.push(`${group(l.price)}\u00A0₸`)
