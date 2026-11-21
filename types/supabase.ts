@@ -1715,6 +1715,57 @@ export interface Database {
           },
         ]
       }
+      paid_services: {
+        Row: {
+          cost: number | null
+          created_at: string
+          currency: string
+          id: string
+          meter: string | null
+          name: string
+          note: string
+          period: string
+          plan: string
+          reminded_for: string | null
+          renews_on: string | null
+          sort: number
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          currency?: string
+          id?: string
+          meter?: string | null
+          name: string
+          note?: string
+          period?: string
+          plan?: string
+          reminded_for?: string | null
+          renews_on?: string | null
+          sort?: number
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          currency?: string
+          id?: string
+          meter?: string | null
+          name?: string
+          note?: string
+          period?: string
+          plan?: string
+          reminded_for?: string | null
+          renews_on?: string | null
+          sort?: number
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
       product_accessories: {
         Row: {
           accessory_product_id: string
@@ -2704,6 +2755,63 @@ export interface Database {
           key?: string
           updated_at?: string
           value?: Json | null
+        }
+        Relationships: []
+      }
+      site_health_checks: {
+        Row: {
+          checked_at: string
+          error: string | null
+          id: number
+          ms: number | null
+          ok: boolean
+          status: number | null
+          url: string
+        }
+        Insert: {
+          checked_at?: string
+          error?: string | null
+          id?: never
+          ms?: number | null
+          ok: boolean
+          status?: number | null
+          url: string
+        }
+        Update: {
+          checked_at?: string
+          error?: string | null
+          id?: never
+          ms?: number | null
+          ok?: boolean
+          status?: number | null
+          url?: string
+        }
+        Relationships: []
+      }
+      site_health_incidents: {
+        Row: {
+          alerted_at: string | null
+          ended_at: string | null
+          id: number
+          reason: string
+          recovered_alerted_at: string | null
+          started_at: string
+        }
+        Insert: {
+          alerted_at?: string | null
+          ended_at?: string | null
+          id?: never
+          reason?: string
+          recovered_alerted_at?: string | null
+          started_at?: string
+        }
+        Update: {
+          alerted_at?: string | null
+          ended_at?: string | null
+          id?: never
+          reason?: string
+          recovered_alerted_at?: string | null
+          started_at?: string
         }
         Relationships: []
       }
@@ -4165,6 +4273,8 @@ export interface Database {
           stock_quantity: number
         }[]
       }
+      site_health_storage: { Args: never, Returns: Json }
+      site_watch_tick: { Args: never, Returns: number }
       submit_review_by_invite: {
         Args: {
           p_author_name?: string
