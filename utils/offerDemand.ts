@@ -1,4 +1,5 @@
 import type { DemandTopic } from './marketDemand'
+import type { OfferNarrow } from './offerQueries'
 import type { Offer } from './supplierOfferList'
 import { narrowLevel, narrowLevelBounds, offerNarrow } from './offerQueries'
 
@@ -90,29 +91,53 @@ export const OFFER_DEMAND_FILTERS: { id: OfferDemandFilter, label: string }[] = 
  * меняется (по времени поста).
  *
  * `volumes` — точный спрос (18.11.2026: «работает слишком широко»): ответы
- * DataForSEO на запросы покупателя к товарам (utils/offerQueries.ts). Есть —
- * «высокий» считается по ним, нет (миграции 20261118120000 ещё нет) — по
- * темам: верхняя треть своих тем.
+ * DataForSEO на запросы покупателя к товарам (utils/offerQueries.ts). У
+ * товара с проверенными фразами «высокий» считается по ним, у остальных — по
+ * теме (offerLevel); без миграции 20261118120000 — у всех по темам.
  */
 export function filterByDemand<T extends Pick<Offer, 'caption' | 'items'> & { queries?: string[][] | null }>(offers: T[], topics: OfferDemandTopic[], filter: OfferDemandFilter, volumes?: Record<string, number | null> | null): T[] {
   if (filter === 'all')
     return offers
-  if (filter === 'high' && volumes) {
-    const bounds = narrowLevelBounds(volumes)
-    return offers
-      .map(o => ({ o, n: offerNarrow(o.queries, volumes) }))
-      .filter(x => narrowLevel(x.n, bounds) === 'high')
-      .sort((a, b) => b.n!.volume - a.n!.volume)
-      .map(x => x.o)
-  }
-  const withDemand = offers.map(o => ({ o, d: offerDemand(o, topics) }))
+  const withDemand = offers.map(o => ({ o, d: offerDemand(o, topics), n: volumes ? offerNarrow(o.queries, volumes) : null }))
   if (filter === 'none')
     return withDemand.filter(x => !x.d).map(x => x.o)
-  const bounds = demandLevelBounds(topics)
+  const narrowBounds = volumes ? narrowLevelBounds(volumes) : null
+  const topicBounds = demandLevelBounds(topics)
   return withDemand
-    .filter(x => demandLevel(x.d, bounds) === 'high')
-    .sort((a, b) => (b.d!.volume ?? 0) - (a.d!.volume ?? 0))
+    .filter(x => offerLevel(x.n, x.d, narrowBounds, topicBounds) === 'high')
+    .sort((a, b) => compareByDemand(a, b))
     .map(x => x.o)
+}
+
+type LevelBounds = { mid: number, high: number } | null
+
+/**
+ * Уровень спроса товара (21.11.2026): по его точным фразам, если DataForSEO
+ * ответил хотя бы на одну из них, иначе — по теме, как до точного спроса.
+ *
+ * Было: при первом ответе на любую фразу уровень у ВСЕХ товаров брался только
+ * по фразам. 20.11 «Новые запросы» на «Спросе на рынке» случайно принесли
+ * цифру для одной фразы товара («кукла с коляской») — и у 917 товаров из 918
+ * встало «Спрос: нет данных», а «Высокий спрос» опустел, хотя темы с цифрами
+ * у них есть.
+ */
+export function offerLevel(narrow: OfferNarrow | null, demand: Pick<OfferDemand, 'volume'> | null, narrowBounds: LevelBounds, topicBounds: LevelBounds): DemandLevel {
+  return narrow?.checked ? narrowLevel(narrow, narrowBounds) : demandLevel(demand, topicBounds)
+}
+
+/** Спрос товара для «сверху больший»: проверенные фразы, иначе тема */
+export function offerVolume(narrow: OfferNarrow | null, demand: Pick<OfferDemand, 'volume'> | null): number {
+  return narrow?.checked ? narrow.volume : demand?.volume ?? 0
+}
+
+/**
+ * Порядок по спросу: сначала товары с проверенными фразами (точный спрос —
+ * то, что владелец просил 18.11), внутри — больший спрос. Цифра фразы и
+ * цифра темы — разного размаха (тема складывает несколько фраз), поэтому
+ * вперемешку их не сравниваем.
+ */
+export function compareByDemand(a: { n: OfferNarrow | null, d: Pick<OfferDemand, 'volume'> | null }, b: { n: OfferNarrow | null, d: Pick<OfferDemand, 'volume'> | null }): number {
+  return Number(!!b.n?.checked) - Number(!!a.n?.checked) || offerVolume(b.n, b.d) - offerVolume(a.n, a.d)
 }
 
 /**
