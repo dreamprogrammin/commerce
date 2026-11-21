@@ -117,6 +117,9 @@ function getProductImage(imageUrl: string | null): string | undefined {
       </Button>
     </div>
 
+    <!-- Состояние сайта и платные сервисы (21.11.2026) — своя загрузка, от статистики не зависит -->
+    <AdminSiteHealthPanel />
+
     <!-- Скелетоны -->
     <template v-if="isLoading">
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">

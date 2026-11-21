@@ -419,6 +419,12 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/sales-digest/index.ts"
 
+# Сторож доступности (21.11.2026): зовёт расписание «Site Watchdog», доступ — x-internal-secret
+[functions.site-watchdog]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/site-watchdog/index.ts"
+
 [functions.team-report]
 enabled = true
 verify_jwt = false
