@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import type { Gauge, PaidService, ServiceCurrency, ServiceMeter, ServicePeriod, SiteHealthPage } from '@/utils/siteHealth'
+import type { Gauge, PaidService, ServiceCurrency, ServiceMeter, ServicePeriod } from '@/utils/siteHealth'
 import type { BatteryState } from '@/utils/usageBatteries'
 import { CreditCard, Database, ExternalLink, Globe, Pencil, Plus, Search, Server, Sparkles, Trash2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
+import { useSiteHealth } from '@/composables/admin/useSiteHealth'
 import { monthlyTotal, priceLine, renewLine, siteBattery } from '@/utils/siteHealth'
 
 /*
@@ -15,7 +16,8 @@ import { monthlyTotal, priceLine, renewLine, siteBattery } from '@/utils/siteHea
  */
 
 const errorText = (e: any, fallback: string) => e?.data?.message || e?.statusMessage || fallback
-const { data, error, refresh } = useAsyncData('admin-site-health', () => adminFetch<SiteHealthPage>('/api/admin/site-health'), { server: false })
+// Та же загрузка, что у строки над продажами (AdminSiteHealthStrip) — запрос один
+const { data, error, refresh } = useSiteHealth()
 
 const TILE: Record<BatteryState, string> = { ok: 'bg-green-100 text-green-700', low: 'bg-amber-100 text-amber-700', empty: 'bg-red-600/10 text-red-700', off: 'bg-neutral-100 text-neutral-500' }
 const BAR: Record<BatteryState, string> = { ok: 'bg-primary', low: 'bg-amber-500', empty: 'bg-red-500', off: 'bg-muted-foreground/30' }
@@ -250,6 +252,9 @@ async function remove(s: PaidService) {
       </Card>
 
       <AdminVercelUsageCard :vercel="data.vercel" @changed="refresh()" />
+    </div>
+    <div v-else class="grid grid-cols-1 gap-6 lg:grid-cols-2" aria-hidden="true" data-testid="site-health-loading">
+      <Skeleton v-for="i in 2" :key="i" class="h-56 rounded-xl" />
     </div>
   </ClientOnly>
 </template>

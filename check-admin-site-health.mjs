@@ -6,6 +6,7 @@
  *
  *   sg docker -c "SHOTS=<папка> node check-admin-site-health.mjs --base=http://localhost:3141"
  */
+import { Buffer } from 'node:buffer'
 import { execFileSync } from 'node:child_process'
 import process from 'node:process'
 import { chromium } from 'playwright'
@@ -111,6 +112,11 @@ async function main() {
   // 1) доступ и ввод
   check((await api('/api/admin/site-health', buyerToken)).status === 403, 'сводка покупателю — 403')
   check((await api('/api/admin/site-health')).status === 401, 'сводка без входа — 401')
+  // Роль спрашивается по id из токена ещё до его проверки (21.11.2026) — подделка с id администратора не проходит
+  const head = adminToken.split('.')[0]
+  const forgedBody = Buffer.from(JSON.stringify({ sub: adminId, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')
+  check((await api('/api/admin/site-health', `${head}.${forgedBody}.${Buffer.from('подделка').toString('base64url')}`)).status === 401, 'токен с id администратора и чужой подписью — 401')
+  check((await api('/api/admin/site-health', 'not-a-token')).status === 401, 'мусор вместо токена — 401')
   check((await api('/api/admin/paid-services', buyerToken, { name: 'x', period: 'month', currency: 'USD' })).status === 403, 'правка сервиса покупателю — 403')
   const bad = await api('/api/admin/paid-services', adminToken, { name: 'Проба', period: 'month', currency: 'USD', renewsOn: '21.11.2026' })
   check(bad.status === 400 && bad.json?.message === 'Дата продления — ГГГГ-ММ-ДД', `дата не ГГГГ-ММ-ДД — понятный отказ (${bad.json?.message})`)
@@ -163,9 +169,46 @@ UPDATE public.paid_services SET cost = 6000, renews_on = '2027-03-01' WHERE name
       throw new Error(`вход: ${loginError}`)
     const sp = t => (t ?? '').replace(/\s+/g, ' ').trim()
 
-    await page.goto(`${BASE}/admin`, { waitUntil: 'networkidle' })
+    // Сводка отвечает позже продаж (на бою так и есть: функция в Вашингтоне, база в Сеуле) —
+    // продажи не должны съезжать, когда над ними догрузится строка (21.11.2026)
+    let healthRequests = 0
+    page.on('request', r => r.url().startsWith(`${BASE}/api/admin/site-health`) && healthRequests++)
+    await page.route('**/api/admin/site-health', async (r) => {
+      await sleep(1500)
+      await r.continue()
+    })
+    await page.goto(`${BASE}/admin`)
+    const yOf = sel => page.locator(sel).first().evaluate(e => Math.round(e.getBoundingClientRect().top + window.scrollY))
+    await page.locator('[data-testid=stats-cards]').waitFor({ timeout: 20000 })
+    const statsBefore = await yOf('[data-testid=stats-cards]')
+    const stripLoading = await page.locator('[data-testid=site-health-strip]').getAttribute('data-state')
+    await page.waitForFunction(() => !['loading', undefined].includes(document.querySelector('[data-testid=site-health-strip]')?.dataset.state), null, { timeout: 20000 })
+    await page.waitForLoadState('networkidle')
+    const statsAfter = await yOf('[data-testid=stats-cards]')
+    check(stripLoading === 'loading' && statsBefore === statsAfter, `продажи на месте, пока догружается строка сайта (${statsBefore} → ${statsAfter}, строка была «${stripLoading}»)`)
+    await page.unroute('**/api/admin/site-health')
+    check(healthRequests === 1, `сводка запрошена один раз на строку и карточки (${healthRequests})`)
+    const strip = page.locator('[data-testid=site-health-strip]')
+    check(await strip.getAttribute('data-state') === 'empty' && sp(await strip.locator('[data-testid=strip-headline]').textContent()) === 'Сайт не открывается', 'строка над продажами: «Сайт не открывается», красная')
+    const alerts = await strip.locator('[data-testid=strip-alert]').evaluateAll(els => els.map(e => `${e.dataset.level}:${e.textContent.trim()}`))
+    check(alerts[0]?.startsWith('bad:402 — Vercel остановил проект') && alerts.some(a => /^warn:Vercel: продление .*через 3 дн/.test(a)), `строка: причина сбоя и скорое продление (${alerts.join(' | ')})`)
     const panel = page.locator('[data-testid=site-health]')
     await panel.waitFor({ timeout: 20000 })
+    const [stripY, statsY, panelY] = [await yOf('[data-testid=site-health-strip]'), await yOf('[data-testid=stats-cards]'), await yOf('[data-testid=site-health]')]
+    check(stripY < statsY && statsY < panelY, `порядок: строка (${stripY}) → продажи (${statsY}) → карточки сайта (${panelY})`)
+    if (SHOTS)
+      await page.screenshot({ path: `${SHOTS}/dashboard-top-1366.png`, fullPage: false })
+    await page.click('[data-testid=strip-more]')
+    await page.waitForFunction(() => window.scrollY > 300, null, { timeout: 5000 }).catch(() => {})
+    await sleep(400)
+    // Заголовок не просто в окне, а виден: плавающая шапка сайта его закрывала
+    const heading = await page.evaluate(() => {
+      const h = document.querySelector('[data-testid=site-health-details] h2')
+      const r = h.getBoundingClientRect()
+      const top = document.elementFromPoint(r.left + 20, r.top + r.height / 2)
+      return { top: Math.round(r.top), visible: r.top >= 0 && r.bottom <= window.innerHeight && (top === h || h.contains(top)), covering: top?.closest('header')?.tagName ?? top?.tagName }
+    })
+    check(heading.visible, `«Сайт и сервисы» в строке ведёт к карточкам — заголовок виден (верх ${heading.top}, в точке — ${heading.covering})`)
     check(await panel.getAttribute('data-state') === 'empty' && sp(await page.locator('[data-testid=site-health-headline]').textContent()) === 'Сайт не открывается', 'панель: «Сайт не открывается», красная')
     check(sp(await page.locator('[data-testid=site-health-note]').textContent()).startsWith('402 — Vercel остановил проект'), `панель: причина — «${sp(await page.locator('[data-testid=site-health-note]').textContent()).slice(0, 60)}»`)
     check(await page.locator('[data-testid=site-health-incidents] p').count() === 3, 'панель: в истории два сбоя')
@@ -201,13 +244,14 @@ UPDATE public.paid_services SET cost = 6000, renews_on = '2027-03-01' WHERE name
     await row('ImprovMX').waitFor({ state: 'detached', timeout: 10000 })
     check(psql(`SELECT count(*) FROM public.paid_services WHERE name = 'ImprovMX';`) === '0', 'удалён из базы')
 
-    // 5) сайт снова открывается
+    // 5) сайт снова открывается. Время у проверок разное: с одинаковым «последней» оказывалась любая из двух (0,9 или 0,7 с)
     psql(`UPDATE public.site_health_incidents SET ended_at = now(), recovered_alerted_at = now() WHERE ended_at IS NULL;
-INSERT INTO public.site_health_checks (url, ok, status, ms) VALUES ('https://uhti.kz/', true, 200, 900), ('https://uhti.kz/catalog', true, 200, 700);`)
+INSERT INTO public.site_health_checks (checked_at, url, ok, status, ms) VALUES (now(), 'https://uhti.kz/', true, 200, 900), (now() - interval '1 second', 'https://uhti.kz/catalog', true, 200, 700);`)
     await page.reload({ waitUntil: 'networkidle' })
     await panel.waitFor()
     check(sp(await page.locator('[data-testid=site-health-headline]').textContent()) === 'Сайт работает' && await panel.getAttribute('data-state') === 'low', 'открылся: «Сайт работает», жёлтая — за сутки меньше 99%')
     check(/^Проверено только что · ответ 0,9 с · за 24 ч — 9\d(,\d)?%/.test(sp(await page.locator('[data-testid=site-health-note]').textContent())), `подпись: «${sp(await page.locator('[data-testid=site-health-note]').textContent())}»`)
+    check(sp(await page.locator('[data-testid=strip-headline]').textContent()) === 'Сайт работает' && /^за сутки 9\d(?:,\d)?% · ответ 0,9 с$/.test(sp(await page.locator('[data-testid=strip-facts]').textContent())), `строка: «Сайт работает», ${sp(await page.locator('[data-testid=strip-facts]').textContent())}`)
 
     // 6) телефон
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, storageState: await ctx.storageState() })
@@ -216,7 +260,11 @@ INSERT INTO public.site_health_checks (url, ok, status, ms) VALUES ('https://uht
     await p2.locator('[data-testid=paid-services]').waitFor({ timeout: 20000 })
     const overflow = await p2.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     check(overflow <= 0, `телефон: без горизонтальной прокрутки (${overflow})`)
+    const p2Stats = await p2.locator('[data-testid=stats-cards]').evaluate(e => Math.round(e.getBoundingClientRect().top))
+    check(p2Stats < 844, `телефон: продажи на первом экране (${p2Stats} из 844)`)
     if (SHOTS) {
+      await p2.evaluate(() => window.scrollTo(0, 0))
+      await p2.screenshot({ path: `${SHOTS}/dashboard-top-390.png`, fullPage: false })
       await p2.locator('[data-testid=site-health]').screenshot({ path: `${SHOTS}/site-health-390.png` })
       await p2.locator('[data-testid=paid-services]').screenshot({ path: `${SHOTS}/paid-services-390.png` })
     }

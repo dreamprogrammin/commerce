@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Gauge, PaidService, SiteHealthPage, SiteStatus, VercelPanel } from '~/utils/siteHealth'
+import type { UsageMeters } from '~/utils/usageBatteries'
 import { supabaseBattery, vercelGauge } from '~/utils/siteHealth'
 import { usageBatteries } from '~/utils/usageBatteries'
 import { vercelHints } from '~/utils/vercelUsage'
@@ -20,12 +21,15 @@ export function toPaidService(r: any): PaidService {
 
 const DAY = 86_400_000
 
-async function siteStatus(db: SupabaseClient, now: Date): Promise<SiteStatus> {
+/** null — таблиц сторожа нет (миграция не применена) */
+async function siteStatus(db: SupabaseClient, now: Date): Promise<SiteStatus | null> {
   const [checks, incidents] = await Promise.all([
     db.from('site_health_checks').select('checked_at, ok, ms, error').gte('checked_at', new Date(now.getTime() - 7 * DAY).toISOString()).order('checked_at', { ascending: false }).limit(5000),
     db.from('site_health_incidents').select('started_at, ended_at, reason, alerted_at').order('started_at', { ascending: false }).limit(6),
   ])
   for (const r of [checks, incidents]) {
+    if (siteHealthNotInstalled(r.error))
+      return null
     if (r.error)
       throw createError({ statusCode: 500, message: r.error.message })
   }
@@ -48,49 +52,70 @@ async function siteStatus(db: SupabaseClient, now: Date): Promise<SiteStatus> {
   }
 }
 
-/** DataForSEO: баланс тем же бесплатным запросом, что «Спрос на рынке»; сбой — строкой */
-async function dataforseoReading(db: SupabaseClient) {
-  const { data: status, error: statusError } = await db.rpc('market_demand_credentials_status')
-  if (statusError || !((status ?? []) as unknown[]).length)
+type DataforseoReading = NonNullable<UsageMeters['dataforseo']>
+
+/*
+ * Баланс DataForSEO на дашборде держим 10 минут: он меняется только от
+ * обновлений спроса, а дашборд открывают часто. «Умный закуп» и «Спрос на
+ * рынке» спрашивают сами и свежим — там баланс смотрят сразу после обновления.
+ */
+const DFS_TTL = 10 * 60_000
+let dfsCache: { at: number, login: string, value: DataforseoReading } | null = null
+
+/** DataForSEO: баланс тем же бесплатным запросом, что «Спрос на рынке»; сбой — строкой; null — ключа нет */
+async function dataforseoReading(db: SupabaseClient, now: Date): Promise<DataforseoReading | null> {
+  // Есть ли ключ и сам ключ — одним кругом: каждый круг до базы с сервера стоит 0,2–0,6 с
+  const [status, secret] = await Promise.all([db.rpc('market_demand_credentials_status'), db.rpc('market_demand_credentials_get')])
+  if (status.error || !((status.data ?? []) as unknown[]).length)
     return null
-  const { data: secret, error } = await db.rpc('market_demand_credentials_get')
-  const creds = (secret as Array<{ login: string, password: string }> | null)?.[0]
+  const creds = (secret.data as Array<{ login: string, password: string }> | null)?.[0]
+  if (creds && dfsCache && dfsCache.login === creds.login && now.getTime() - dfsCache.at < DFS_TTL)
+    return dfsCache.value
   try {
-    if (error || !creds)
-      throw new Error(error?.message ?? 'ключ не прочитан')
+    if (secret.error || !creds)
+      throw new Error(secret.error?.message ?? 'ключ не прочитан')
     const a = await dataforseoAccount(creds.login, creds.password)
-    return { balance: a.balance, total: a.total ?? null, dayLimit: a.dayLimit ?? null, daySpent: a.daySpent ?? null, error: null }
+    const value = { balance: a.balance, total: a.total ?? null, dayLimit: a.dayLimit ?? null, daySpent: a.daySpent ?? null, error: null }
+    dfsCache = { at: now.getTime(), login: creds.login, value }
+    return value
   }
   catch (e: any) {
     return { balance: null, total: null, dayLimit: null, daySpent: null, error: e?.message ?? 'Не удалось узнать баланс' }
   }
 }
 
+/**
+ * Сводка дашборда. Всё, что можно, — одним кругом (21.11.2026, владелец:
+ * «дашборд какой-то неудобный, я жду когда он прогрузится»): функции Vercel
+ * в Вашингтоне, база в Сеуле, и каждый круг до базы стоил 0,2–0,6 с, а их
+ * было восемь подряд — 2,9 с тёплым и 5,1 с холодным (журнал Supabase).
+ * Показания считаются для всех счётчиков сразу, ненужные отбрасываются.
+ */
 export async function siteHealthPage(db: SupabaseClient, now = new Date()): Promise<SiteHealthPage> {
-  const services = await db.from('paid_services').select('*').order('sort').order('created_at')
-  if (siteHealthNotInstalled(services.error))
+  const [services, site, storage, dfs, vercel, usage] = await Promise.all([
+    db.from('paid_services').select('*').order('sort').order('created_at'),
+    siteStatus(db, now),
+    db.rpc('site_health_storage'),
+    dataforseoReading(db, now),
+    vercelPanel(db, now),
+    readUsageMeters(db, null, now),
+  ])
+  if (siteHealthNotInstalled(services.error) || !site)
     return { installed: false, site: null, services: [], readings: {}, vercel: { installed: false, key: null, usage: null, hints: [], error: null } }
   if (services.error)
     throw createError({ statusCode: 500, message: services.error.message })
   const list = (services.data ?? []).map(toPaidService)
   const meters = new Set(list.map(s => s.meter).filter(Boolean))
 
-  const [site, storage, dfs, vercel] = await Promise.all([
-    siteStatus(db, now),
-    meters.has('supabase') ? db.rpc('site_health_storage') : Promise.resolve(null),
-    meters.has('dataforseo') || meters.has('ai') ? dataforseoReading(db) : Promise.resolve(null),
-    vercelPanel(db, now),
-  ])
-
   const readings: SiteHealthPage['readings'] = {}
   const supa = list.find(s => s.meter === 'supabase')
-  if (supa && storage && !storage.error) {
+  if (supa && !storage.error) {
     const v = storage.data as { db_bytes: number, files_bytes: number }
     readings.supabase = supabaseBattery(supa.plan, Number(v.db_bytes), Number(v.files_bytes))
   }
   // Бюджет ИИ и DataForSEO — те же батарейки, что на «Умном закупе»
   if (meters.has('ai') || meters.has('dataforseo')) {
-    const batteries = usageBatteries(await readUsageMeters(db, dfs, now), now)
+    const batteries = usageBatteries({ ...usage, dataforseo: dfs }, now)
     const pick = (id: string): Gauge | undefined => batteries.find(b => b.id === id)
     if (meters.has('ai'))
       readings.ai = pick('ai_budget')
@@ -108,7 +133,8 @@ export async function siteHealthPage(db: SupabaseClient, now = new Date()): Prom
 /** Vercel: ключ, расход и подсказки; сбой Vercel — строкой, дашборд не роняет */
 async function vercelPanel(db: SupabaseClient, now: Date): Promise<VercelPanel> {
   const empty = { installed: true, key: null, usage: null, hints: [], error: null }
-  const status = await db.rpc('vercel_key_status')
+  // Что задано и сам ключ — одним кругом
+  const [status, key] = await Promise.all([db.rpc('vercel_key_status'), vercelKey(db).catch((e: any) => e as Error)])
   if (vercelNotInstalled(status.error))
     return { ...empty, installed: false }
   if (status.error)
@@ -118,7 +144,8 @@ async function vercelPanel(db: SupabaseClient, now: Date): Promise<VercelPanel> 
     return empty
   const keyInfo = { last4: row.last4, teamName: row.team_name, updatedAt: row.updated_at }
   try {
-    const key = await vercelKey(db)
+    if (key instanceof Error)
+      throw key
     if (!key || key === 'not-installed')
       return { ...empty, key: keyInfo, error: 'ключ не прочитан' }
     const usage = await vercelUsage(key, now)
