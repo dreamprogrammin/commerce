@@ -943,6 +943,29 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   const before = await narrowLine()
   check(/Не проверено: \d+ запрос/.test(before) && await page.locator('[data-testid=offers-check-demand]').count() === 1 && sp(await page.locator('[data-testid=offers-check-demand]').innerText()).startsWith('Узнать спрос · ≈ $'), `до проверки — «${before}», кнопка «Узнать спрос» с ценой`)
   check(await page.locator('[data-testid=offer-narrow]').count() === 0 && await page.locator('[data-testid=offer-topic]').count() > 0, 'пока DataForSEO не ответил — спрос по темам, как прежде')
+  // 21.11.2026, как на бою: цифра есть у одной фразы одного товара (пришла с «Новыми запросами»).
+  // Было: у всех остальных — «Спрос: нет данных», «Высокий спрос» пуст. Остальные — по своей теме
+  psql(`INSERT INTO public.market_demand_keywords (keyword, search_volume) VALUES ('игрушка po 1023 купить', 40);`)
+  await reload(page)
+  const partialLevel = article => page.locator('[data-testid=offer-card]', { hasText: article }).locator('[data-testid=offer-demand-level]').evaluate(e => e.dataset.level)
+  const p16 = await partialLevel('PO-1016')
+  const p13 = await partialLevel('PO-1013')
+  const p23 = await partialLevel('PO-1023')
+  check(p16 === 'high' && p13 === 'low' && p23 === 'mid', `одна проверенная фраза: у остальных — уровень темы (PO-1016 ${p16}, PO-1013 ${p13}), у товара с цифрой — по фразе (PO-1023 ${p23})`)
+  const partialCards = await page.locator('[data-testid=offer-card]').evaluateAll(els => els.map(el => ({
+    topicVolume: !!el.querySelector('[data-testid=offer-demand-volume]'),
+    level: el.querySelector('[data-testid=offer-demand-level]')?.dataset.level,
+  })))
+  const withTopic = partialCards.filter(c => c.topicVolume)
+  check(withTopic.length > 0 && withTopic.every(c => c.level !== 'unknown'), `у товаров с цифрами темы нет «нет данных»: ${withTopic.length} с темой, «нет данных» у ${withTopic.filter(c => c.level === 'unknown').length}`)
+  await page.locator('[data-testid=offers-demand-high]').click()
+  await painted(page)
+  const partialHigh = await cards(page).locator('[data-testid=offer-name]').evaluateAll(ns => ns.map(n => n.textContent.trim()))
+  check(partialHigh[0] === 'Игрушка PO-1016', `«Высокий спрос» не пуст — высокий по теме: ${partialHigh.join(', ')}`)
+  await page.locator('[data-testid=offers-demand-all]').click()
+  await painted(page)
+  psql(`DELETE FROM public.market_demand_keywords WHERE keyword = 'игрушка po 1023 купить';`)
+  await reload(page)
   // Без ключа DataForSEO — отказ базы текстом
   await noToasts(page)
   await page.locator('[data-testid=offers-check-demand]').click()

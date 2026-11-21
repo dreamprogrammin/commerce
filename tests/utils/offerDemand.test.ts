@@ -1,6 +1,7 @@
 import type { OfferDemandTopic } from '@/utils/offerDemand'
 import { describe, expect, it } from 'vitest'
-import { demandLevel, demandLevelBounds, filterByDemand, offerDemand, termRegex, topicDraft, topicMatches } from '@/utils/offerDemand'
+import { compareByDemand, demandLevel, demandLevelBounds, filterByDemand, offerDemand, offerLevel, termRegex, topicDraft, topicMatches } from '@/utils/offerDemand'
+import { narrowLevelBounds, offerNarrow } from '@/utils/offerQueries'
 
 function topic(over: Partial<OfferDemandTopic>): OfferDemandTopic {
   return {
@@ -107,5 +108,36 @@ describe('уровень спроса', () => {
     expect(demandLevel({ volume: null }, b)).toBe('unknown')
     expect(demandLevel(null, b)).toBe('unknown')
     expect(demandLevel({ volume: 50 }, null)).toBe('mid')
+  })
+})
+
+/*
+ * 21.11.2026, владелец: «что-то везде нет данных о спросе». На бою DataForSEO
+ * ответил на одну фразу товара из 884 («кукла с коляской», пришла с «Новыми
+ * запросами» 20.11), и страница перешла на точный спрос у всех: 917 из 918
+ * товаров — «Спрос: нет данных», «Высокий спрос» пуст, хотя темы с цифрами
+ * у товаров есть. Непроверенные фразы — уровень по теме.
+ */
+describe('точный спрос проверен не у всех — остальные по теме', () => {
+  const topics = [
+    topic({ topic_id: 'labubu', name: 'Лабубу', match_terms: ['лабубу'], volume_avg3: 9000 }),
+    topic({ topic_id: 'cars', name: 'Машинки', match_terms: ['машинк'], volume_avg3: 3000 }),
+    topic({ topic_id: 'puzzle', name: 'Пазлы', match_terms: ['пазл'], volume_avg3: 100 }),
+  ]
+  const volumes = { 'кукла с коляской': 140 }
+  const o = (caption: string, queries: string[][] | null) => ({ caption, items: null, queries })
+  const list = [o('Кукла с коляской', [['кукла с коляской']]), o('Лабубу macaron', [['лабубу macaron купить']]), o('Пазл 1000', null), o('Слайм', [['слайм купить']])]
+  const level = (x: (typeof list)[number]) => offerLevel(offerNarrow(x.queries, volumes), offerDemand(x, topics), narrowLevelBounds(volumes), demandLevelBounds(topics))
+
+  it('метка: проверенная фраза — по ней, непроверенная или нет фраз — по теме, нет темы — «нет данных»', () => {
+    expect(list.map(level)).toEqual(['mid', 'high', 'low', 'unknown'])
+  })
+  it('«Высокий спрос» не пуст: высокий по теме', () => {
+    expect(filterByDemand(list, topics, 'high', volumes).map(x => x.caption)).toEqual(['Лабубу macaron'])
+  })
+  it('порядок: сначала проверенные фразы, внутри — больший спрос', () => {
+    const fr = (phrase: string, volume: number) => ({ phrase: null, volume, phrases: [{ phrase, checked: true, volume }], checked: true })
+    const rows = [{ n: null, d: { volume: 9000 } }, { n: fr('а', 140), d: { volume: 3000 } }, { n: fr('б', 900), d: null }, { n: null, d: { volume: 20000 } }]
+    expect([...rows].sort(compareByDemand).map(r => r.n ? `фраза ${r.n.volume}` : `тема ${r.d!.volume}`)).toEqual(['фраза 900', 'фраза 140', 'тема 20000', 'тема 9000'])
   })
 })
