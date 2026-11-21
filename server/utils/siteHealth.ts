@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Gauge, PaidService, SiteHealthPage, SiteStatus } from '~/utils/siteHealth'
-import { supabaseBattery } from '~/utils/siteHealth'
+import type { Gauge, PaidService, SiteHealthPage, SiteStatus, VercelPanel } from '~/utils/siteHealth'
+import { supabaseBattery, vercelGauge } from '~/utils/siteHealth'
 import { usageBatteries } from '~/utils/usageBatteries'
+import { vercelHints } from '~/utils/vercelUsage'
 
 /**
  * «Состояние сайта» и платные сервисы (21 ноября 2026): проверки сторожа,
@@ -68,16 +69,17 @@ async function dataforseoReading(db: SupabaseClient) {
 export async function siteHealthPage(db: SupabaseClient, now = new Date()): Promise<SiteHealthPage> {
   const services = await db.from('paid_services').select('*').order('sort').order('created_at')
   if (siteHealthNotInstalled(services.error))
-    return { installed: false, site: null, services: [], readings: {} }
+    return { installed: false, site: null, services: [], readings: {}, vercel: { installed: false, key: null, usage: null, hints: [], error: null } }
   if (services.error)
     throw createError({ statusCode: 500, message: services.error.message })
   const list = (services.data ?? []).map(toPaidService)
   const meters = new Set(list.map(s => s.meter).filter(Boolean))
 
-  const [site, storage, dfs] = await Promise.all([
+  const [site, storage, dfs, vercel] = await Promise.all([
     siteStatus(db, now),
     meters.has('supabase') ? db.rpc('site_health_storage') : Promise.resolve(null),
     meters.has('dataforseo') || meters.has('ai') ? dataforseoReading(db) : Promise.resolve(null),
+    vercelPanel(db, now),
   ])
 
   const readings: SiteHealthPage['readings'] = {}
@@ -95,5 +97,34 @@ export async function siteHealthPage(db: SupabaseClient, now = new Date()): Prom
     if (meters.has('dataforseo'))
       readings.dataforseo = pick('dataforseo')
   }
-  return { installed: true, site, services: list, readings }
+  if (meters.has('vercel')) {
+    const g = vercelGauge(vercel)
+    if (g)
+      readings.vercel = g
+  }
+  return { installed: true, site, services: list, readings, vercel }
+}
+
+/** Vercel: ключ, расход и подсказки; сбой Vercel — строкой, дашборд не роняет */
+async function vercelPanel(db: SupabaseClient, now: Date): Promise<VercelPanel> {
+  const empty = { installed: true, key: null, usage: null, hints: [], error: null }
+  const status = await db.rpc('vercel_key_status')
+  if (vercelNotInstalled(status.error))
+    return { ...empty, installed: false }
+  if (status.error)
+    throw createError({ statusCode: 500, message: status.error.message })
+  const row = ((status.data ?? []) as { last4: string, team_name: string, updated_at: string }[])[0]
+  if (!row)
+    return empty
+  const keyInfo = { last4: row.last4, teamName: row.team_name, updatedAt: row.updated_at }
+  try {
+    const key = await vercelKey(db)
+    if (!key || key === 'not-installed')
+      return { ...empty, key: keyInfo, error: 'ключ не прочитан' }
+    const usage = await vercelUsage(key, now)
+    return { installed: true, key: keyInfo, usage, hints: vercelHints(usage), error: null }
+  }
+  catch (e: any) {
+    return { ...empty, key: keyInfo, error: e?.message ?? 'Vercel не ответил' }
+  }
 }

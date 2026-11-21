@@ -1,4 +1,6 @@
 import type { Battery, BatteryState } from './usageBatteries'
+import type { VercelHint, VercelUsage } from './vercelUsage'
+import { usdText } from './vercelUsage'
 
 /**
  * «Состояние сайта» и платные сервисы на дашборде админки (21 ноября 2026).
@@ -48,6 +50,40 @@ export interface SiteHealthPage {
   services: PaidService[]
   /** Показания для строк сервисов: батарейки — как на «Умном закупе» */
   readings: Partial<Record<ServiceMeter, Gauge>>
+  /** Vercel (21.11.2026): ключ, расход за месяц, сборки, подсказки */
+  vercel: VercelPanel
+}
+
+export interface VercelPanel {
+  /** Миграция ключа (20261121140000) применена */
+  installed: boolean
+  key: { last4: string, teamName: string, updatedAt: string } | null
+  usage: VercelUsage | null
+  hints: VercelHint[]
+  error: string | null
+}
+
+/** Батарейка Vercel: шкалы нет — у Pro нет «остатка», есть расход и прогноз */
+export function vercelGauge(v: VercelPanel): Gauge | null {
+  if (!v.installed)
+    return null
+  if (!v.key)
+    return { id: 'vercel', title: 'Vercel', state: 'off', level: null, value: 'ключ не задан', note: 'Задайте ключ Vercel ниже — покажу расход за месяц, сборки и подскажу, что дорого.', reset: null }
+  if (v.error || !v.usage)
+    return { id: 'vercel', title: 'Vercel', state: 'low', level: null, value: 'нет данных', note: v.error ?? 'Vercel не ответил.', reset: null }
+  const u = v.usage
+  const parts = [`расход в этом месяце ${usdText(u.effective)}`]
+  if (u.forecast != null)
+    parts.push(`услуги к концу месяца ≈ ${usdText(u.forecast)}`)
+  return {
+    id: 'vercel',
+    title: 'Vercel',
+    state: u.billed >= 0.01 || v.hints.some(h => h.level === 'warn') ? 'low' : 'ok',
+    level: null,
+    value: parts.join(', '),
+    note: u.billed >= 0.01 ? `Сверх включённого в тариф: ${usdText(u.billed)}.` : 'Сверх включённого в тариф — $0.',
+    reset: null,
+  }
 }
 
 const PERIODS: ServicePeriod[] = ['month', 'year', 'usage']
