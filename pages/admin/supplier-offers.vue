@@ -13,8 +13,8 @@ import { formatPrice } from '@/utils/formatPrice'
 import { rankTop } from '@/utils/kaspiMatch'
 import { offerKaspiKey } from '@/utils/kaspiSnapshot'
 import { DEMAND_REFRESH_COST, formatUsd, formatVolume, trendKind, trendLabel } from '@/utils/marketDemand'
-import { DEMAND_LEVEL_TEXT, demandLevel, demandLevelBounds, filterByDemand, OFFER_DEMAND_FILTERS, offerDemand, topicDraft } from '@/utils/offerDemand'
-import { narrowLevel, narrowLevelBounds, offerNarrow } from '@/utils/offerQueries'
+import { compareByDemand, DEMAND_LEVEL_TEXT, demandLevelBounds, filterByDemand, OFFER_DEMAND_FILTERS, offerDemand, offerLevel, topicDraft } from '@/utils/offerDemand'
+import { narrowLevelBounds, offerNarrow } from '@/utils/offerQueries'
 import { buildOrderWorkbook, groupOrderLines, orderFileName } from '@/utils/orderSheet'
 import { plural } from '@/utils/restockOrder'
 import { collectedText, dayTitle, groupOffers, modelLabel, offerOrderLine, timeOf } from '@/utils/supplierOfferList'
@@ -128,18 +128,16 @@ const groups = computed(() => {
   const list = groupOffers(filterByDemand(p.offers, p.topics ?? [], filter, volumes.value), p.channels, grouping.value)
   // «Высокий спрос» — внутри группы сверху больший спрос (groupOffers ставит по времени)
   if (filter === 'high') {
-    const volumeOf = (o: Offer) => volumes.value ? narrowById.value.get(o.id)?.volume ?? 0 : demandById.value.get(o.id)?.volume ?? 0
+    const demandOf = (o: Offer) => ({ n: narrowById.value.get(o.id) ?? null, d: demandById.value.get(o.id) ?? null })
     for (const g of list)
-      g.offers.sort((a, b) => volumeOf(b) - volumeOf(a))
+      g.offers.sort((a, b) => compareByDemand(demandOf(a), demandOf(b)))
   }
   return list
 })
-// Уровень спроса — метка в углу фото: трети своих фраз (или тем) по запросам в месяц
+// Уровень спроса — метка в углу фото: по проверенным фразам товара (трети своих фраз), иначе по теме (трети тем)
 const levelBounds = computed(() => demandLevelBounds(page.value?.topics ?? []))
 function levelOf(o: Offer) {
-  return volumes.value
-    ? narrowLevel(narrowById.value.get(o.id) ?? null, narrowBounds.value)
-    : demandLevel(demandById.value.get(o.id) ?? null, levelBounds.value)
+  return offerLevel(narrowById.value.get(o.id) ?? null, demandById.value.get(o.id) ?? null, narrowBounds.value, levelBounds.value)
 }
 const itemNarrow = (o: Offer, i: number) => volumes.value ? offerNarrow(o.queries, volumes.value, i) : null
 // Пробел в начале <template> Vue съедает («купить»560) — строки собираются здесь
