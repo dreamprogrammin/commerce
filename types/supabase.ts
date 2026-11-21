@@ -4304,6 +4304,21 @@ export interface Database {
         Args: { p_code: string, p_order_amount: number }
         Returns: Json
       }
+      vercel_key_delete: { Args: never, Returns: undefined }
+      vercel_key_get: { Args: never, Returns: Json }
+      vercel_key_set: {
+        Args: { p_admin: string, p_team_id: string, p_team_name: string, p_token: string }
+        Returns: undefined
+      }
+      vercel_key_status: {
+        Args: never
+        Returns: {
+          last4: string
+          team_id: string
+          team_name: string
+          updated_at: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

@@ -244,10 +244,12 @@ async function remove(s: PaidService) {
             </div>
           </template>
           <p class="pt-2 text-xs text-muted-foreground">
-            Счета Vercel и трафик Supabase сайт сам не видит — их смотрите по ссылкам. За неделю до даты продления бот напомнит в Telegram.
+            Трафик Supabase сайт сам не видит — смотрите по ссылке. За неделю до даты продления бот напомнит в Telegram.
           </p>
         </CardContent>
       </Card>
+
+      <AdminVercelUsageCard :vercel="data.vercel" @changed="refresh()" />
     </div>
   </ClientOnly>
 </template>
