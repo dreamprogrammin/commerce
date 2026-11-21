@@ -61,6 +61,12 @@ async function fetchStats() {
 
 onMounted(fetchStats)
 
+// «Обновить» — и продажи, и состояние сайта
+function refreshAll() {
+  fetchStats()
+  refreshNuxtData('admin-site-health')
+}
+
 // Форматирование цены
 function formatPrice(value: number): string {
   return new Intl.NumberFormat('ru-RU').format(Math.round(value))
@@ -111,14 +117,18 @@ function getProductImage(imageUrl: string | null): string | undefined {
           Обзор ключевых показателей магазина
         </p>
       </div>
-      <Button variant="outline" size="sm" :disabled="isLoading" @click="fetchStats">
+      <Button variant="outline" size="sm" :disabled="isLoading" @click="refreshAll">
         <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': isLoading }" />
         Обновить
       </Button>
     </div>
 
-    <!-- Состояние сайта и платные сервисы (21.11.2026) — своя загрузка, от статистики не зависит -->
-    <AdminSiteHealthPanel />
+    <!--
+      Сайт — одной строкой над продажами, карточки сайта и сервисов — внизу
+      (21.11.2026): раньше они стояли здесь, грузились последними и сдвигали
+      продажи вниз. Своя загрузка, от статистики не зависит.
+    -->
+    <AdminSiteHealthStrip />
 
     <!-- Скелетоны -->
     <template v-if="isLoading">
@@ -156,7 +166,7 @@ function getProductImage(imageUrl: string | null): string | undefined {
     <!-- Данные -->
     <template v-else-if="stats">
       <!-- Карточки статистики -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" data-testid="stats-cards">
         <!-- Выручка за месяц -->
         <Card>
           <CardHeader class="flex flex-row items-center justify-between pb-2">
@@ -413,5 +423,17 @@ function getProductImage(imageUrl: string | null): string | undefined {
         </NuxtLink>
       </div>
     </template>
+
+    <!--
+      Сайт и платные сервисы — подробно; строка-сводка — над продажами.
+      scroll-mt-28: на ≥lg шапка сайта при прокрутке плавает поверх страницы
+      (~100 px) и закрывала заголовок, к которому ведёт ссылка из строки
+    -->
+    <section id="site-health-details" class="scroll-mt-28 space-y-3" data-testid="site-health-details">
+      <h2 class="text-lg font-semibold">
+        Сайт и сервисы
+      </h2>
+      <AdminSiteHealthPanel />
+    </section>
   </div>
 </template>

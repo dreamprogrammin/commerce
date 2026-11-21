@@ -223,3 +223,52 @@ export function siteBattery(s: SiteStatus | null, now = new Date()): Gauge & { h
     return { ...base, state: 'low', level: s.uptime24, value: 'сторож молчит', note: `Последняя проверка ${agoText} — проверьте расписание «Site Watchdog» и функцию site-watchdog.`, headline: 'Нет свежих проверок' }
   return { ...base, state: s.uptime24 != null && s.uptime24 < 0.99 ? 'low' : 'ok', level: s.uptime24, value: 'открывается', note: upper(parts.join(' · ')), headline: 'Сайт работает' }
 }
+
+export interface SiteHealthLine {
+  state: BatteryState
+  headline: string
+  /** Коротко о сайте: доступность и ответ */
+  facts: string[]
+  /** Что требует внимания — поднимается в строку над продажами */
+  alerts: { text: string, level: 'warn' | 'bad' }[]
+}
+
+/**
+ * Строка над продажами (21.11.2026, владелец: «дашборд какой-то неудобный, я
+ * жду когда он прогрузится»): сайт работает или нет — одной строкой, и туда
+ * же всё, что требует внимания: продление в ближайшую неделю, доплата Vercel
+ * сверх тарифа, упавшая сборка боевого сайта, пустой счётчик. Подробности —
+ * в карточках внизу страницы.
+ */
+export function siteHealthLine(page: SiteHealthPage, now = new Date()): SiteHealthLine {
+  const site = siteBattery(page.site, now)
+  const pct = (v: number) => `${(Math.floor(v * 1000) / 10).toLocaleString('ru-RU')}%`
+  const facts: string[] = []
+  if (!page.site?.last) {
+    facts.push('сторож ещё не проверял')
+  }
+  else if (!page.site.down) {
+    if (page.site.uptime24 != null)
+      facts.push(`за сутки ${pct(page.site.uptime24)}`)
+    if (page.site.last.ok && page.site.last.ms != null)
+      facts.push(`ответ ${(page.site.last.ms / 1000).toFixed(1).replace('.', ',')}\u00A0с`)
+  }
+  const alerts: SiteHealthLine['alerts'] = []
+  if (page.site?.down)
+    alerts.push({ level: 'bad', text: page.site.down.reason })
+  for (const s of page.services) {
+    const r = renewLine(s.renewsOn, now)
+    if (r?.soon)
+      alerts.push({ level: 'warn', text: `${s.name}: ${r.text}` })
+  }
+  const u = page.vercel.usage
+  if (u && u.billed >= 0.01)
+    alerts.push({ level: 'warn', text: `Vercel: сверх тарифа ${usdText(u.billed)}` })
+  if (u?.deploys.find(d => d.target === 'production')?.state === 'ERROR')
+    alerts.push({ level: 'bad', text: 'Vercel: сборка uhti.kz упала' })
+  for (const g of Object.values(page.readings)) {
+    if (g?.state === 'empty')
+      alerts.push({ level: 'bad', text: `${g.title}: ${g.value}` })
+  }
+  return { state: site.state, headline: site.headline, facts, alerts }
+}
