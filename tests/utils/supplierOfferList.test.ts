@@ -10,7 +10,7 @@ const channels: OfferChannel[] = [
   { id: 'c3', title: 'Оптом Игрушки Алматы', supplierName: 'Оптом', closed: true, collectedAt: null },
 ]
 function offer(id: string, channelId: string, postedAt: string): Offer {
-  return { id, channelId, postedAt, caption: '', postUrl: `https://t.me/x/${id}`, photoUrl: null, photoCount: 1, status: 'new', statusAt: null, items: null, readError: null, queries: null }
+  return { id, channelId, postedAt, caption: '', postUrl: `https://t.me/x/${id}`, photoUrl: null, photoCount: 1, status: 'new', statusAt: null, items: null, readError: null, queries: null, guess: null }
 }
 const offers = [
   offer('a', 'c1', '2026-11-03T05:00:00Z'),

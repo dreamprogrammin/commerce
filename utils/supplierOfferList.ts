@@ -1,3 +1,4 @@
+import type { OfferGuess } from './offerGuess'
 import type { OrderSheetLine } from './orderSheet'
 
 /**
@@ -66,6 +67,11 @@ export interface Offer {
    * null — не подбирали или нет миграции 20261118120000
    */
   queries: string[][] | null
+  /**
+   * Разбор ИИ по товарам поста (22.11.2026): как такую вещь ищут и тема по
+   * смыслу; null — не разбирали или нет миграции 20261122120000
+   */
+  guess: (OfferGuess | null)[] | null
 }
 
 /** Чтение ИИ на странице «Товары поставщиков» */

@@ -47,7 +47,12 @@
  *     страница и дашборд говорят про миграцию; без миграции товаров — тоже
  *     про миграцию, не 500;
  * 13) телефон 390px — без горизонтальной прокрутки, цена с ₸ одной строкой;
- *     без ошибок консоли.
+ *     без ошибок консоли;
+ * 14) примерный спрос (22.11.2026): после сбора ИИ сам разбирает товары —
+ *     текстом, со списком тем; «как такое ищут» уходит в «Узнать спрос»
+ *     первым; тема по смыслу даёт уровень товару без темы; по названию не
+ *     ищут — уровень по примерному запросу, а не «спроса нет»; без миграции
+ *     20261122120000 — страница как прежде, разбор — off: 'migration'.
  *
  * Данные заводит сам — администратор, покупатель, два поставщика с каналами,
  * вход подделки Telegram, ключ ИИ для заглушки — и в конце всё убирает, фото
@@ -63,6 +68,7 @@
  */
 import { Buffer } from 'node:buffer'
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import http from 'node:http'
 import process from 'node:process'
 import ExcelJS from 'exceljs'
@@ -217,7 +223,7 @@ await new Promise(r => server.listen(WEB_PORT, '127.0.0.1', r))
  * провайдер отвечает 429, 'down' — рвёт соединение. Фото в журнал не пишется —
  * только тип и совпало ли с отданным заглушкой t.me и подделкой Telegram.
  */
-const ai = { mode: 'ok', requests: [], queries: [], retrieved: 0, tries: new Map() }
+const ai = { mode: 'ok', requests: [], queries: [], guesses: [], retrieved: 0, tries: new Map() }
 function aiAnswer(article, caption) {
   const price = Number(/Цена (\d+)/.exec(caption)?.[1]) || null
   const item = patch => ({ name: `Игрушка ${article}`, article, brand: null, price_text: price, price_image: null, price_note: null, age: '3+', confidence: 'high', doubt: null, ...patch })
@@ -268,6 +274,17 @@ const aiServer = http.createServer((req, res) => {
       const items = list.map(it => ({ id: it.id, queries: [`${it.name} точно`, `${it.name} купить`, 'кукла'] }))
       return send(200, { id: `msg_q_${ai.queries.length}`, type: 'message', role: 'assistant', model: body.model, content: [{ type: 'text', text: JSON.stringify({ items }) }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 800, output_tokens: 400 } })
     }
+    // Разбор товаров (22.11.2026): «как такое ищут» — «Похожие игрушки <номер>»; тема по смыслу —
+    // «Проверка спроса средний» у PO-1020, если она есть в списке, иначе 0
+    if (typeof body.system === 'string' && body.system.startsWith('Ты разбираешь товары')) {
+      const text = typeof body.messages?.[0]?.content === 'string' ? body.messages[0].content : ''
+      const topicLines = text.slice(0, text.indexOf('\n\nТовары:')).split('\n').slice(1)
+      const list = JSON.parse(text.slice(text.indexOf('Товары:\n') + 'Товары:\n'.length))
+      const middle = topicLines.findIndex(l => /^\d+\. Проверка спроса средний(?: —|$)/.test(l)) + 1
+      ai.guesses.push({ model: body.model, format: body.output_config?.format?.type, items: list.length, topics: topicLines.length, images: JSON.stringify(body.messages).includes('"image"') })
+      const items = list.map(it => ({ id: it.id, query: `Похожие игрушки ${/(\d+)\s*$/.exec(it.name)?.[1] ?? '0'}`, topic: it.name.endsWith('PO-1020') ? middle : 0 }))
+      return send(200, { id: `msg_g_${ai.guesses.length}`, type: 'message', role: 'assistant', model: body.model, content: [{ type: 'text', text: JSON.stringify({ items }) }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 600, output_tokens: 200 } })
+    }
     const content = body.messages?.[0]?.content ?? []
     const caption = content.find(b => b.type === 'text')?.text ?? ''
     const article = /(?:PO|ЗК)-\d+/.exec(caption)?.[0] ?? null
@@ -312,9 +329,16 @@ await new Promise(r => aiServer.listen(AI_PORT, '127.0.0.1', r))
 /*
  * Спрос по номеру из фразы: «игрушка po 1016 точно» — 5 000 (верхняя треть),
  * po 1013 — 30, po 1018 — «данных нет» (null), остальные — номер × 10.
+ * Примерные «похожие игрушки N» (22.11.2026): 1018 — 40 (нижняя треть своих),
+ * 1020 — «данных нет», от 1000 — (N − 1000) × 30, прочие — 100.
  */
 const dfs = { requests: [] }
 function dfsVolume(keyword) {
+  const like = /^похожие игрушки (\d+)$/.exec(keyword)
+  if (like) {
+    const n = Number(like[1])
+    return n === 1018 ? 40 : n === 1020 ? null : n >= 1000 ? (n - 1000) * 30 : 100
+  }
   const n = Number(/po (\d+)/.exec(keyword)?.[1])
   if (n === 1016)
     return 5000
@@ -387,7 +411,7 @@ async function cleanup() {
     await removeFiles(await bucketFiles(id))
   psql(`DELETE FROM public.suppliers WHERE name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
   // Фразы стража — «игрушка po 1016 точно», «игрушка зк 10 купить», «набор b 2 точно»
-  psql(`DELETE FROM public.market_demand_monthly WHERE keyword ~ '^(игрушка|набор) .+ (точно|купить)$'; DELETE FROM public.market_demand_keywords WHERE keyword ~ '^(игрушка|набор) .+ (точно|купить)$';`)
+  psql(`DELETE FROM public.market_demand_monthly WHERE keyword ~ '^(игрушка|набор) .+ (точно|купить)$' OR keyword ~ '^похожие игрушки [0-9]+$'; DELETE FROM public.market_demand_keywords WHERE keyword ~ '^(игрушка|набор) .+ (точно|купить)$' OR keyword ~ '^похожие игрушки [0-9]+$';`)
   if (started && psql(`SELECT to_regproc('public.market_demand_request_offers') IS NOT NULL;`) === 't')
     psql(`DELETE FROM public.market_demand_runs WHERE kind = 'offers'; DELETE FROM vault.secrets WHERE name = 'dataforseo_credentials';`)
   if (started)
@@ -409,6 +433,29 @@ NOTIFY pgrst, 'reload schema';`)
 
 function psqlSuper(sql) {
   return execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=postgres', DB_CONTAINER, 'psql', '-w', '-h', '127.0.0.1', '-U', 'supabase_admin', '-d', 'postgres', '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1'], { input: sql, encoding: 'utf8' }).trim()
+}
+
+/*
+ * База «до 20261122120000», как бой до разбора ИИ: тела supplier_offer_phrases
+ * и supplier_offer_demand — из миграции 20261118120000, колонок разбора нет
+ * (переименованы). Обратно — колонки и тела, снятые перед этим.
+ */
+let guessDefs = ''
+function guessOff(off) {
+  const [from, to] = off ? ['', '_check_off'] : ['_check_off', '']
+  const rename = ['demand_guess', 'guessed_at'].map(c => `ALTER TABLE public.supplier_offers RENAME COLUMN ${c}${from} TO ${c}${to};`).join('\n')
+  // Тело SQL-функции проверяется при создании: новые — только при колонках на месте, прежние — до переименования
+  if (off) {
+    guessDefs = psqlSuper(`SELECT string_agg(pg_get_functiondef(p.oid), E';\n') || ';' FROM pg_proc p WHERE p.proname IN ('supplier_offer_phrases', 'supplier_offer_demand') AND p.pronamespace = 'public'::regnamespace;`)
+    const src = readFileSync('supabase/migrations/20261118120000_supplier_offer_queries.sql', 'utf8')
+    const before = ['supplier_offer_phrases', 'supplier_offer_demand']
+      .map(n => new RegExp(`CREATE FUNCTION public\\.${n}\\([\\s\\S]*?\\n\\$\\$;`).exec(src)[0].replace('CREATE FUNCTION', 'CREATE OR REPLACE FUNCTION'))
+      .join('\n')
+    psqlSuper(`BEGIN;\n${before}\n${rename}\nCOMMIT;\nNOTIFY pgrst, 'reload schema';`)
+  }
+  else {
+    psqlSuper(`BEGIN;\n${rename}\n${guessDefs}\nCOMMIT;\nNOTIFY pgrst, 'reload schema';`)
+  }
 }
 async function restartRest() {
   execFileSync('docker', ['restart', REST_CONTAINER], { encoding: 'utf8' })
@@ -438,11 +485,14 @@ const browser = await chromium.launch()
 let gucSet = false
 let renamed = false
 let readRenamed = false
+let guessRenamed = false
 try {
   if (psql(`SELECT to_regclass('public.supplier_offers') IS NOT NULL;`) !== 't')
     throw new Error('На локальной базе нет миграции 20261104160000_supplier_offers')
   if (vaultNames())
     throw new Error(`На локальной базе уже есть секреты Telegram (${vaultNames()}) — страж их не трогает`)
+  if (psql(`SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'supplier_offers' AND column_name = 'demand_guess';`) !== '1')
+    throw new Error('На локальной базе нет миграции 20261122120000_supplier_offer_guess')
   if (psql(`SELECT to_regclass('public.service_meters') IS NOT NULL;`) !== 't')
     throw new Error('На локальной базе нет миграции 20261106120000_usage_meters')
   if (psql(`SELECT (SELECT count(*) FROM public.ai_usage_daily) + (SELECT count(*) FROM public.service_meters) + (SELECT count(*) FROM public.ai_settings WHERE key = 'ai_budget');`) !== '0')
@@ -902,7 +952,8 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   check(l18.level === 'unknown' && l20.level === 'unknown' && l20.text === 'Спрос: нет данных', `уровень без цифр и без темы — «нет данных»: ${l18.level}, ${JSON.stringify(l20)}`)
   check(await page.locator('[data-testid=offer-card]').count() === await page.locator('[data-testid=offer-demand-level]').count(), 'уровень — на каждой карточке')
   const d20 = await demandOf('PO-1020')
-  check(d20 === 'Темы спроса нет · Добавить тему', `темы нет — предложение добавить: «${d20}»`)
+  // 22.11.2026: под темой — как такое ищут (разбор ИИ), пока DataForSEO не ответил
+  check(d20 === 'Темы спроса нет · Добавить тему Такое ищут как «похожие игрушки 1020» спрос ещё не проверен', `темы нет — предложение добавить, под ним — как такое ищут: «${d20}»`)
   // «Высокий спрос» (18.11.2026) — уровень «высокий», как метка на фото. Тема с цифрами пока одна —
   // делить на трети не на что, высокого нет ни у кого
   await page.locator('[data-testid=offers-demand-high]').click()
@@ -933,12 +984,61 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   await page.goto(`${BASE}/admin/supplier-offers`, { waitUntil: 'networkidle', timeout: 120000 })
   await painted(page)
 
+  console.log('\n== примерный спрос: тема по смыслу')
+  // Разбор после сбора шёл без тем стража — у PO-1020 темы нет. Разобрать заново: ИИ видит «Проверка спроса средний»
+  const offer20 = psql(`SELECT id FROM public.supplier_offers WHERE channel_id = :'c' AND post_url LIKE '%/1020';`, { c: openId })
+  psql(`UPDATE public.supplier_offers SET demand_guess = NULL, guessed_at = NULL WHERE id = :'o';`, { o: offer20 })
+  await reload(page)
+  const guessLeft = sp(await page.locator('[data-testid=offers-guess-state]').textContent())
+  check(guessLeft === 'Не разобрано ИИ: 1 товар.' && await page.locator('[data-testid=offers-queries]').count() === 1 && sp(await page.locator('[data-testid=offers-guess-about]').textContent()).startsWith('По названию не ищут — примерный'), `разбора нет у одного товара — «${guessLeft}», кнопка «Подобрать запросы»`)
+  const guessedBefore = ai.guesses.length
+  await noToasts(page)
+  const reguessed = listed(page)
+  await page.locator('[data-testid=offers-queries]').click()
+  const guessToast = toastWith(page, 'ИИ разобрал').last()
+  await guessToast.waitFor({ timeout: 60000 })
+  await reguessed
+  await painted(page)
+  const lastGuess = ai.guesses.at(-1)
+  check(sp(await guessToast.textContent()) === 'ИИ разобрал: 1 товар' && ai.guesses.length === guessedBefore + 1 && lastGuess.items === 1 && lastGuess.topics >= 4 && !lastGuess.images, `разбор кнопкой — один запрос к модели, со списком тем, без фото: «${sp(await guessToast.textContent())}», тем ${lastGuess?.topics}`)
+  const meaningOf = article => page.locator('[data-testid=offer-card]', { hasText: article }).evaluate((el) => {
+    const t = s => el.querySelector(`[data-testid=${s}]`)?.textContent.replace(/\s+/g, ' ').trim()
+    return {
+      level: el.querySelector('[data-testid=offer-demand-level]')?.dataset.level,
+      source: el.querySelector('[data-testid=offer-demand-level]')?.dataset.source,
+      meaning: el.querySelector('[data-testid=offer-topic]')?.dataset.meaning,
+      topic: t('offer-topic-name'),
+      topicVolume: t('offer-demand-volume'),
+      guess: t('offer-guess-phrase'),
+      guessVolume: t('offer-guess-volume'),
+    }
+  })
+  const m20 = await meaningOf('PO-1020')
+  // Темы с цифрами 100, 900, 2 400 — 900 средний
+  check(m20.meaning === 'true' && m20.topic === 'Проверка спроса средний (подобрал ИИ)' && m20.topicVolume === '900 поисков в месяц' && m20.level === 'mid' && m20.source === 'meaning', `PO-1020 без признаков темы — тема по смыслу, уровень по ней: ${JSON.stringify(m20)}`)
+  check(m20.guess === '«похожие игрушки 1020»' && m20.guessVolume === 'спрос ещё не проверен', `и как такое ищут: ${m20.guess} — ${m20.guessVolume}`)
+  const m16 = await meaningOf('PO-1016')
+  check(!m16.meaning && m16.source === 'topic' && m16.topic === 'Проверка спроса' && m16.topicVolume === '2 400 поисков в месяц', `тема по признакам — как была, без «подобрал ИИ»: ${JSON.stringify(m16)}`)
+  await page.locator('[data-testid=offers-demand-none]').click()
+  await painted(page)
+  const noneNames = await cards(page).locator('[data-testid=offer-name]').evaluateAll(ns => ns.map(n => n.textContent.trim()))
+  check(noneNames.length > 0 && !noneNames.includes('Игрушка PO-1020'), `«Темы нет» — без товара с темой по смыслу: ${noneNames.length} карточек`)
+  await page.locator('[data-testid=offers-demand-all]').click()
+  await painted(page)
+  if (SHOTS)
+    await page.locator('[data-testid=offer-card]', { hasText: 'PO-1020' }).screenshot({ path: `${SHOTS}/offer-meaning.png` })
+
   console.log('\n== точный спрос: запросы покупателя и DataForSEO')
   // Запросы подобраны сами после сбора и «Прочитать»: текстом, без фото, пачками
   const ownQueries = () => JSON.parse(psql(`SELECT json_build_object('with', count(*) FILTER (WHERE o.search_queries IS NOT NULL), 'read', count(*) FILTER (WHERE jsonb_typeof(o.read_items) = 'array' AND jsonb_array_length(o.read_items) > 0), 'sample', (SELECT o2.search_queries FROM public.supplier_offers o2 WHERE o2.post_url LIKE '%/1023' AND o2.channel_id = :'c' LIMIT 1)) FROM public.supplier_offers o JOIN public.supplier_channels c ON c.id = o.channel_id JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}') AND o.status = 'new';`, { c: openId }))
   const q0 = ownQueries()
   check(q0.with > 0 && q0.with >= q0.read && ai.queries.length > 0 && ai.queries.every(r => r.model === VISION && r.format === 'json_schema' && !r.images && r.items <= 40), `запросы подобраны у прочитанных: ${q0.with} из ${q0.read}, запросов к модели ${ai.queries.length}, без фото, по схеме`)
   check(JSON.stringify(q0.sample) === JSON.stringify([['игрушка po 1023 точно', 'игрушка po 1023 купить'], ['набор b 2 точно', 'набор b 2 купить'], ['набор b 3 точно', 'набор b 3 купить'], ['набор b 4 точно', 'набор b 4 купить']]), `фразы по товарам поста, в их порядке, «кукла» одним словом — мимо: ${JSON.stringify(q0.sample)}`)
+  // Разбор ИИ (22.11.2026) — тоже сам после сбора: текстом, со списком тем, пачками
+  const ownGuess = () => JSON.parse(psql(`SELECT json_build_object('with', count(*) FILTER (WHERE o.demand_guess IS NOT NULL), 'read', count(*) FILTER (WHERE jsonb_typeof(o.read_items) = 'array' AND jsonb_array_length(o.read_items) > 0), 'sample', (SELECT o2.demand_guess FROM public.supplier_offers o2 WHERE o2.post_url LIKE '%/1023' AND o2.channel_id = :'c' LIMIT 1)) FROM public.supplier_offers o JOIN public.supplier_channels c ON c.id = o.channel_id JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}') AND o.status = 'new';`, { c: openId }))
+  const g0 = ownGuess()
+  check(g0.read > 0 && g0.with >= g0.read && ai.guesses.length > 0 && ai.guesses.every(r => r.model === VISION && r.format === 'json_schema' && !r.images && r.items <= 40 && r.topics > 0), `разбор ИИ у прочитанных: ${g0.with} из ${g0.read}, запросов к модели ${ai.guesses.length}, без фото, по схеме, со списком тем`)
+  check(JSON.stringify(g0.sample) === JSON.stringify(['1023', '2', '3', '4'].map(n => ({ query: `похожие игрушки ${n}`, topic: null }))), `разбор по товарам поста, в их порядке, строчными: ${JSON.stringify(g0.sample)}`)
   const narrowLine = async () => sp(await page.locator('[data-testid=offers-narrow]').innerText())
   const before = await narrowLine()
   check(/Не проверено: \d+ запрос/.test(before) && await page.locator('[data-testid=offers-check-demand]').count() === 1 && sp(await page.locator('[data-testid=offers-check-demand]').innerText()).startsWith('Узнать спрос · ≈ $'), `до проверки — «${before}», кнопка «Узнать спрос» с ценой`)
@@ -988,6 +1088,9 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   await painted(page)
   const sent = dfs.requests.filter(r => r.url === '/v3/keywords_data/google_ads/search_volume/live')
   check(sent.length === 1 && sent[0].good && sent[0].task.location_code === 2398 && sent[0].task.language_code === 'ru' && sent[0].task.keywords.length === Number(phrases) && !sent[0].task.keywords.includes('кукла'), `одна задача search_volume по Казахстану: ${sent[0]?.task.keywords.length} фраз из ${phrases}, «кукла» не ушла`)
+  const sentWords = sent[0]?.task.keywords ?? []
+  const likeSent = sentWords.filter(k => k.startsWith('похожие игрушки ')).length
+  check(likeSent > 0 && sentWords.slice(0, likeSent).every(k => k.startsWith('похожие игрушки ')), `примерные запросы — в той же задаче, первыми: ${likeSent} из ${sentWords.length}`)
   check(sp(await doneToast.textContent()) === `DataForSEO ответил: ${phrases} ${Number(phrases) % 10 === 1 && Number(phrases) % 100 !== 11 ? 'запрос' : [2, 3, 4].includes(Number(phrases) % 10) && ![12, 13, 14].includes(Number(phrases) % 100) ? 'запроса' : 'запросов'}`, `уведомление: «${sp(await doneToast.textContent())}»`)
   const after = await narrowLine()
   check(after.includes('Все запросы проверены') && await page.locator('[data-testid=offers-check-demand]').count() === 0, `после ответа — «${after}», кнопки нет`)
@@ -998,6 +1101,8 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
     topic: el.querySelector('[data-testid=offer-topic]')?.textContent.replace(/\s+/g, ' ').trim(),
     more: el.querySelector('[data-testid=offer-narrow-more]')?.textContent.replace(/\s+/g, ' ').trim(),
     items: [...el.querySelectorAll('[data-testid=offer-item-narrow]')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
+    source: el.querySelector('[data-testid=offer-demand-level]')?.dataset.source,
+    guess: ['offer-guess-phrase', 'offer-guess-volume'].map(s => el.querySelector(`[data-testid=${s}]`)?.textContent.replace(/\s+/g, ' ').trim()).join(' — '),
   }))
   const n16 = await narrowOf('PO-1016')
   const n13 = await narrowOf('PO-1013')
@@ -1007,7 +1112,11 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   check(n16.more === 'ещё: «игрушка po 1016 купить» 5 000', `у товара — и другие фразы с цифрами: «${n16.more}»`)
   check(JSON.stringify(n23.items) === JSON.stringify(['Ищут «набор b 2 точно» — 70 в месяц', 'Ищут «набор b 3 точно» — 70 в месяц']), `второй и третий товар поста — свой спрос: ${JSON.stringify(n23.items)}`)
   check(n13.level === 'low' && n13.volume === '30 поисков в месяц', `PO-1013 — тема «средняя», а фраза — низкий: ${JSON.stringify(n13)}`)
-  check(n18.level === 'none' && n18.volume === 'ищут слишком редко — цифр нет', `PO-1018 — DataForSEO «данных нет»: ${JSON.stringify(n18)}`)
+  // 22.11.2026: по названию не ищут (было — «спроса нет») — уровень по примерному запросу, 40 — нижняя треть своих
+  check(n18.level === 'low' && n18.source === 'type' && n18.volume === 'ищут слишком редко — цифр нет' && n18.guess === '«похожие игрушки 1018» — 40 поисков в месяц', `PO-1018 — по названию не ищут, уровень по примерному запросу: ${JSON.stringify(n18)}`)
+  check(n16.source === 'narrow' && n16.guess === '«похожие игрушки 1016» — 480 поисков в месяц', `у PO-1016 уровень по своей фразе, примерный — рядом: ${n16.guess}`)
+  if (SHOTS)
+    await page.locator('[data-testid=offer-card]', { hasText: 'PO-1018' }).screenshot({ path: `${SHOTS}/offer-type.png` })
   await page.locator('[data-testid=offers-demand-high]').click()
   await painted(page)
   const hiNames = await cards(page).locator('[data-testid=offer-name]').evaluateAll(ns => ns.map(n => n.textContent.trim()))
@@ -1134,8 +1243,9 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   }, id)
   const usage = JSON.parse(psql(`SELECT json_build_object('posts', coalesce(sum(posts), 0), 'in', coalesce(sum(input_tokens), 0), 'out', coalesce(sum(output_tokens), 0), 'rows', count(*)) FROM public.ai_usage_daily;`))
   const readNow = Number(psql(`SELECT count(*) FROM public.supplier_offers WHERE read_items IS NOT NULL;`))
-  // Подбор запросов покупателя (18.11) — в тот же журнал, постов не прибавляет: 800/400 токенов на запрос заглушки
-  check(usage.posts === readNow && usage.in === readNow * 2000 + ai.queries.length * 800 && usage.out === readNow * 300 + ai.queries.length * 400 && usage.rows === 1, `журнал расхода — все удачные чтения и подборы запросов (${ai.queries.length}), одной строкой за день: ${usage.posts} из ${readNow}, токены ${usage.in}/${usage.out}`)
+  // Подбор запросов покупателя (18.11) и разбор ИИ (22.11) — в тот же журнал, постов не прибавляют:
+  // 800/400 и 600/200 токенов на запрос заглушки
+  check(usage.posts === readNow && usage.in === readNow * 2000 + ai.queries.length * 800 + ai.guesses.length * 600 && usage.out === readNow * 300 + ai.queries.length * 400 + ai.guesses.length * 200 && usage.rows === 1, `журнал расхода — все удачные чтения, подборы запросов (${ai.queries.length}) и разборы (${ai.guesses.length}), одной строкой за день: ${usage.posts} из ${readNow}, токены ${usage.in}/${usage.out}`)
   const lim = await battery('ai_limits')
   check(lim.state === 'ok' && lim.value === '40 000 из 50 000 токенов входа' && lim.now === '80' && /^сброс в \d\d:\d\d$/.test(lim.reset ?? ''), `лимит ИИ — по слабому месту, со сбросом: ${lim.value} · ${lim.reset} · ${lim.now}%`)
   const noBudget = await battery('ai_budget')
@@ -1208,6 +1318,24 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   check(!leaked.length, `ни один ответ маршрутов не несёт секретов${leaked.length ? ` — нашлось: ${leaked.join(', ')}` : ''}`)
   check(offerBodies.length && !offerBodies.some(b => b.includes('last4')), `ответы «Товаров поставщиков» — без последних знаков ключа ИИ: ${offerBodies.length} ответов`)
 
+  console.log('\n== без миграции разбора ИИ')
+  guessOff(true)
+  guessRenamed = true
+  await new Promise(r => setTimeout(r, 1500))
+  const unguessed = await api('/api/admin/supplier-offers', adminToken)
+  check(unguessed.status === 200 && unguessed.json?.narrow?.withoutGuess === null && JSON.stringify(unguessed.json.narrow.guessVolumes) === '{}' && unguessed.json.offers?.length > 0 && unguessed.json.offers.every(o => o.guess === null) && unguessed.json.offers.some(o => o.queries), `список без миграции разбора — точный спрос как был, разбора нет, не 500: ${unguessed.status}`)
+  const guessOffReply = await api('/api/admin/supplier-offers/guess', adminToken, {})
+  check(guessOffReply.status === 200 && guessOffReply.json?.off === 'migration' && guessOffReply.json.done === 0, `разбор без миграции — off: migration: ${JSON.stringify(guessOffReply.json)}`)
+  const guessedNow = ai.guesses.length
+  await page.goto(`${BASE}/admin/supplier-offers`, { waitUntil: 'networkidle', timeout: 120000 })
+  await painted(page)
+  check(await page.locator('[data-testid=offers-guess-about]').count() === 0 && await page.locator('[data-testid=offer-guess]').count() === 0 && await page.locator('[data-testid=offer-card]').count() === await page.locator('[data-testid=offer-demand-level]').count() && ai.guesses.length === guessedNow, 'страница без миграции разбора — как прежде: ни строки, ни «как такое ищут», уровни на месте, к модели не ходили')
+  guessOff(false)
+  guessRenamed = false
+  await new Promise(r => setTimeout(r, 1500))
+  const reguess = await api('/api/admin/supplier-offers', adminToken)
+  check(reguess.status === 200 && reguess.json?.narrow?.withoutGuess != null && reguess.json.offers.some(o => o.guess), 'миграция на месте — разбор вернулся')
+
   console.log('\n== без миграции чтения')
   renameRead(false)
   readRenamed = true
@@ -1266,6 +1394,15 @@ NOTIFY pgrst, 'reload schema';`)
   }
   if (readRenamed)
     renameRead(true)
+  // Не вернулось — сказать и всё равно убрать данные стража: секреты не должны остаться
+  if (guessRenamed) {
+    try {
+      guessOff(false)
+    }
+    catch (e) {
+      console.error(`разбор ИИ не вернулся на место — верните руками: ${e.message}`)
+    }
+  }
   await cleanup()
   for (const id of users)
     await fetch(`${SUPA}/auth/v1/admin/users/${id}`, { method: 'DELETE', headers: serviceHeaders })

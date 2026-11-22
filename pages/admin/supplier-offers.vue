@@ -8,13 +8,14 @@ import { useLocalStorage } from '@vueuse/core'
 import { Check, ChevronDown, Download, ExternalLink, ImageOff, Inbox, ListChecks, Lock, RefreshCw, Search, Send, ShoppingCart, Sparkles, Undo2, X } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import KaspiLine from '@/components/admin/purchasing/KaspiLine.vue'
+import OfferGuessLine from '@/components/admin/purchasing/OfferGuessLine.vue'
 import { jpegForSheet, saveOrderFile } from '@/composables/useOrderSheetFile'
 import { formatPrice } from '@/utils/formatPrice'
 import { rankTop } from '@/utils/kaspiMatch'
 import { offerKaspiKey } from '@/utils/kaspiSnapshot'
 import { DEMAND_REFRESH_COST, formatUsd, formatVolume, trendKind, trendLabel } from '@/utils/marketDemand'
-import { compareByDemand, DEMAND_LEVEL_TEXT, demandLevelBounds, filterByDemand, OFFER_DEMAND_FILTERS, offerDemand, offerLevel, topicDraft } from '@/utils/offerDemand'
-import { narrowLevelBounds, offerNarrow } from '@/utils/offerQueries'
+import { compareByDemand, DEMAND_LEVEL_TEXT, demandBounds, filterByDemand, OFFER_DEMAND_FILTERS, offerEstimate, offerEvidence, topicDraft } from '@/utils/offerDemand'
+import { offerNarrow } from '@/utils/offerQueries'
 import { buildOrderWorkbook, groupOrderLines, orderFileName } from '@/utils/orderSheet'
 import { plural } from '@/utils/restockOrder'
 import { collectedText, dayTitle, groupOffers, modelLabel, offerOrderLine, timeOf } from '@/utils/supplierOfferList'
@@ -106,7 +107,6 @@ const demandFilter = useLocalStorage<OfferDemandFilter>('admin-supplier-offers-d
 // До 18.11 был «Есть спрос» ('demand') — в браузере мог остаться
 if (!OFFER_DEMAND_FILTERS.some(f => f.id === demandFilter.value))
   demandFilter.value = 'all'
-const demandById = computed(() => new Map((page.value?.offers ?? []).map(o => [o.id, page.value?.topics ? offerDemand(o, page.value.topics) : null])))
 /*
  * Точный спрос (18.11.2026, владелец: «работает слишком широко, типа по
  * запросу «куклы»»): у товара — запросы покупателя, подобранные ИИ, и ответ
@@ -118,27 +118,39 @@ const volumes = computed(() => {
   const v = page.value?.narrow?.volumes
   return v && Object.keys(v).length ? v : null
 })
-const narrowById = computed(() => new Map((page.value?.offers ?? []).map(o => [o.id, volumes.value ? offerNarrow(o.queries, volumes.value) : null])))
-const narrowBounds = computed(() => volumes.value ? narrowLevelBounds(volumes.value) : null)
+/*
+ * Примерный спрос (22.11.2026, владелец: «ии должен еще делать примерный
+ * поиск а не обязательно по названию товара»): ИИ разбирает, что это за
+ * вещь, — как такое ищут и тема по смыслу (utils/offerGuess.ts). Нет
+ * миграции 20261122120000 — null, как прежде.
+ */
+const guessVolumes = computed(() => page.value?.narrow?.withoutGuess != null ? page.value.narrow.guessVolumes : null)
+// Всё о спросе товара: точные фразы, тема по признакам, запрос разбора ИИ, тема по смыслу
+const evidenceById = computed(() => new Map((page.value?.offers ?? []).map(o => [o.id, offerEvidence(o, page.value?.topics ?? [], volumes.value, guessVolumes.value)])))
+const narrowById = computed(() => new Map([...evidenceById.value].map(([id, e]) => [id, e.narrow])))
+const demandById = computed(() => new Map([...evidenceById.value].map(([id, e]) => [id, e.demand])))
+const typeById = computed(() => new Map([...evidenceById.value].map(([id, e]) => [id, e.type])))
+// Тема: по признакам, иначе — подобранная ИИ по смыслу
+const topicOf = (o: Offer) => demandById.value.get(o.id) ?? evidenceById.value.get(o.id)?.meaning ?? null
+const byMeaning = (o: Offer) => !demandById.value.get(o.id) && !!evidenceById.value.get(o.id)?.meaning
+// Уровень спроса — метка в углу фото: точная фраза, примерный запрос, тема — у каждого свои трети (offerEstimate)
+const bounds = computed(() => demandBounds(page.value?.topics ?? [], volumes.value, guessVolumes.value))
+const estimateById = computed(() => new Map([...evidenceById.value].map(([id, e]) => [id, offerEstimate(e, bounds.value)])))
+const estimateOf = (o: Offer) => estimateById.value.get(o.id) ?? { level: 'unknown' as const, source: null, volume: 0 }
+const levelOf = (o: Offer) => estimateOf(o).level
 const groups = computed(() => {
   const p = page.value
   if (!p)
     return []
   const filter = p.topics ? demandFilter.value : 'all'
-  const list = groupOffers(filterByDemand(p.offers, p.topics ?? [], filter, volumes.value), p.channels, grouping.value)
+  const list = groupOffers(filterByDemand(p.offers, p.topics ?? [], filter, volumes.value, guessVolumes.value), p.channels, grouping.value)
   // «Высокий спрос» — внутри группы сверху больший спрос (groupOffers ставит по времени)
   if (filter === 'high') {
-    const demandOf = (o: Offer) => ({ n: narrowById.value.get(o.id) ?? null, d: demandById.value.get(o.id) ?? null })
     for (const g of list)
-      g.offers.sort((a, b) => compareByDemand(demandOf(a), demandOf(b)))
+      g.offers.sort((a, b) => compareByDemand(estimateOf(a), estimateOf(b)))
   }
   return list
 })
-// Уровень спроса — метка в углу фото: по проверенным фразам товара (трети своих фраз), иначе по теме (трети тем)
-const levelBounds = computed(() => demandLevelBounds(page.value?.topics ?? []))
-function levelOf(o: Offer) {
-  return offerLevel(narrowById.value.get(o.id) ?? null, demandById.value.get(o.id) ?? null, narrowBounds.value, levelBounds.value)
-}
 const itemNarrow = (o: Offer, i: number) => volumes.value ? offerNarrow(o.queries, volumes.value, i) : null
 // Пробел в начале <template> Vue съедает («купить»560) — строки собираются здесь
 const narrowPhrase = (n: OfferNarrow) => n.phrase ?? n.phrases[0]!.phrase
@@ -163,6 +175,15 @@ const kaspiHits = computed(() => new Set(rankTop(Object.entries(page.value?.kasp
   .map(t => t.key)))
 const kaspiHit = (o: Offer, i: number) => kaspiHits.value.has(offerKaspiKey(o.id, i))
 const listNarrowText = (n: OfferNarrow) => `«${narrowPhrase(n)}»${n.volume ? ` · ${formatVolume(n.volume)}` : ''}`
+// Примерный запрос: DataForSEO ответил — над темой; ещё нет — под ней, тема с цифрами важнее
+const typeChecked = (o: Offer) => !!typeById.value.get(o.id)?.checked
+// Над темой есть точные фразы или проверенный примерный запрос — тема фоном, с чертой
+const topicBelow = (o: Offer) => !!volumes.value || typeChecked(o)
+function topicTitle(o: Offer) {
+  const t = topicOf(o)!
+  const meaning = byMeaning(o) ? ' (подобрал ИИ)' : ''
+  return topicBelow(o) ? `Тема «${t.name}»${meaning}` : `${t.name}${meaning}`
+}
 // Пилюли по макету «Товары поставщиков» (Claude Design, 18.11.2026)
 const CARD = 'rounded-[20px] bg-background shadow-sm'
 const CHIP = 'inline-flex items-center whitespace-nowrap rounded-full px-2 py-[3px] text-xs font-semibold'
@@ -315,45 +336,72 @@ async function rereadAll() {
   await fillQueries(true)
 }
 
-// --- Точный спрос (18.11.2026) ---
-/** Подобрано запросов за проход; null — не подбираем */
+// --- Точный спрос (18.11.2026) и разбор ИИ (22.11.2026) ---
+/** Подобрано запросов (разобрано товаров) за проход; null — не подбираем */
 const querying = ref<number | null>(null)
+/** Что идёт: подбор запросов или разбор */
+const queryStep = ref<'queries' | 'guess'>('queries')
 
-/*
- * Запросы покупателя к прочитанным товарам — порциями, пока сервер отвечает
- * `more`. После сбора и «Прочитать» — сами (`quiet`: без уведомления, если
- * подбирать было нечего); кнопкой — с уведомлением.
- */
-async function fillQueries(quiet = false) {
-  if (querying.value !== null || !page.value?.narrow)
-    return
-  if (quiet && !page.value.narrow.withoutQueries)
-    return
-  querying.value = 0
-  let failure: string | null = null
-  let off: string | null = null
+interface PassReply { done: number, more: boolean, off: 'migration' | 'key' | null, error: string | null }
+type PassResult = Omit<PassReply, 'more'>
+
+/** Проход сервера порциями, пока он отвечает `more` */
+async function runPass(url: string, fallback: string): Promise<PassResult> {
+  const out: PassResult = { done: 0, off: null, error: null }
   try {
     for (let i = 0; i < 20; i++) {
-      const res = await adminFetch<{ done: number, more: boolean, off: 'migration' | 'key' | null, error: string | null }>('/api/admin/supplier-offers/queries', { method: 'POST' })
-      querying.value += res.done
-      failure = res.error
-      off = res.off
+      const res = await adminFetch<PassReply>(url, { method: 'POST' })
+      out.done += res.done
+      querying.value = out.done
+      out.error = res.error
+      out.off = res.off
       if (!res.more)
         break
     }
   }
   catch (e) {
-    failure = errorText(e, 'Не удалось подобрать запросы')
+    out.error = errorText(e, fallback)
   }
-  const done = querying.value
+  return out
+}
+
+/*
+ * Запросы покупателя к прочитанным товарам, потом разбор ИИ — порциями, пока
+ * сервер отвечает `more`. После сбора и «Прочитать» — сами (`quiet`: без
+ * уведомления, если подбирать было нечего); кнопкой — с уведомлением.
+ */
+async function fillQueries(quiet = false) {
+  const n = page.value?.narrow
+  if (querying.value !== null || !n)
+    return
+  if (quiet && !n.withoutQueries && !n.withoutGuess)
+    return
+  queryStep.value = 'queries'
+  querying.value = 0
+  const none: PassResult = { done: 0, off: null, error: null }
+  const q = !quiet || n.withoutQueries ? await runPass('/api/admin/supplier-offers/queries', 'Не удалось подобрать запросы') : none
+  // Разбор ИИ — с миграции 20261122120000; без ключа или после ошибки подбора не начинаем
+  let g = none
+  if (n.withoutGuess != null && !q.off && !q.error) {
+    queryStep.value = 'guess'
+    querying.value = 0
+    g = await runPass('/api/admin/supplier-offers/guess', 'Не удалось разобрать товары')
+  }
   querying.value = null
+  const parts = [
+    q.done ? `запросы покупателей подобраны: ${count(q.done, 'товар', 'товара', 'товаров')}` : '',
+    g.done ? `ИИ разобрал: ${count(g.done, 'товар', 'товара', 'товаров')}` : '',
+  ].filter(Boolean).join(' · ')
+  const done = parts && parts[0]!.toUpperCase() + parts.slice(1)
   // Без ключа после сбора молчим: строка чтения ИИ выше уже зовёт на «Модели ИИ»
-  if (off === 'key' && !quiet)
+  if ((q.off === 'key' || g.off === 'key') && !quiet)
     toast.error('Запросы подбирает ИИ — задайте ключ на странице «Модели ИИ»')
-  else if (failure)
-    toast.error(`Запросы подобраны у ${count(done, 'товара', 'товаров', 'товаров')}, дальше — ошибка: ${failure}`)
+  else if (q.error)
+    toast.error(`Запросы подобраны у ${count(q.done, 'товара', 'товаров', 'товаров')}, дальше — ошибка: ${q.error}`)
+  else if (g.error)
+    toast.error(`${done ? `${done}. ` : ''}Разбор ИИ прервался: ${g.error}`)
   else if (done || !quiet)
-    toast.success(done ? `Запросы покупателей подобраны: ${count(done, 'товар', 'товара', 'товаров')}` : 'Подбирать нечего')
+    toast.success(done || 'Подбирать нечего')
   await refresh()
 }
 
@@ -635,10 +683,12 @@ async function downloadOrder() {
                   <!-- Пробелы между соседними пилюлями-фразами Vue выкидывает при сборке — отступ стилем -->
                   <span class="[&>span+span]:ml-1">
                     Точный спрос: ИИ подбирает товару запросы покупателей, DataForSEO отвечает, сколько их ищут.
-                    <span v-if="querying !== null" data-testid="offers-narrow-state">Подбираю запросы… {{ querying }}</span>
+                    <span v-if="page.narrow.withoutGuess != null" data-testid="offers-guess-about">По названию не ищут — примерный: ИИ разбирает, что это за вещь и как такое ищут.</span>
+                    <span v-if="querying !== null" data-testid="offers-narrow-state">{{ queryStep === 'guess' ? 'Разбираю товары…' : 'Подбираю запросы…' }} {{ querying }}</span>
                     <span v-else-if="page.narrow.pending || checking" data-testid="offers-narrow-state">Ждём ответа DataForSEO…</span>
                     <template v-else>
                       <span v-if="page.narrow.withoutQueries" data-testid="offers-narrow-state">Без запросов: {{ count(page.narrow.withoutQueries, 'товар', 'товара', 'товаров') }}.</span>
+                      <span v-if="page.narrow.withoutGuess" data-testid="offers-guess-state">Не разобрано ИИ: {{ count(page.narrow.withoutGuess, 'товар', 'товара', 'товаров') }}.</span>
                       <span v-if="page.narrow.unchecked" data-testid="offers-narrow-unchecked">Не проверено: {{ count(page.narrow.unchecked, 'запрос', 'запроса', 'запросов') }}.</span>
                       <span v-else-if="!page.narrow.withoutQueries && Object.keys(page.narrow.volumes).length" data-testid="offers-narrow-state">Все запросы проверены.</span>
                       <span v-if="page.narrow.last?.status === 'failed'" class="text-destructive" data-testid="offers-narrow-error">Последняя проверка: {{ page.narrow.last.error }}</span>
@@ -647,7 +697,7 @@ async function downloadOrder() {
                 </p>
                 <div class="flex shrink-0 gap-2">
                   <Button
-                    v-if="page.narrow.withoutQueries && querying === null"
+                    v-if="(page.narrow.withoutQueries || page.narrow.withoutGuess) && querying === null"
                     variant="outline"
                     size="sm"
                     :disabled="!!collecting || rereading !== null"
@@ -804,7 +854,7 @@ async function downloadOrder() {
                   <span v-else class="flex h-full items-center justify-center text-muted-foreground">
                     <ImageOff class="h-6 w-6" />
                   </span>
-                  <span v-if="page.topics" class="absolute left-2.5 top-2.5 shadow-sm" :class="[CHIP, LEVEL_CHIP[levelOf(o)]]" :data-level="levelOf(o)" data-testid="offer-demand-level">
+                  <span v-if="page.topics" class="absolute left-2.5 top-2.5 shadow-sm" :class="[CHIP, LEVEL_CHIP[levelOf(o)]]" :data-level="levelOf(o)" :data-source="estimateOf(o).source" data-testid="offer-demand-level">
                     {{ DEMAND_LEVEL_TEXT[levelOf(o)] }}
                   </span>
                   <span v-if="o.photoCount > 1" class="absolute bottom-2.5 right-2.5 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
@@ -873,8 +923,8 @@ async function downloadOrder() {
                   </p>
                 </div>
 
-                <!-- Спрос: точный — по запросам покупателя к товару; тема «Спроса на рынке» — фоном -->
-                <div v-if="page.topics || volumes" class="flex flex-col gap-1 rounded-xl bg-neutral-100 px-3 py-2.5 text-xs" data-testid="offer-demand">
+                <!-- Спрос: точный — по запросам покупателя к товару; примерный — как такое ищут (ИИ); тема «Спроса на рынке» — фоном -->
+                <div v-if="page.topics || volumes || typeById.get(o.id)" class="flex flex-col gap-1 rounded-xl bg-neutral-100 px-3 py-2.5 text-xs" data-testid="offer-demand">
                   <template v-if="volumes">
                     <div v-if="narrowById.get(o.id)" class="flex flex-col gap-0.5" data-testid="offer-narrow">
                       <span class="break-words text-[13px] font-semibold" data-testid="offer-narrow-phrase">«{{ narrowPhrase(narrowById.get(o.id)!) }}»</span>
@@ -889,16 +939,18 @@ async function downloadOrder() {
                       {{ o.items?.length ? 'Запросы покупателей ещё не подобраны' : 'Запросов нет — товар не прочитан' }}
                     </span>
                   </template>
-                  <div v-if="page.topics" :class="volumes ? 'mt-1 flex flex-col gap-0.5 border-t border-neutral-200 pt-1.5' : 'flex flex-col gap-1'" data-testid="offer-topic">
-                    <template v-if="demandById.get(o.id)">
+                  <!-- Примерно (22.11.2026): как такую вещь ищут, не зная марки, — разбор ИИ -->
+                  <OfferGuessLine v-if="typeChecked(o)" :guess="typeById.get(o.id)!" :ruled="!!volumes" />
+                  <div v-if="page.topics" :class="topicBelow(o) ? 'mt-1 flex flex-col gap-0.5 border-t border-neutral-200 pt-1.5' : 'flex flex-col gap-1'" :data-meaning="byMeaning(o) || undefined" data-testid="offer-topic">
+                    <template v-if="topicOf(o)">
                       <div class="flex items-center justify-between gap-2">
-                        <span class="min-w-0 break-words" :class="volumes ? 'text-muted-foreground' : 'text-[13px] font-semibold'">{{ volumes ? `Тема «${demandById.get(o.id)!.name}»` : demandById.get(o.id)!.name }}</span>
-                        <span v-if="trendLabel(demandById.get(o.id)!.trendPct)" class="px-[7px] py-0.5 text-[11px]" :class="[CHIP, TREND_CHIP[trendKind(demandById.get(o.id)!.trendPct)!]]">{{ trendLabel(demandById.get(o.id)!.trendPct) }}</span>
+                        <span class="min-w-0 break-words" :class="topicBelow(o) ? 'text-muted-foreground' : 'text-[13px] font-semibold'" data-testid="offer-topic-name">{{ topicTitle(o) }}</span>
+                        <span v-if="trendLabel(topicOf(o)!.trendPct)" class="px-[7px] py-0.5 text-[11px]" :class="[CHIP, TREND_CHIP[trendKind(topicOf(o)!.trendPct)!]]">{{ trendLabel(topicOf(o)!.trendPct) }}</span>
                       </div>
-                      <span v-if="demandById.get(o.id)!.volume != null" class="text-muted-foreground" data-testid="offer-demand-volume">{{ formatVolume(demandById.get(o.id)!.volume) }} поисков в месяц{{ volumes ? ' по теме' : '' }}</span>
+                      <span v-if="topicOf(o)!.volume != null" class="text-muted-foreground" data-testid="offer-demand-volume">{{ formatVolume(topicOf(o)!.volume!) }} поисков в месяц{{ topicBelow(o) ? ' по теме' : '' }}</span>
                       <span v-else class="text-muted-foreground">цифр спроса ещё нет</span>
-                      <span :class="demandById.get(o.id)!.ourTotal ? 'text-muted-foreground' : 'font-semibold text-red-700'" data-testid="offer-demand-ours">
-                        {{ demandById.get(o.id)!.ourTotal ? `На сайте ${demandById.get(o.id)!.ourTotal}, в наличии ${demandById.get(o.id)!.ourInStock}` : 'На сайте такого нет' }}{{ demandById.get(o.id)!.seasonSoon ? ' · скоро сезон' : '' }}
+                      <span :class="topicOf(o)!.ourTotal ? 'text-muted-foreground' : 'font-semibold text-red-700'" data-testid="offer-demand-ours">
+                        {{ topicOf(o)!.ourTotal ? `На сайте ${topicOf(o)!.ourTotal}, в наличии ${topicOf(o)!.ourInStock}` : 'На сайте такого нет' }}{{ topicOf(o)!.seasonSoon ? ' · скоро сезон' : '' }}
                       </span>
                     </template>
                     <p v-else class="text-muted-foreground" data-testid="offer-demand-none">
@@ -908,6 +960,7 @@ async function downloadOrder() {
                       </NuxtLink>
                     </p>
                   </div>
+                  <OfferGuessLine v-if="typeById.get(o.id) && !typeChecked(o)" :guess="typeById.get(o.id)!" :ruled="!!page.topics || !!volumes" />
                 </div>
 
                 <div class="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
@@ -978,12 +1031,15 @@ async function downloadOrder() {
                 </div>
                 <div v-if="page.topics || volumes" class="flex min-w-0 flex-[0_1_190px] flex-col items-start gap-1">
                   <span :class="[CHIP, levelChipFlat(o)]">{{ DEMAND_LEVEL_TEXT[levelOf(o)] }}</span>
-                  <span v-if="narrowById.get(o.id)" class="break-words text-xs text-muted-foreground">
+                  <span v-if="narrowById.get(o.id) && estimateOf(o).source !== 'type'" class="break-words text-xs text-muted-foreground">
                     {{ listNarrowText(narrowById.get(o.id)!) }}
                   </span>
+                  <span v-else-if="typeById.get(o.id)" class="break-words text-xs text-muted-foreground">
+                    Такое ищут как {{ listNarrowText(typeById.get(o.id)!) }}
+                  </span>
                   <span v-if="!page.topics" />
-                  <span v-else-if="demandById.get(o.id)" class="text-xs" :class="demandById.get(o.id)!.ourTotal ? 'text-muted-foreground' : 'font-semibold text-red-700'">
-                    {{ demandById.get(o.id)!.ourTotal ? `На сайте ${demandById.get(o.id)!.ourTotal}, в наличии ${demandById.get(o.id)!.ourInStock}` : 'На сайте такого нет' }}
+                  <span v-else-if="topicOf(o)" class="text-xs" :class="topicOf(o)!.ourTotal ? 'text-muted-foreground' : 'font-semibold text-red-700'">
+                    {{ topicOf(o)!.ourTotal ? `На сайте ${topicOf(o)!.ourTotal}, в наличии ${topicOf(o)!.ourInStock}` : 'На сайте такого нет' }}
                   </span>
                   <span v-else class="text-xs text-muted-foreground">Темы спроса нет</span>
                 </div>

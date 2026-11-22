@@ -62,10 +62,23 @@ interface Job {
   items: { id: string, name: string, brand: string | null, age: string | null }[]
 }
 
-type Ask = (list: Job['items']) => Promise<{ raw: string, input: number, output: number }>
+type Ask = (user: string) => Promise<{ raw: string, input: number, output: number }>
 
-/** Чем спрашивать: модель «Моделей ИИ» и ключ её провайдера; ключа нет — null */
-async function loadAsk(db: SupabaseClient): Promise<{ model: string, ask: Ask } | null> {
+/** Текстовый запрос к модели: системный промпт, схема ответа и что делает — для текста ошибки */
+export interface TextAskSpec {
+  system: string
+  schema: Record<string, unknown>
+  /** Имя схемы для OpenAI-совместимых */
+  name: string
+  /** «подбирать запросы» — в «Модель отказалась …» */
+  what: string
+}
+
+/**
+ * Чем спрашивать: модель «Моделей ИИ» и ключ её провайдера; ключа нет — null.
+ * Общий для подбора запросов и разбора товаров (server/utils/supplierGuess.ts).
+ */
+export async function loadTextAsk(db: SupabaseClient, spec: TextAskSpec): Promise<{ model: string, ask: Ask } | null> {
   const [model, core] = await Promise.all([visionModel(db), loadCore()])
   const { provider, model: id, config } = core.parseModelSpec(model)
   const { data: key, error } = await db.rpc('ai_key_get', { p_provider: provider })
@@ -74,24 +87,23 @@ async function loadAsk(db: SupabaseClient): Promise<{ model: string, ask: Ask } 
   if (typeof key !== 'string' || !key)
     return null
   const stub = aiStubBase()
-  const user = (list: Job['items']) => `Товары:\n${JSON.stringify(list)}`
 
   if (config.kind === 'anthropic') {
     const Anthropic = await loadAnthropic()
     const client = new Anthropic({ apiKey: key, baseURL: stub ?? undefined, timeout: TIMEOUT_MS, maxRetries: 1 })
     return {
       model,
-      ask: async (list) => {
+      ask: async (user) => {
         const reply = await client.messages.create({
           model: id,
           max_tokens: MAX_TOKENS,
-          system: QUERIES_PROMPT,
+          system: spec.system,
           // Форма вывода — как у чтения фото (supplierVisionCore): в типах SDK её может не быть
-          ...({ output_config: { format: { type: 'json_schema', schema: QUERIES_SCHEMA } } } as object),
-          messages: [{ role: 'user', content: user(list) }],
+          ...({ output_config: { format: { type: 'json_schema', schema: spec.schema } } } as object),
+          messages: [{ role: 'user', content: user }],
         })
         if (reply.stop_reason === 'refusal')
-          throw new Error('Модель отказалась подбирать запросы')
+          throw new Error(`Модель отказалась ${spec.what}`)
         if (reply.stop_reason === 'max_tokens')
           throw new Error(`Ответ не поместился в ${MAX_TOKENS} токенов`)
         const block = reply.content.find(b => b.type === 'text')
@@ -106,7 +118,7 @@ async function loadAsk(db: SupabaseClient): Promise<{ model: string, ask: Ask } 
   const base = stub ? { openai: `${stub}/openai/v1`, gemini: `${stub}/gemini/v1beta/openai` }[provider] ?? stub : config.baseURL!
   return {
     model,
-    ask: async (list) => {
+    ask: async (user) => {
       let strict = true
       const signal = AbortSignal.timeout(TIMEOUT_MS)
       const request = () => fetch(`${base.replace(/\/$/, '')}/chat/completions`, {
@@ -117,11 +129,11 @@ async function loadAsk(db: SupabaseClient): Promise<{ model: string, ask: Ask } 
           model: id,
           [config.maxTokensParam ?? 'max_tokens']: MAX_TOKENS,
           messages: [
-            { role: 'system', content: strict ? QUERIES_PROMPT : `${QUERIES_PROMPT}\n\nОтветь только JSON по схеме:\n${JSON.stringify(QUERIES_SCHEMA)}` },
-            { role: 'user', content: user(list) },
+            { role: 'system', content: strict ? spec.system : `${spec.system}\n\nОтветь только JSON по схеме:\n${JSON.stringify(spec.schema)}` },
+            { role: 'user', content: user },
           ],
           response_format: strict
-            ? { type: 'json_schema', json_schema: { name: 'search_queries', strict: true, schema: QUERIES_SCHEMA } }
+            ? { type: 'json_schema', json_schema: { name: spec.name, strict: true, schema: spec.schema } }
             : { type: 'json_object' },
         }),
       })
@@ -177,7 +189,7 @@ export async function fillOfferQueries(db: SupabaseClient): Promise<QueriesOutco
   if (!rows.length)
     return { done: 0, left: 0, more: false, off: null, error: null }
 
-  const loaded = await loadAsk(db)
+  const loaded = await loadTextAsk(db, { system: QUERIES_PROMPT, schema: QUERIES_SCHEMA, name: 'search_queries', what: 'подбирать запросы' })
   if (!loaded)
     return { done: 0, left: data.length, more: false, off: 'key', error: null }
 
@@ -197,7 +209,7 @@ export async function fillOfferQueries(db: SupabaseClient): Promise<QueriesOutco
   for (let i = 0; i < all.length && !failure; i += ITEMS_PER_CALL) {
     const list = all.slice(i, i + ITEMS_PER_CALL)
     try {
-      const reply = await loaded.ask(list)
+      const reply = await loaded.ask(`Товары:\n${JSON.stringify(list)}`)
       spent.input += reply.input
       spent.output += reply.output
       for (const [id, queries] of parseQueriesReply(reply.raw, list.map(it => it.id)))

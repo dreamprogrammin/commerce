@@ -17,6 +17,14 @@ export interface OfferNarrowSummary {
   unchecked: number
   /** Прочитанных новых товаров без подобранных запросов */
   withoutQueries: number
+  /**
+   * Ответы DataForSEO на запросы разбора ИИ — как такую вещь ищут
+   * (utils/offerGuess.ts, 22.11.2026); отдельно от volumes: границы уровней
+   * точных фраз по ним не сдвигаются
+   */
+  guessVolumes: Record<string, number | null>
+  /** Прочитанных новых товаров без разбора ИИ; null — нет миграции 20261122120000 */
+  withoutGuess: number | null
   /** Проверка идёт */
   pending: boolean
   last: { status: 'pending' | 'done' | 'failed', error: string | null, items: number | null, sent: number, finishedAt: string | null } | null
