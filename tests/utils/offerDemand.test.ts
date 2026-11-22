@@ -156,7 +156,7 @@ describe('примерный спрос — разбор ИИ', () => {
     topic({ topic_id: 'off', name: 'Отключённая', match_terms: ['трюмо'], volume_avg3: 50000, is_active: false }),
   ]
   const g = (query: string | null, topic: string | null = null) => ({ query, topic })
-  type Row = { caption: string, items: null, queries: string[][] | null, guess: ({ query: string | null, topic: string | null } | null)[] | null }
+  interface Row { caption: string, items: null, queries: string[][] | null, guess: ({ query: string | null, topic: string | null } | null)[] | null }
   const o = (caption: string, queries: string[][] | null, guess: Row['guess']): Row => ({ caption, items: null, queries, guess })
 
   it('тема по смыслу — та, что выбрал ИИ; из нескольких — с бо́льшим спросом; отключённая и чужая — мимо', () => {
