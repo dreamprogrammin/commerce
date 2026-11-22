@@ -9,6 +9,7 @@ import type { Offer, OfferChannel, OfferReading, OfferStatus } from '~/utils/sup
 import type { PreviewPost } from '~/utils/telegramPreview'
 import { Buffer } from 'node:buffer'
 import process from 'node:process'
+import { guessesOf } from '~/utils/offerGuess'
 import { isPreviewPage, parsePreviewPosts } from '~/utils/telegramPreview'
 import { loadVisionReader, offerItemsReader, readFailure, visionModel } from './supplierVision'
 import { meterNotInstalled } from './usageMeters'
@@ -64,6 +65,8 @@ const OFFER_COLUMNS = 'id, channel_id, posted_at, caption, post_url, photo_url, 
 const READ_COLUMNS = 'read_items, read_error'
 /** Запросы покупателя к товарам — миграция 20261118120000 */
 const QUERY_COLUMNS = 'search_queries'
+/** Разбор ИИ: как такую вещь ищут, тема по смыслу — миграция 20261122120000 */
+const GUESS_COLUMNS = 'demand_guess'
 
 interface OfferRow {
   id: string
@@ -78,6 +81,7 @@ interface OfferRow {
   read_items?: unknown
   read_error?: string | null
   search_queries?: unknown
+  demand_guess?: unknown
 }
 
 /** Фразы товаров поста из базы: массив массивов строк, иначе null */
@@ -109,9 +113,9 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
     .gte('posted_at', since)
     .order('posted_at', { ascending: false })
     .limit(LIST_LIMIT)
-  const [channels, withQueries, summary, secrets, readSummary, model, aiKeys, demand, narrowSummary] = await Promise.all([
+  const [channels, withGuess, summary, secrets, readSummary, model, aiKeys, demand, narrowSummary] = await Promise.all([
     db.from('supplier_channels').select('id, title, invite_hash, collected_at, suppliers(name)').order('created_at'),
-    listOffers(`${OFFER_COLUMNS}, ${READ_COLUMNS}, ${QUERY_COLUMNS}`),
+    listOffers(`${OFFER_COLUMNS}, ${READ_COLUMNS}, ${QUERY_COLUMNS}, ${GUESS_COLUMNS}`),
     db.rpc('supplier_offers_summary'),
     db.rpc('telegram_secrets_status'),
     db.rpc('supplier_offers_read_summary'),
@@ -120,7 +124,9 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
     db.rpc('market_demand_summary'),
     db.rpc('supplier_offer_demand'),
   ])
-  // Миграции точного спроса ещё нет — без запросов; чтения ИИ — и без прочитанного, как до 5.11
+  // Миграции разбора ИИ ещё нет — без него; точного спроса — без запросов; чтения ИИ — и без прочитанного, как до 5.11
+  const guessInstalled = withGuess.error?.code !== '42703'
+  const withQueries = guessInstalled ? withGuess : await listOffers(`${OFFER_COLUMNS}, ${READ_COLUMNS}, ${QUERY_COLUMNS}`)
   const narrowInstalled = !narrowSummary.error && withQueries.error?.code !== '42703'
   const withRead = narrowInstalled ? withQueries : await listOffers(`${OFFER_COLUMNS}, ${READ_COLUMNS}`)
   const readInstalled = !supplierOffersNotInstalled(readSummary.error) && withRead.error?.code !== '42703'
@@ -160,11 +166,14 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
       }))
   if (narrowSummary.error && !supplierOffersNotInstalled(narrowSummary.error))
     throw dbError(narrowSummary.error)
-  const n = narrowInstalled ? narrowSummary.data as { volumes: Record<string, number | null>, unchecked: number, without_queries: number, pending: boolean, last: { status: 'pending' | 'done' | 'failed', error: string | null, items: number | null, sent: number, finished_at: string | null } | null } : null
+  // guess_volumes и without_guess — с миграции 20261122120000
+  const n = narrowInstalled ? narrowSummary.data as { volumes: Record<string, number | null>, guess_volumes?: Record<string, number | null>, unchecked: number, without_queries: number, without_guess?: number, pending: boolean, last: { status: 'pending' | 'done' | 'failed', error: string | null, items: number | null, sent: number, finished_at: string | null } | null } : null
   const narrow: OfferNarrowSummary | null = n && {
     volumes: n.volumes ?? {},
     unchecked: n.unchecked,
     withoutQueries: n.without_queries,
+    guessVolumes: n.guess_volumes ?? {},
+    withoutGuess: guessInstalled ? n.without_guess ?? null : null,
     pending: n.pending,
     last: n.last && { status: n.last.status, error: n.last.error, items: n.last.items, sent: n.last.sent, finishedAt: n.last.finished_at },
   }
@@ -203,6 +212,7 @@ export async function supplierOffersPage(db: SupabaseClient, status: OfferStatus
       items: items(o.read_items),
       readError: o.read_error ?? null,
       queries: queriesOf(o.search_queries),
+      guess: guessesOf(o.demand_guess),
     })),
   }
 }

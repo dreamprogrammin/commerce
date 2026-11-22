@@ -1,6 +1,8 @@
 import type { DemandTopic } from './marketDemand'
+import type { OfferGuess } from './offerGuess'
 import type { OfferNarrow } from './offerQueries'
 import type { Offer } from './supplierOfferList'
+import { guessQueries } from './offerGuess'
 import { narrowLevel, narrowLevelBounds, offerNarrow } from './offerQueries'
 
 /**
@@ -56,11 +58,11 @@ export function topicMatches(topic: Pick<OfferDemandTopic, 'keywords' | 'match_t
   })
 }
 
-export function offerDemand(offer: Pick<Offer, 'caption' | 'items'>, topics: OfferDemandTopic[]): OfferDemand | null {
-  const text = offerText(offer)
+/** Из тем, подходящих товару, — с бо́льшим спросом */
+function bestTopic(topics: OfferDemandTopic[], fits: (t: OfferDemandTopic) => boolean): OfferDemand | null {
   let best: OfferDemandTopic | null = null
   for (const t of topics) {
-    if (!t.is_active || !topicMatches(t, text))
+    if (!t.is_active || !fits(t))
       continue
     if (!best || (t.volume_avg3 ?? -1) > (best.volume_avg3 ?? -1))
       best = t
@@ -76,6 +78,22 @@ export function offerDemand(offer: Pick<Offer, 'caption' | 'items'>, topics: Off
   }
 }
 
+export function offerDemand(offer: Pick<Offer, 'caption' | 'items'>, topics: OfferDemandTopic[]): OfferDemand | null {
+  const text = offerText(offer)
+  return bestTopic(topics, t => topicMatches(t, text))
+}
+
+/**
+ * Тема по смыслу (22.11.2026) — её выбрал ИИ, разбирая товары поста
+ * (utils/offerGuess.ts): признаки темы в названии не нашлись, а вещь та же —
+ * «полицейская машина» у темы «Машинки» с признаком «машинк». У поста из
+ * нескольких товаров — как у тем по признакам: с бо́льшим спросом.
+ */
+export function offerMeaning(guess: (OfferGuess | null)[] | null | undefined, topics: OfferDemandTopic[]): OfferDemand | null {
+  const ids = new Set((guess ?? []).map(g => g?.topic).filter(Boolean))
+  return ids.size ? bestTopic(topics, t => ids.has(t.topic_id)) : null
+}
+
 export type OfferDemandFilter = 'all' | 'high' | 'none'
 
 export const OFFER_DEMAND_FILTERS: { id: OfferDemandFilter, label: string }[] = [
@@ -84,60 +102,127 @@ export const OFFER_DEMAND_FILTERS: { id: OfferDemandFilter, label: string }[] = 
   { id: 'none', label: 'Темы нет' },
 ]
 
+/** Товар поставщика — то, по чему считается его спрос */
+export type DemandOffer = Pick<Offer, 'caption' | 'items'> & { queries?: string[][] | null, guess?: (OfferGuess | null)[] | null }
+
 /**
- * Отбор и порядок по спросу: «Высокий спрос» (владелец 18.11.2026, по
- * макету) — уровень «высокий», как метка на фото, сверху самый большой
- * спрос; «Темы нет» — ни одна тема не нашла товар. «Все» — порядок не
- * меняется (по времени поста).
- *
- * `volumes` — точный спрос (18.11.2026: «работает слишком широко»): ответы
- * DataForSEO на запросы покупателя к товарам (utils/offerQueries.ts). У
- * товара с проверенными фразами «высокий» считается по ним, у остальных — по
- * теме (offerLevel); без миграции 20261118120000 — у всех по темам.
+ * Всё, что известно о спросе товара:
+ *   • narrow — точные фразы, по названию (18.11.2026);
+ *   • demand — тема по признакам в названии и подписи (6.11.2026);
+ *   • type — запрос разбора ИИ: как такую вещь ищут, не зная марки (22.11.2026);
+ *   • meaning — тема, которую ИИ выбрал по смыслу (22.11.2026).
  */
-export function filterByDemand<T extends Pick<Offer, 'caption' | 'items'> & { queries?: string[][] | null }>(offers: T[], topics: OfferDemandTopic[], filter: OfferDemandFilter, volumes?: Record<string, number | null> | null): T[] {
-  if (filter === 'all')
-    return offers
-  const withDemand = offers.map(o => ({ o, d: offerDemand(o, topics), n: volumes ? offerNarrow(o.queries, volumes) : null }))
-  if (filter === 'none')
-    return withDemand.filter(x => !x.d).map(x => x.o)
-  const narrowBounds = volumes ? narrowLevelBounds(volumes) : null
-  const topicBounds = demandLevelBounds(topics)
-  return withDemand
-    .filter(x => offerLevel(x.n, x.d, narrowBounds, topicBounds) === 'high')
-    .sort((a, b) => compareByDemand(a, b))
-    .map(x => x.o)
+export interface DemandEvidence {
+  narrow: OfferNarrow | null
+  demand: Pick<OfferDemand, 'volume'> | null
+  type?: OfferNarrow | null
+  meaning?: Pick<OfferDemand, 'volume'> | null
+}
+
+/**
+ * `volumes` — ответы DataForSEO на точные фразы, `guessVolumes` — на запросы
+ * разбора ИИ; null — их ещё нет (до первого ответа уровень — по темам).
+ */
+export function offerEvidence(offer: DemandOffer, topics: OfferDemandTopic[], volumes?: Record<string, number | null> | null, guessVolumes?: Record<string, number | null> | null) {
+  return {
+    narrow: volumes ? offerNarrow(offer.queries, volumes) : null,
+    demand: offerDemand(offer, topics),
+    type: guessVolumes ? offerNarrow(guessQueries(offer.guess), guessVolumes) : null,
+    meaning: offerMeaning(offer.guess, topics),
+  }
 }
 
 type LevelBounds = { mid: number, high: number } | null
 
+/** Границы уровней у каждого источника — свои трети: цифры фразы и темы разного размаха */
+export interface DemandBounds {
+  narrow: LevelBounds
+  topic: LevelBounds
+  type?: LevelBounds
+}
+
+export function demandBounds(topics: Pick<OfferDemandTopic, 'is_active' | 'volume_avg3'>[], volumes?: Record<string, number | null> | null, guessVolumes?: Record<string, number | null> | null): DemandBounds {
+  return {
+    narrow: volumes ? narrowLevelBounds(volumes) : null,
+    topic: demandLevelBounds(topics),
+    type: guessVolumes ? narrowLevelBounds(guessVolumes) : null,
+  }
+}
+
+/** Откуда уровень спроса товара */
+export type OfferDemandSource = 'narrow' | 'type' | 'topic' | 'meaning'
+
+export interface DemandEstimate {
+  level: DemandLevel
+  /** null — данных нет */
+  source: OfferDemandSource | null
+  /** Поисков в месяц по этому источнику — для «сверху больший» */
+  volume: number
+}
+
 /**
- * Уровень спроса товара (21.11.2026): по его точным фразам, если DataForSEO
- * ответил хотя бы на одну из них, иначе — по теме, как до точного спроса.
+ * Уровень спроса товара. По порядку — что ближе к самому товару:
+ *   1. точная фраза, у которой есть цифра, — товар ищут по названию;
+ *   2. запрос разбора ИИ с цифрой — такую вещь ищут, хоть и не по названию;
+ *   3. тема по признакам, иначе тема по смыслу (ИИ) — с её цифрами;
+ *   4. фразы проверены, а цифр нет — «спроса нет»;
+ *   5. иначе — «нет данных».
  *
- * Было: при первом ответе на любую фразу уровень у ВСЕХ товаров брался только
- * по фразам. 20.11 «Новые запросы» на «Спросе на рынке» случайно принесли
- * цифру для одной фразы товара («кукла с коляской») — и у 917 товаров из 918
- * встало «Спрос: нет данных», а «Высокий спрос» опустел, хотя темы с цифрами
- * у них есть.
+ * 21.11.2026: точная фраза без ответа DataForSEO уровня не задаёт — было, что
+ * одна случайно проверенная фраза давала «нет данных» 917 товарам из 918.
+ * 22.11.2026 (владелец: «не обязательно по названию товара»): фразы
+ * проверены, но по названию не ищут — уровень по примерному запросу или теме,
+ * а не «спроса нет», как было с 18.11: безымянную игрушку ищут по виду.
  */
-export function offerLevel(narrow: OfferNarrow | null, demand: Pick<OfferDemand, 'volume'> | null, narrowBounds: LevelBounds, topicBounds: LevelBounds): DemandLevel {
-  return narrow?.checked ? narrowLevel(narrow, narrowBounds) : demandLevel(demand, topicBounds)
+export function offerEstimate(e: DemandEvidence, b: DemandBounds): DemandEstimate {
+  if (e.narrow?.checked && e.narrow.volume > 0)
+    return { level: narrowLevel(e.narrow, b.narrow), source: 'narrow', volume: e.narrow.volume }
+  if (e.type?.checked && e.type.volume > 0)
+    return { level: narrowLevel(e.type, b.type ?? null), source: 'type', volume: e.type.volume }
+  const topic = e.demand ?? e.meaning ?? null
+  if (topic?.volume != null)
+    return { level: demandLevel(topic, b.topic), source: e.demand ? 'topic' : 'meaning', volume: topic.volume }
+  if (e.narrow?.checked || e.type?.checked)
+    return { level: 'none', source: e.narrow?.checked ? 'narrow' : 'type', volume: 0 }
+  return { level: 'unknown', source: null, volume: 0 }
 }
 
-/** Спрос товара для «сверху больший»: проверенные фразы, иначе тема */
-export function offerVolume(narrow: OfferNarrow | null, demand: Pick<OfferDemand, 'volume'> | null): number {
-  return narrow?.checked ? narrow.volume : demand?.volume ?? 0
+/** Уровень по точным фразам и теме — без разбора ИИ (страница до миграции 20261122120000) */
+export function offerLevel(narrow: OfferNarrow | null, demand: Pick<OfferDemand, 'volume'> | null, narrowBounds: LevelBounds, topicBounds: LevelBounds): DemandLevel {
+  return offerEstimate({ narrow, demand }, { narrow: narrowBounds, topic: topicBounds }).level
+}
+
+const SOURCE_RANK: Record<OfferDemandSource, number> = { narrow: 0, type: 1, topic: 2, meaning: 3 }
+
+/**
+ * Порядок по спросу: сначала то, что ближе к самому товару (точные фразы,
+ * потом запрос разбора ИИ, тема, тема по смыслу), внутри — больший спрос.
+ * Цифра фразы и цифра темы — разного размаха (тема складывает несколько
+ * фраз), поэтому вперемешку их не сравниваем.
+ */
+export function compareByDemand(a: DemandEstimate, b: DemandEstimate): number {
+  const rank = (e: DemandEstimate) => (e.source ? SOURCE_RANK[e.source] : 9)
+  return rank(a) - rank(b) || b.volume - a.volume
 }
 
 /**
- * Порядок по спросу: сначала товары с проверенными фразами (точный спрос —
- * то, что владелец просил 18.11), внутри — больший спрос. Цифра фразы и
- * цифра темы — разного размаха (тема складывает несколько фраз), поэтому
- * вперемешку их не сравниваем.
+ * Отбор и порядок по спросу: «Высокий спрос» (владелец 18.11.2026, по
+ * макету) — уровень «высокий», как метка на фото, сверху самый большой
+ * спрос; «Темы нет» — ни тема по признакам, ни тема по смыслу (ИИ) не нашли
+ * товар. «Все» — порядок не меняется (по времени поста).
  */
-export function compareByDemand(a: { n: OfferNarrow | null, d: Pick<OfferDemand, 'volume'> | null }, b: { n: OfferNarrow | null, d: Pick<OfferDemand, 'volume'> | null }): number {
-  return Number(!!b.n?.checked) - Number(!!a.n?.checked) || offerVolume(b.n, b.d) - offerVolume(a.n, a.d)
+export function filterByDemand<T extends DemandOffer>(offers: T[], topics: OfferDemandTopic[], filter: OfferDemandFilter, volumes?: Record<string, number | null> | null, guessVolumes?: Record<string, number | null> | null): T[] {
+  if (filter === 'all')
+    return offers
+  const withDemand = offers.map(o => ({ o, e: offerEvidence(o, topics, volumes, guessVolumes) }))
+  if (filter === 'none')
+    return withDemand.filter(x => !x.e.demand && !x.e.meaning).map(x => x.o)
+  const bounds = demandBounds(topics, volumes, guessVolumes)
+  return withDemand
+    .map(x => ({ o: x.o, est: offerEstimate(x.e, bounds) }))
+    .filter(x => x.est.level === 'high')
+    .sort((a, b) => compareByDemand(a.est, b.est))
+    .map(x => x.o)
 }
 
 /**
