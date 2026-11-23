@@ -86,7 +86,12 @@ function goBack(event: MouseEvent) {
     он рисует компактную мобильную плашку — в админке она не нужна.
   -->
   <div class="hidden lg:block">
-    <CommonSiteHeader />
+    <!--
+      В потоке, а не плавающей (23.11.2026): плавая при прокрутке, шапка сайта
+      закрывала строку админки с кнопкой «назад» и верх бокового меню.
+      Сверху прилипает строка админки, шапка сайта уезжает со страницей
+    -->
+    <CommonSiteHeader :sticky="false" />
   </div>
   <div class="flex min-h-screen w-full bg-muted/40">
     <!-- Десктоп сайдбар: карточка по макету AdminSidebar.dc.html -->

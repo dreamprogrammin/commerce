@@ -467,6 +467,34 @@ try {
   check(new URL(page.url()).pathname === '/admin/ai', 'кнопка шага «Модели ИИ» открывает /admin/ai')
   await openHub(page)
 
+  // Компьютер (23.11.2026): шапка сайта плавала при прокрутке поверх строки админки с «назад» и верха меню
+  await page.goto(`${BASE}/admin/demand`, { waitUntil: 'load', timeout: 120000 })
+  await page.waitForLoadState('networkidle')
+  const deskPinned = await page.evaluate(async () => {
+    document.querySelector('main').insertAdjacentHTML('beforeend', '<div data-probe-spacer style="height:3000px"></div>')
+    window.scrollTo(0, document.documentElement.scrollHeight)
+    await new Promise(r => setTimeout(r, 400))
+    const seen = (el) => {
+      const r = el.getBoundingClientRect()
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+      return r.top >= 0 && !!hit && el.contains(hit)
+    }
+    return {
+      scrolled: Math.round(window.scrollY),
+      back: seen(document.querySelector('[data-testid=admin-back]')),
+      menu: seen(document.querySelector('aside nav a[href="/admin/purchasing"]')),
+      logo: seen(document.querySelector('[data-testid=admin-sidebar] > a')),
+    }
+  })
+  const seen = ok => ok ? 'видно' : 'не видно'
+  check(deskPinned.scrolled > 2000 && deskPinned.back && deskPinned.menu && deskPinned.logo, `1366 px, внизу страницы: кнопку «назад» ${seen(deskPinned.back)}, пункт «Умный закуп» ${seen(deskPinned.menu)}, верх меню ${seen(deskPinned.logo)} — шапка сайта поверх не плавает`)
+  if (SHOTS) {
+    // Без кадра отрисовки снимок после прыжка на 3000 px выходит белым
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 300)))))
+    await page.screenshot({ path: `${SHOTS}/back-1366-scrolled.png` })
+  }
+  await openHub(page)
+
   console.log('\n== шаги и расход вслед за базой')
   const supplierId = psql(`INSERT INTO public.suppliers (name) VALUES ('${SUPPLIER}') RETURNING id;`)
   psql(`
