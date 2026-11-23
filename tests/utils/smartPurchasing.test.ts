@@ -1,7 +1,7 @@
 import type { DemandTopic } from '../../utils/marketDemand'
 import type { PurchasingStatus } from '../../utils/smartPurchasing'
 import { describe, expect, it } from 'vitest'
-import { demandOverview, nextAutoRefresh, purchasingSteps, refreshesLeft, seriesMonths } from '../../utils/smartPurchasing'
+import { demandOverview, nextAutoRefresh, purchasingBack, purchasingSteps, refreshesLeft, seriesMonths } from '../../utils/smartPurchasing'
 
 const overview = (topics: number) => ({ ...demandOverview([], 0), topics })
 type Demand = NonNullable<PurchasingStatus['demand']>
@@ -393,5 +393,37 @@ describe('nextAutoRefresh', () => {
     expect(nextAutoRefresh('2026-11-02T20:30:00Z', at('2026-11-03T10:00:00Z'))).toBe('2026-12-05T04:30:00.000Z')
     // 10 октября — к 5 ноября прошло 26 дней
     expect(nextAutoRefresh('2026-10-10T08:00:00Z', at('2026-11-03T10:00:00Z'))).toBe('2026-11-05T04:30:00.000Z')
+  })
+})
+
+describe('purchasingBack — «назад» на страницах умного закупа', () => {
+  it('на дашборде и вне закупа кнопки нет', () => {
+    expect(purchasingBack('/admin/purchasing', '/admin/demand')).toBeNull()
+    expect(purchasingBack('/admin/purchasing?tab=x', null)).toBeNull()
+    expect(purchasingBack('/admin/products', '/admin/purchasing')).toBeNull()
+    expect(purchasingBack('/admin/demand-old', null)).toBeNull()
+  })
+
+  it('пришли не из закупа или открыли по ссылке — вверх, на дашборд', () => {
+    const hub = { to: '/admin/purchasing', label: 'Умный закуп', history: false }
+    expect(purchasingBack('/admin/supplier-offers', null)).toEqual(hub)
+    expect(purchasingBack('/admin/restock', '/admin/products')).toEqual(hub)
+    expect(purchasingBack('/admin/kaspi?topic=t1', '/')).toEqual(hub)
+  })
+
+  it('пришли с экрана закупа — назад историей, подпись — куда', () => {
+    expect(purchasingBack('/admin/demand', '/admin/purchasing')).toEqual({ to: '/admin/purchasing', label: 'Умный закуп', history: true })
+    expect(purchasingBack('/admin/kaspi?offer=o1&item=0', '/admin/supplier-offers')).toEqual({ to: '/admin/supplier-offers', label: 'Товары поставщиков', history: true })
+    expect(purchasingBack('/admin/kaspi?topic=t1', '/admin/demand?filter=missing')).toEqual({ to: '/admin/demand?filter=missing', label: 'Спрос на рынке', history: true })
+  })
+
+  it('та же страница с другим адресом — «Назад»; тот же адрес — вверх', () => {
+    expect(purchasingBack('/admin/kaspi?offer=o1&item=0', '/admin/kaspi')).toEqual({ to: '/admin/kaspi', label: 'Назад', history: true })
+    expect(purchasingBack('/admin/kaspi', '/admin/kaspi')).toEqual({ to: '/admin/purchasing', label: 'Умный закуп', history: false })
+  })
+
+  it('вложенная страница без истории — вверх, на свою страницу', () => {
+    expect(purchasingBack('/admin/suppliers/s1', null)).toEqual({ to: '/admin/suppliers', label: 'Поставщики', history: false })
+    expect(purchasingBack('/admin/suppliers', '/admin/suppliers/s1')).toEqual({ to: '/admin/suppliers/s1', label: 'Поставщики', history: true })
   })
 })

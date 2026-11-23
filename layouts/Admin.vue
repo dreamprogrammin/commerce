@@ -2,6 +2,7 @@
 import {
   AlertTriangle,
   BarChart3,
+  ChevronLeft,
   Home,
   Menu,
   Package,
@@ -12,13 +13,14 @@ import { useCacheManager } from '@/composables/useCacheManager'
 import { useAdminQuestionsStore } from '@/stores/adminStore/adminQuestionsStore'
 import { useAdminReviewsStore } from '@/stores/adminStore/adminReviewsStore'
 import { useProfileStore } from '@/stores/core/profileStore'
-import { PURCHASING_PAGES } from '@/utils/smartPurchasing'
+import { PURCHASING_HUB, PURCHASING_PAGES, purchasingBack } from '@/utils/smartPurchasing'
 
 const { handleOut } = useAuth()
 const { clearAllQueryCache, hardReset } = useCacheManager()
 const adminQuestionsStore = useAdminQuestionsStore()
 const adminReviewsStore = useAdminReviewsStore()
 const route = useRoute()
+const router = useRouter()
 const profileStore = useProfileStore()
 const { fullName, profile } = storeToRefs(profileStore)
 // Пока профиль не загружен, fullName — «Гость»: имени не показываем вовсе.
@@ -46,9 +48,36 @@ onMounted(() => {
 // Умный закуп — одним пунктом (владелец 3.11.2026: «собери всё в одном месте»,
 // «лишнее с сайд-меню убрать»). Его страницы — кнопками на дашборде, и пункт
 // горит на них так же, как на самом дашборде
-const PURCHASING = '/admin/purchasing'
+const PURCHASING = PURCHASING_HUB.to
 const inPurchasing = computed(() => [PURCHASING, ...PURCHASING_PAGES.map(p => p.to)]
   .some(to => route.path === to || route.path.startsWith(`${to}/`)))
+
+// «Назад» на страницах закупа (владелец 23.11.2026: «непонятно, как обратно»;
+// в приложении на телефоне кнопки браузера нет) — utils/smartPurchasing.ts.
+// Прежний адрес вкладки — history.state.back от vue-router; читаем только в
+// браузере после монтирования, чтобы шапка при гидрации совпала с серверной
+const historyBack = ref<string | null>(null)
+function readHistoryBack() {
+  const back: unknown = window.history.state?.back
+  historyBack.value = typeof back === 'string' ? back : null
+}
+onMounted(readHistoryBack)
+watch(() => route.fullPath, () => {
+  if (import.meta.client)
+    readHistoryBack()
+})
+const back = computed(() => purchasingBack(route.fullPath, historyBack.value))
+function goBack(event: MouseEvent) {
+  const target = back.value
+  // Ctrl/⌘/Shift и средняя кнопка — ссылку откроет сам браузер
+  if (!target || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+    return
+  event.preventDefault()
+  if (target.history)
+    router.back()
+  else
+    navigateTo(target.to)
+}
 </script>
 
 <template>
@@ -105,7 +134,26 @@ const inPurchasing = computed(() => [PURCHASING, ...PURCHASING_PAGES.map(p => p.
       <header
         class="sticky top-0 z-10 flex h-14 md:h-16 items-center gap-4 border-b bg-background px-4 md:px-6"
       >
-        <h1 class="text-lg md:text-xl font-semibold truncate">
+        <!-- На страницах умного закупа — «‹ куда» вместо заголовка: шапка прилипает, кнопка видна и внизу длинных списков -->
+        <Button
+          v-if="back"
+          as-child
+          variant="ghost"
+          class="-ml-3 h-10 min-w-0 shrink gap-1 text-base font-semibold md:text-lg"
+        >
+          <a
+            :href="back.to"
+            :aria-label="back.label === 'Назад' ? 'Назад' : `Назад: ${back.label}`"
+            data-testid="admin-back"
+            @click="goBack"
+          >
+            <ChevronLeft class="size-5" />
+            <!-- md…lg: рядом меню и «Очистить кеш» / «Полный сброс» — имя не влезает, коротко -->
+            <span class="truncate md:max-lg:hidden" data-testid="admin-back-label">{{ back.label }}</span>
+            <span class="hidden md:max-lg:inline">Назад</span>
+          </a>
+        </Button>
+        <h1 v-else class="text-lg md:text-xl font-semibold truncate">
           Панель администратора
         </h1>
         <div class="ml-auto flex items-center gap-2">
