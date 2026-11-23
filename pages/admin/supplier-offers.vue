@@ -526,21 +526,7 @@ async function downloadOrder() {
   <div class="mx-auto max-w-[1400px] space-y-4 p-4">
     <div class="flex flex-wrap items-end gap-3 px-1 pt-1.5">
       <div class="flex min-w-0 flex-[1_1_320px] flex-col gap-1.5">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink as-child>
-                <NuxtLink to="/admin/purchasing">
-                  Умный закуп
-                </NuxtLink>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Товары поставщиков</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+        <!-- «Умный закуп › Товары поставщиков» из макета 18.11 заменила кнопка «‹ Умный закуп» в шапке (23.11.2026) -->
         <h1 class="text-[26px] font-bold leading-tight tracking-[-0.02em]">
           Товары поставщиков
         </h1>

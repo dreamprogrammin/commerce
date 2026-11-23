@@ -26,6 +26,48 @@ export const PURCHASING_PAGES = [
   { to: '/admin/restock', label: 'К закупке' },
 ] as const
 
+/** Дашборд — корень раздела */
+export const PURCHASING_HUB = { to: '/admin/purchasing', label: 'Умный закуп' } as const
+
+/** Кнопка «назад» в шапке админки на страницах закупа */
+export interface PurchasingBack {
+  /** Куда ведёт; при `history` — адрес прежней записи истории */
+  to: string
+  label: string
+  /** Вернуться историей (router.back): прежний экран откроется там, где его оставили */
+  history: boolean
+}
+
+const pathOf = (fullPath: string) => fullPath.split(/[?#]/, 1)[0]!
+
+function purchasingPage(path: string) {
+  return [PURCHASING_HUB, ...PURCHASING_PAGES].find(p => path === p.to || path.startsWith(`${p.to}/`)) ?? null
+}
+
+/**
+ * «Назад» на страницах умного закупа (23 ноября 2026). Владелец: «в раздел
+ * умный закуп нужно сделать удобную кнопку назад, а то непонятно, как
+ * обратно, порой приходится выходить на домашнюю страницу». Сайт ставится на
+ * телефон приложением (site.webmanifest, display: standalone) — кнопки
+ * «назад» у браузера там нет.
+ *
+ * `back` — history.state.back от vue-router: прежний адрес в этой вкладке.
+ * Пришли с экрана закупа — назад на него историей: «‹ Товары поставщиков» на
+ * «Цифрах Kaspi», «‹ Назад» — та же страница с другим адресом. Иначе — вверх:
+ * на дашборд, с вложенной страницы — на её страницу. На дашборде и вне
+ * закупа — null, кнопки нет.
+ */
+export function purchasingBack(current: string, back: string | null | undefined): PurchasingBack | null {
+  const path = pathOf(current)
+  const here = purchasingPage(path)
+  if (!here || path === PURCHASING_HUB.to)
+    return null
+  if (back && back !== current && purchasingPage(pathOf(back)))
+    return { to: back, label: pathOf(back) === path ? 'Назад' : purchasingPage(pathOf(back))!.label, history: true }
+  const up = path === here.to ? PURCHASING_HUB : here
+  return { to: up.to, label: up.label, history: false }
+}
+
 /** Тема в списках дашборда — числа Google (DataForSEO) */
 export interface DemandLine {
   id: string

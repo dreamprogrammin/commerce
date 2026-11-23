@@ -21,7 +21,11 @@
  *     сами страницы — кнопками на дашборде;
  *  7) телефон 390px: всё влезает без горизонтальной прокрутки, вкладка
  *     «Закупки» и мобильное меню;
- *  8) без миграции каналов — работает; без ошибок консоли.
+ *  8) без миграции каналов — работает; без ошибок консоли;
+ *  9) «назад» в шапке на страницах закупа (23.11.2026): с дашборда —
+ *     «‹ Умный закуп» и назад историей; по прямой ссылке и из других разделов —
+ *     на дашборд; с другой страницы закупа — «‹ её имя»; та же страница с
+ *     другим адресом — «‹ Назад»; на телефоне видна и внизу длинной страницы.
  *
  * Данные заводит сам и в конце убирает. Цифры спроса заводятся, только если
  * на локальной базе своих нет; пробные ключи DataForSEO и ИИ — тоже только
@@ -85,7 +89,7 @@ const OLD_LINKS = [
   '/admin/ai',
 ]
 // Страницы закупа — кнопками на дашборде, в меню их нет
-const PAGES = [['/admin/suppliers', 'Поставщики'], ['/admin/telegram', 'Аккаунт Telegram'], ['/admin/supplier-offers', 'Товары поставщиков'], ['/admin/demand', 'Спрос на рынке'], ['/admin/ai', 'Модели ИИ'], ['/admin/restock', 'К закупке']]
+const PAGES = [['/admin/suppliers', 'Поставщики'], ['/admin/telegram', 'Аккаунт Telegram'], ['/admin/supplier-offers', 'Товары поставщиков'], ['/admin/demand', 'Спрос на рынке'], ['/admin/kaspi', 'Цифры Kaspi'], ['/admin/ai', 'Модели ИИ'], ['/admin/restock', 'К закупке']]
 const MENU = [...OLD_LINKS.filter(h => !PAGES.some(([p]) => p === h)), '/admin/purchasing']
 
 if (!/localhost|127\.0\.0\.1/.test(BASE))
@@ -438,11 +442,24 @@ try {
   const item = page.locator('aside nav a[href="/admin/purchasing"]')
   // Горящий пункт — aria-current="page" (меню по макету AdminSidebar, 9.11.2026; прежде — класс bg-muted)
   check(sp(await item.innerText()) === 'Умный закуп' && await item.getAttribute('aria-current') === 'page', 'на дашборде «Умный закуп» в меню подсвечен')
+  check(await page.locator('[data-testid=admin-back]').count() === 0 && sp(await page.locator('header h1').textContent()) === 'Панель администратора', 'на дашборде кнопки «назад» нет — в шапке «Панель администратора»')
   for (const [href, label] of PAGES) {
     await page.locator(`[data-testid=purchasing-pages] a[href="${href}"]`).click()
     await page.waitForURL(`**${href}`, { timeout: 30000 })
     await page.waitForLoadState('networkidle')
     check(await item.getAttribute('aria-current') === 'page', `«${label}» — открылась кнопкой, «Умный закуп» в меню горит`)
+    // «Назад» (23.11.2026): пришли с дашборда — на него же историей, вперёд — эта страница
+    const back = page.locator('[data-testid=admin-back]')
+    const backText = sp(await back.locator('[data-testid=admin-back-label]').textContent())
+    const backSeen = await back.evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+      return !!hit && el.contains(hit)
+    })
+    await back.click()
+    await page.waitForURL('**/admin/purchasing', { timeout: 30000 })
+    const state = await page.evaluate(() => window.history.state)
+    check(backText === 'Умный закуп' && backSeen && state?.forward === href, `«${label}»: в шапке «‹ ${backText}»${backSeen ? '' : ' (закрыта)'} — назад на дашборд историей (вперёд — ${state?.forward})`)
     await openHub(page)
   }
   await page.locator('[data-testid=step-ai] [data-testid=step-link]').click()
@@ -745,7 +762,98 @@ INSERT INTO public.market_demand_candidates (keyword, search_volume, trend_pct) 
   await mobile.getByRole('button', { name: 'Меню' }).click()
   await sheet.waitFor()
   check(await sheet.locator('nav a[href="/admin/purchasing"]').getAttribute('aria-current') === 'page', 'и в мобильном меню горит «Умный закуп»')
+  await mobile.keyboard.press('Escape')
+  await sheet.waitFor({ state: 'hidden' })
+
+  // «Назад» в шапке (23.11.2026). В приложении на телефоне кнопки браузера нет
+  console.log('\n== «назад» на страницах закупа')
+  const mBack = mobile.locator('[data-testid=admin-back]')
+  const mLabel = async () => sp(await mBack.locator('[data-testid=admin-back-label]').textContent())
+  const loads = []
+  mobile.on('load', () => loads.push(mobile.url().replace(BASE, '')))
+  const push = async (to) => {
+    try {
+      await mobile.evaluate(async (to) => {
+        await document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$router.push(to)
+      }, to)
+    }
+    catch (e) {
+      // 23.11.2026 один прогон из нескольких перезагрузил страницу здесь, повторить не вышло — пусть краснеет с подробностями
+      check(false, `переход на ${to} — без перезагрузки страницы: ${e.message.split('\n')[0]}; загрузки: ${loads.join(', ')}; ошибки: ${errors.slice(-4).join(' | ').slice(0, 600)}; ответы: ${failed.slice(-4).join(' | ')}`)
+      await mobile.waitForLoadState('load')
+    }
+  }
+  const settle = async (path) => {
+    await mobile.waitForFunction(p => location.pathname + location.search === p, path, { timeout: 30000 })
+    await mobile.waitForLoadState('networkidle')
+  }
+  await mobile.goto(`${BASE}/admin/demand`, { waitUntil: 'load', timeout: 120000 })
+  await mobile.waitForLoadState('networkidle')
+  check(await mLabel() === 'Умный закуп' && await mobile.locator('header h1').count() === 0, 'телефон, «Спрос на рынке» по прямой ссылке: в шапке «‹ Умный закуп» вместо «Панель администратора»')
+  if (SHOTS)
+    await mobile.screenshot({ path: `${SHOTS}/back-390-top.png` })
+  // Внизу длинной страницы кнопка там же: шапка прилипает. Длину даёт распорка — цифр на базе может не быть
+  const pinned = await mobile.evaluate(async () => {
+    document.querySelector('main').insertAdjacentHTML('beforeend', '<div data-probe-spacer style="height:3000px"></div>')
+    window.scrollTo(0, document.documentElement.scrollHeight)
+    await new Promise(r => setTimeout(r, 300))
+    const el = document.querySelector('[data-testid=admin-back]')
+    const r = el.getBoundingClientRect()
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+    return { scrolled: Math.round(window.scrollY), top: Math.round(r.top), height: Math.round(r.height), right: Math.round(r.right), hit: !!hit && el.contains(hit) }
+  })
+  check(pinned.scrolled > 2000 && pinned.hit && pinned.top >= 0 && pinned.top + pinned.height <= 56 && pinned.height >= 40, `внизу страницы кнопка на месте и не мелкая: прокрутка ${pinned.scrolled}, кнопка ${pinned.top}…${pinned.top + pinned.height} px, высота ${pinned.height}`)
+  if (SHOTS)
+    await mobile.screenshot({ path: `${SHOTS}/back-390-scrolled.png` })
+  await mBack.click()
+  await settle('/admin/purchasing')
+  check((await mobile.evaluate(() => window.history.state?.back)) === '/admin/demand', 'по прямой ссылке назад некуда — кнопка открыла дашборд новым шагом (назад браузером — снова «Спрос на рынке»)')
+
+  await push('/admin/demand')
+  await settle('/admin/demand')
+  await push('/admin/kaspi')
+  await settle('/admin/kaspi')
+  const fromDemand = await mLabel()
+  await mBack.click()
+  await settle('/admin/demand')
+  const afterKaspi = await mobile.evaluate(() => window.history.state?.forward)
+  check(fromDemand === 'Спрос на рынке' && afterKaspi === '/admin/kaspi', `со «Спроса на рынке» на «Цифры Kaspi»: в шапке «‹ ${fromDemand}», назад — на «Спрос на рынке» историей`)
+  check(await mLabel() === 'Умный закуп', 'а оттуда — «‹ Умный закуп»: до него пришли с дашборда')
+
+  // Не «Модели ИИ»: там к этому шагу лежит пробный ключ, и страница спросила бы список моделей у провайдера
+  await push('/admin/suppliers')
+  await settle('/admin/suppliers')
+  await push('/admin/suppliers?probe=1')
+  await settle('/admin/suppliers?probe=1')
+  const samePage = await mLabel()
+  await mBack.click()
+  await settle('/admin/suppliers')
+  check(samePage === 'Назад', `та же страница с другим адресом — «‹ ${samePage}», назад на прежний адрес`)
+
+  await push('/admin')
+  await settle('/admin')
+  check(await mBack.count() === 0, 'вне закупа кнопки нет')
+  await push('/admin/restock')
+  await settle('/admin/restock')
+  const fromOutside = await mLabel()
+  await mBack.click()
+  await settle('/admin/purchasing')
+  check(fromOutside === 'Умный закуп' && (await mobile.evaluate(() => window.history.state?.back)) === '/admin/restock', `пришли из другого раздела — «‹ ${fromOutside}», кнопка открыла дашборд, а не прежний раздел`)
   await mobile.context().close()
+
+  // Планшет: рядом боковое меню и «Очистить кеш» / «Полный сброс» — имя не влезало («Умный з…»), там «‹ Назад»
+  const tablet = await newPage({ width: 820, height: 900 })
+  await tablet.goto(`${BASE}/admin/supplier-offers`, { waitUntil: 'load', timeout: 120000 })
+  await tablet.waitForLoadState('networkidle')
+  const tb = await tablet.evaluate(() => {
+    const el = document.querySelector('[data-testid=admin-back]')
+    const shown = [...el.querySelectorAll('span')].filter(s => s.offsetParent).map(s => ({ text: s.textContent.trim(), cut: s.scrollWidth > s.clientWidth }))
+    const r = el.getBoundingClientRect()
+    const firstTool = el.closest('header').querySelector('.ml-auto').getBoundingClientRect()
+    return { shown, apart: r.right <= firstTool.left }
+  })
+  check(tb.shown.length === 1 && tb.shown[0].text === 'Назад' && !tb.shown[0].cut && tb.apart, `планшет 820 px: в шапке «‹ ${tb.shown.map(s => s.text).join(' / ')}», не обрезано, с кнопками справа не сходится`)
+  await tablet.context().close()
 
   console.log('\n== без миграции каналов')
   psql(`ALTER TABLE public.supplier_channels RENAME TO supplier_channels_check_off; NOTIFY pgrst, 'reload schema';`)

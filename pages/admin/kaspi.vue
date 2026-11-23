@@ -431,10 +431,8 @@ useHead({ title: 'Цифры Kaspi' })
 <template>
   <div class="container mx-auto max-w-3xl space-y-6 p-4 md:p-8">
     <div>
-      <NuxtLink to="/admin/purchasing" class="text-sm text-muted-foreground hover:text-foreground">
-        ← Умный закуп
-      </NuxtLink>
-      <h1 class="mt-1 text-2xl font-bold tracking-tight md:text-3xl">
+      <!-- «‹ Умный закуп» — в шапке админки (layouts/Admin.vue, 23.11.2026) -->
+      <h1 class="text-2xl font-bold tracking-tight md:text-3xl">
         Цифры Kaspi
       </h1>
       <p class="mt-1 text-sm text-muted-foreground">
