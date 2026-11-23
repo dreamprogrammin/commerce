@@ -426,10 +426,11 @@ function getProductImage(imageUrl: string | null): string | undefined {
 
     <!--
       Сайт и платные сервисы — подробно; строка-сводка — над продажами.
-      scroll-mt-28: на ≥lg шапка сайта при прокрутке плавает поверх страницы
-      (~100 px) и закрывала заголовок, к которому ведёт ссылка из строки
+      scroll-mt-20: сверху прилипает строка админки (64 px) и закрыла бы
+      заголовок, к которому ведёт ссылка из строки. Шапка сайта с 23.11.2026
+      не плавает — до того здесь стояло scroll-mt-28 под неё (~100 px)
     -->
-    <section id="site-health-details" class="scroll-mt-28 space-y-3" data-testid="site-health-details">
+    <section id="site-health-details" class="scroll-mt-20 space-y-3" data-testid="site-health-details">
       <h2 class="text-lg font-semibold">
         Сайт и сервисы
       </h2>
