@@ -5,6 +5,7 @@ import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { groupProducts } from '~/utils/supplierPosts'
 import { isSessionGone, phoneLast4, telegramErrorText } from '~/utils/telegramLogin'
+import { pgrstTableNotFound } from './pgrstErrors'
 
 /**
  * Аккаунт Telegram для закрытых каналов поставщиков (4 ноября 2026).
@@ -452,11 +453,12 @@ type SecretName = 'api_id' | 'api_hash' | 'session' | 'login'
 
 /*
  * Миграции 20261104120000 ещё нет: превью с `dev` смотрит в боевую базу до её
- * применения. PostgREST: PGRST202 — нет функции, PGRST205 — нет таблицы;
- * Postgres: 42883, 42P01.
+ * применения. PostgREST: PGRST202 — нет функции; таблицы нет — на чтение 42P01
+ * от Postgres, на запись пустая ошибка PostgREST 12 (pgrstErrors.ts), PGRST205 —
+ * у PostgREST 13; Postgres: 42883, 42P01.
  */
-export function telegramNotInstalled(error: { code?: string } | null | undefined): boolean {
-  return ['PGRST202', 'PGRST205', '42883', '42P01'].includes(error?.code ?? '')
+export function telegramNotInstalled(error: { code?: string, message?: string } | null | undefined): boolean {
+  return ['PGRST202', 'PGRST205', '42883', '42P01'].includes(error?.code ?? '') || pgrstTableNotFound(error)
 }
 
 function dbError(error: { code?: string, message: string }) {

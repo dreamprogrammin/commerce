@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 import process from 'node:process'
+import { pgrstTableNotFound } from './pgrstErrors'
 
 /**
  * DataForSEO для страницы «Спрос на рынке» (1 ноября 2026): проверка ключа и
@@ -60,9 +61,10 @@ export async function dataforseoAccount(login: string, password: string): Promis
 
 /*
  * Миграция спроса ещё не применена: таблицы или функции нет. PostgREST
- * отвечает PGRST202 (функция) / PGRST205 (таблица), Postgres — 42P01/42883.
+ * отвечает PGRST202 (функция); таблицы нет — на чтение 42P01 от Postgres, на
+ * запись пустая ошибка PostgREST 12 (pgrstErrors.ts), PGRST205 — у PostgREST 13.
  * Страница тогда говорит это прямо, а не падает.
  */
-export function demandNotInstalled(error: { code?: string } | null | undefined): boolean {
-  return ['PGRST202', 'PGRST205', '42P01', '42883'].includes(error?.code ?? '')
+export function demandNotInstalled(error: { code?: string, message?: string } | null | undefined): boolean {
+  return ['PGRST202', 'PGRST205', '42P01', '42883'].includes(error?.code ?? '') || pgrstTableNotFound(error)
 }
