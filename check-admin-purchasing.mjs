@@ -341,6 +341,19 @@ try {
     await openHub(page)
     return page
   }
+  // Прокрутка колесом, как у человека. После прыжка scrollTo снимок выходит белым или со сдвигом:
+  // «Спрос на рынке» дорисовывается после загрузки (прыжок к низу — ~5 000 px, потом страница растёт
+  // до 20 000), и кадр ловится посреди перестройки. Замеры при этом верны (23.11.2026)
+  async function wheelDown(page) {
+    await page.evaluate(() => document.querySelector('main').insertAdjacentHTML('beforeend', '<div data-probe-spacer style="height:3000px"></div>'))
+    const { width, height } = page.viewportSize()
+    await page.mouse.move(width / 2, height / 2)
+    for (let i = 0; i < 12; i++) {
+      await page.mouse.wheel(0, 400)
+      await page.waitForTimeout(50)
+    }
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 300)))))
+  }
   async function openHub(page) {
     await page.goto(`${BASE}/admin/purchasing`, { waitUntil: 'load', timeout: 120000 })
     await page.locator('[data-testid=purchasing-steps]').waitFor({ timeout: 30000 })
@@ -479,10 +492,8 @@ try {
   // Компьютер (23.11.2026): шапка сайта плавала при прокрутке поверх строки админки с «назад» и верха меню
   await page.goto(`${BASE}/admin/demand`, { waitUntil: 'load', timeout: 120000 })
   await page.waitForLoadState('networkidle')
-  const deskPinned = await page.evaluate(async () => {
-    document.querySelector('main').insertAdjacentHTML('beforeend', '<div data-probe-spacer style="height:3000px"></div>')
-    window.scrollTo(0, document.documentElement.scrollHeight)
-    await new Promise(r => setTimeout(r, 400))
+  await wheelDown(page)
+  const deskPinned = await page.evaluate(() => {
     const seen = (el) => {
       const r = el.getBoundingClientRect()
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
@@ -497,11 +508,8 @@ try {
   })
   const seen = ok => ok ? 'видно' : 'не видно'
   check(deskPinned.scrolled > 2000 && deskPinned.back && deskPinned.menu && deskPinned.logo, `1366 px, внизу страницы: кнопку «назад» ${seen(deskPinned.back)}, пункт «Умный закуп» ${seen(deskPinned.menu)}, верх меню ${seen(deskPinned.logo)} — шапка сайта поверх не плавает`)
-  if (SHOTS) {
-    // Без кадра отрисовки снимок после прыжка на 3000 px выходит белым
-    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 300)))))
+  if (SHOTS)
     await page.screenshot({ path: `${SHOTS}/back-1366-scrolled.png` })
-  }
   await openHub(page)
 
   console.log('\n== шаги и расход вслед за базой')
@@ -837,22 +845,17 @@ INSERT INTO public.market_demand_candidates (keyword, search_volume, trend_pct) 
   check(await mLabel() === 'Умный закуп' && await mobile.locator('header h1').count() === 0, 'телефон, «Спрос на рынке» по прямой ссылке: в шапке «‹ Умный закуп» вместо «Панель администратора»')
   if (SHOTS)
     await mobile.screenshot({ path: `${SHOTS}/back-390-top.png` })
-  // Внизу длинной страницы кнопка там же: шапка прилипает. Длину даёт распорка — цифр на базе может не быть
-  const pinned = await mobile.evaluate(async () => {
-    document.querySelector('main').insertAdjacentHTML('beforeend', '<div data-probe-spacer style="height:3000px"></div>')
-    window.scrollTo(0, document.documentElement.scrollHeight)
-    await new Promise(r => setTimeout(r, 300))
+  // Далеко внизу длинной страницы кнопка там же: шапка прилипает. Длину даёт распорка — цифр на базе может не быть
+  await wheelDown(mobile)
+  const pinned = await mobile.evaluate(() => {
     const el = document.querySelector('[data-testid=admin-back]')
     const r = el.getBoundingClientRect()
     const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
     return { scrolled: Math.round(window.scrollY), top: Math.round(r.top), height: Math.round(r.height), right: Math.round(r.right), hit: !!hit && el.contains(hit) }
   })
   check(pinned.scrolled > 2000 && pinned.hit && pinned.top >= 0 && pinned.top + pinned.height <= 56 && pinned.height >= 40, `внизу страницы кнопка на месте и не мелкая: прокрутка ${pinned.scrolled}, кнопка ${pinned.top}…${pinned.top + pinned.height} px, высота ${pinned.height}`)
-  if (SHOTS) {
-    // Без кадра отрисовки снимок после прыжка на 3000 px выходит белым
-    await mobile.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 300)))))
+  if (SHOTS)
     await mobile.screenshot({ path: `${SHOTS}/back-390-scrolled.png` })
-  }
   await mBack.click()
   await settle('/admin/purchasing')
   check((await mobile.evaluate(() => window.history.state?.back)) === '/admin/demand', 'по прямой ссылке назад некуда — кнопка открыла дашборд новым шагом (назад браузером — снова «Спрос на рынке»)')
