@@ -391,7 +391,8 @@ export function parseItems(raw: string): ReadItem[] {
  */
 const effortSupport = new Map<string, Promise<boolean>>()
 
-function supportsEffort(client: AnthropicClient, model: string): Promise<boolean> {
+/** Им же пользуются «Тексты для сайта» (server/utils/contentWriter.ts) */
+export function supportsEffort(client: AnthropicClient, model: string): Promise<boolean> {
   const key = `${client.baseURL} ${model}`
   const known = effortSupport.get(key)
   if (known)

@@ -16,7 +16,12 @@
 
 export type AdminPromptKind = 'product' | 'category' | 'brand'
 
-export const PROMPT_COMMON_RULES = `Ты пишешь тексты для интернет-магазина детских игрушек «Ухтышка» (uhti.kz, Алматы, Казахстан). Пишешь по-русски, для родителей, которые выбирают игрушку ребёнку. Тон — спокойный, конкретный, без рекламного крика.
+/**
+ * Правила магазина — без строки о том, в каком виде отвечать: её ставит тот,
+ * кто спрашивает. Кнопке нужен ответ по подписям полей (его раскладывают
+ * руками), «Текстам для сайта» (server/utils/contentWriter.ts) — JSON по схеме.
+ */
+export const PROMPT_SHOP_RULES = `Ты пишешь тексты для интернет-магазина детских игрушек «Ухтышка» (uhti.kz, Алматы, Казахстан). Пишешь по-русски, для родителей, которые выбирают игрушку ребёнку. Тон — спокойный, конкретный, без рекламного крика.
 
 ГЛАВНОЕ ПРАВИЛО: никаких выдуманных фактов. Используй только то, что дано в блоке ДАННЫЕ и в фактах о магазине ниже. Если не указаны размер, вес, материал, страна, батарейки, сертификаты, возраст, год основания бренда, награды — не пиши о них вовсе. Короче, но верно — лучше, чем красиво и неверно.
 
@@ -45,9 +50,12 @@ export const PROMPT_COMMON_RULES = `Ты пишешь тексты для инт
   <li data-icon="fluent-emoji-flat:ИКОНКА">Пункт</li>
 </ul>
 Только теги h2, h3, p, ul, li. Без <br>, <strong>, ссылок, стилей и классов.
-Иконки — только из этого списка, по смыслу: racing-car, teddy-bear, doll, baby, child, puzzle-piece, brain, rocket, robot, house, sparkles, star, wrapped-gift, trophy, light-bulb, check-mark-button, delivery-truck, artist-palette, musical-notes, building-construction, bulldozer, superhero, princess, mermaid, rainbow, gem-stone, battery, speaking-head, direct-hit, party-popper.
+Иконки — только из этого списка, по смыслу: racing-car, teddy-bear, doll, baby, child, puzzle-piece, brain, rocket, robot, house, sparkles, star, wrapped-gift, trophy, light-bulb, check-mark-button, delivery-truck, artist-palette, musical-notes, building-construction, bulldozer, superhero, princess, mermaid, rainbow, gem-stone, battery, speaking-head, direct-hit, party-popper.`
 
-Отвечай строго по полям из задания — каждое поле с новой строки: «Имя поля:», дальше значение. Без пояснений до и после.`
+/** Ответ в чате — по подписям полей формы */
+const ANSWER_BY_FIELDS = 'Отвечай строго по полям из задания — каждое поле с новой строки: «Имя поля:», дальше значение. Без пояснений до и после.'
+
+export const PROMPT_COMMON_RULES = `${PROMPT_SHOP_RULES}\n\n${ANSWER_BY_FIELDS}`
 
 /** Строки блока ДАННЫЕ: подпись и ключ значения, которое форма может подставить. */
 const DATA_LINES: Record<AdminPromptKind, [label: string, key?: string][]> = {
@@ -133,6 +141,14 @@ SEO описание: 120–160 знаков, без HTML — это описа�
   <h2> про бренд, <p> 400–700 знаков: что выпускает, для какого возраста, чем интересен ребёнку — страна и год только если даны в ДАННЫХ;
   <ul> из 3 пунктов: про ассортимент, кому подойдёт, про покупку в Ухтышке.
 Если бренд у нас представлен 1–2 товарами — пиши о бренде, а не обещай «всю линейку».`,
+}
+
+/**
+ * Задание вида без ДАННЫХ — для запросов к модели из кода
+ * (server/utils/contentWriter.ts): ДАННЫЕ и вид ответа там свои.
+ */
+export function adminPromptTask(kind: AdminPromptKind): string {
+  return TASKS[kind]
 }
 
 /** HTML-описание в ДАННЫЕ — текстом: нейросети хватит смысла, разметку она соберёт заново. */
