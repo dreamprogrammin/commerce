@@ -2,15 +2,16 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { VisionModelSpend } from '~/utils/supplierOfferList'
 import type { AiBudget, AiLimitsReading, UsageMeters } from '~/utils/usageBatteries'
 import { budgetPeriod } from '~/utils/usageBatteries'
+import { pgrstTableNotFound } from './pgrstErrors'
 
 /**
  * Показания «батареек» дашборда «Умный закуп» (6 ноября 2026); подписи и
  * уровни — utils/usageBatteries.ts. Таблицы — миграция 20261106120000.
  */
 
-/** Миграции «батареек» нет: таблицы или функции нет в базе */
-export function meterNotInstalled(error: { code?: string } | null | undefined): boolean {
-  return ['PGRST202', 'PGRST205', '42P01', '42883'].includes(error?.code ?? '')
+/** Миграции «батареек» нет: таблицы или функции нет в базе. Запись на PostgREST 12 — пустая ошибка (pgrstErrors.ts) */
+export function meterNotInstalled(error: { code?: string, message?: string } | null | undefined): boolean {
+  return ['PGRST202', 'PGRST205', '42P01', '42883'].includes(error?.code ?? '') || pgrstTableNotFound(error)
 }
 
 export function isAiBudget(v: unknown): v is AiBudget {

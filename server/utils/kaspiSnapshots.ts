@@ -4,6 +4,7 @@ import { matchCandidate, rankTop } from '~/utils/kaspiMatch'
 import { kaspiSummaries, offerKaspiKey, parseKaspiReadReply } from '~/utils/kaspiSnapshot'
 import { offerNarrow } from '~/utils/offerQueries'
 import { aiStubBase } from './aiProviders'
+import { pgrstTableNotFound } from './pgrstErrors'
 import { supplierOfferPhoto } from './supplierOffers'
 import { readFailure, visionModel } from './supplierVision'
 
@@ -54,8 +55,8 @@ function toSnapshot(r: Row): KaspiSnapshot {
   }
 }
 
-/** Таблицы ещё нет — миграция не применена */
-export const kaspiNotInstalled = (error: { code?: string } | null | undefined) => error?.code === '42P01' || error?.code === 'PGRST205'
+/** Таблицы ещё нет — миграция не применена. Запись на PostgREST 12 — пустая ошибка (pgrstErrors.ts) */
+export const kaspiNotInstalled = (error: { code?: string, message?: string } | null | undefined) => error?.code === '42P01' || error?.code === 'PGRST205' || pgrstTableNotFound(error)
 
 function dbError(error: { message: string }) {
   return createError({ statusCode: 500, message: error.message })

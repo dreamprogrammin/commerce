@@ -11,6 +11,7 @@ import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { guessesOf } from '~/utils/offerGuess'
 import { isPreviewPage, parsePreviewPosts } from '~/utils/telegramPreview'
+import { pgrstTableNotFound } from './pgrstErrors'
 import { loadVisionReader, offerItemsReader, readFailure, visionModel } from './supplierVision'
 import { meterNotInstalled } from './usageMeters'
 
@@ -91,9 +92,9 @@ function queriesOf(raw: unknown): string[][] | null {
   return raw.map(list => Array.isArray(list) ? list.filter((q): q is string => typeof q === 'string') : [])
 }
 
-/** Миграции 20261104160000 (или 20261105120000 — чтения ИИ) ещё нет: таблицы, функции или колонки */
-export function supplierOffersNotInstalled(error: { code?: string } | null | undefined): boolean {
-  return ['PGRST202', 'PGRST204', 'PGRST205', '42883', '42P01', '42703'].includes(error?.code ?? '')
+/** Миграции 20261104160000 (или 20261105120000 — чтения ИИ) ещё нет: таблицы, функции или колонки. Запись на PostgREST 12 — пустая ошибка (pgrstErrors.ts) */
+export function supplierOffersNotInstalled(error: { code?: string, message?: string } | null | undefined): boolean {
+  return ['PGRST202', 'PGRST204', 'PGRST205', '42883', '42P01', '42703'].includes(error?.code ?? '') || pgrstTableNotFound(error)
 }
 
 function dbError(error: { code?: string, message: string }) {

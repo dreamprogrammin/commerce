@@ -4,6 +4,7 @@ import type { UsageMeters } from '~/utils/usageBatteries'
 import { supabaseBattery, vercelGauge } from '~/utils/siteHealth'
 import { usageBatteries } from '~/utils/usageBatteries'
 import { vercelHints } from '~/utils/vercelUsage'
+import { pgrstTableNotFound } from './pgrstErrors'
 
 /**
  * «Состояние сайта» и платные сервисы (21 ноября 2026): проверки сторожа,
@@ -11,8 +12,8 @@ import { vercelHints } from '~/utils/vercelUsage'
  * 20261121120000_site_health; без неё installed: false, дашборд работает.
  */
 
-export function siteHealthNotInstalled(error: { code?: string } | null | undefined): boolean {
-  return ['PGRST202', 'PGRST205', '42P01', '42883'].includes(error?.code ?? '')
+export function siteHealthNotInstalled(error: { code?: string, message?: string } | null | undefined): boolean {
+  return ['PGRST202', 'PGRST205', '42P01', '42883'].includes(error?.code ?? '') || pgrstTableNotFound(error)
 }
 
 export function toPaidService(r: any): PaidService {
