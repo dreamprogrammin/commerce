@@ -310,11 +310,16 @@ try {
 
   const errors = []
   const failed = []
+  const chunkFails = []
   async function newPage(viewport) {
     const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2 })
     await ctx.addInitScript(() => localStorage.setItem('tg_modal_dismissed_at', String(Date.now())))
+    // Кусок кода не загрузился — Nuxt перезагрузит страницу по адресу перехода (reloadNuxtApp)
+    await ctx.addInitScript(() => addEventListener('vite:preloadError', e => console.warn(`[chunk] ${e.payload?.message ?? e.payload}`)))
     const page = await ctx.newPage()
     page.on('pageerror', e => errors.push(e.message))
+    page.on('console', m => m.text().startsWith('[chunk]') && chunkFails.push(m.text()))
+    page.on('requestfailed', r => r.url().includes('/_nuxt/') && chunkFails.push(`${r.failure()?.errorText} ${r.url().replace(BASE, '')}`))
     page.on('console', m => m.type() === 'error' && !m.text().startsWith('Failed to load resource') && !m.text().includes('[nuxt-gtag]') && errors.push(m.text()))
     page.on('response', (r) => {
       if (r.status() >= 400 && !/\/_payload\.json/.test(r.url()) && !(r.status() === 406 && r.url().includes('/rest/v1/server_carts')))
@@ -322,6 +327,9 @@ try {
     })
     await page.goto(`${BASE}/about`, { waitUntil: 'load', timeout: 120000 })
     await page.waitForFunction(() => document.querySelector('#__nuxt')?.__vue_app__, null, { timeout: 30000 })
+    // После входа магазин грузит профиль (SIGNED_IN). Уйти раньше — запрос оборвётся, и в консоли
+    // останется «Profile loading error: Failed to fetch» (23.11.2026 так покраснел прогон)
+    const profileDone = page.waitForEvent('requestfinished', { predicate: r => r.url().includes('/rest/v1/profiles'), timeout: 15000 }).catch(() => null)
     const loginError = await page.evaluate(async ({ email, password }) => {
       const nuxt = document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$nuxt
       const { error } = await nuxt.$supabase.client.auth.signInWithPassword({ email, password })
@@ -329,6 +337,7 @@ try {
     }, { email: emails.admin, password: PASSWORD })
     if (loginError)
       throw new Error(`вход: ${loginError}`)
+    await profileDone
     await openHub(page)
     return page
   }
@@ -806,13 +815,21 @@ INSERT INTO public.market_demand_candidates (keyword, search_volume, trend_pct) 
       }, to)
     }
     catch (e) {
-      // 23.11.2026 один прогон из нескольких перезагрузил страницу здесь, повторить не вышло — пусть краснеет с подробностями
-      check(false, `переход на ${to} — без перезагрузки страницы: ${e.message.split('\n')[0]}; загрузки: ${loads.join(', ')}; ошибки: ${errors.slice(-4).join(' | ').slice(0, 600)}; ответы: ${failed.slice(-4).join(' | ')}`)
+      // 23.11.2026 перезагрузка здесь случалась в трёх прогонах из четырёх — пусть краснеет с подробностями.
+      // Метку nuxt:reload оставляет reloadNuxtApp: так Nuxt перезагружает при сбое куска кода
       await mobile.waitForLoadState('load')
+      const mark = await mobile.evaluate(() => sessionStorage.getItem('nuxt:reload')).catch(() => null)
+      check(false, `переход на ${to} — без перезагрузки страницы: ${e.message.split('\n')[0]}; метка Nuxt: ${mark ?? 'нет'}; куски кода: ${chunkFails.slice(-6).join(' | ') || 'сбоев нет'}; загрузки: ${loads.join(', ')}; ошибки: ${errors.slice(-4).join(' | ').slice(0, 600)}; ответы: ${failed.slice(-4).join(' | ')}`)
     }
   }
+  // Переход закончен, когда новую страницу показал макет. После «назад» строка браузера меняется сразу,
+  // а роутер и макет догоняют позже: 23.11.2026 страж читал подпись раньше и краснел через раз
   const settle = async (path) => {
-    await mobile.waitForFunction(p => location.pathname + location.search === p, path, { timeout: 30000 })
+    await mobile.waitForFunction((p) => {
+      const app = document.querySelector('#__nuxt')?.__vue_app__?.config.globalProperties
+      return location.pathname + location.search === p && app?.$router.currentRoute.value.fullPath === p && app.$nuxt._route.fullPath === p
+    }, path, { timeout: 30000 })
+    await mobile.evaluate(() => new Promise(r => requestAnimationFrame(() => r())))
     await mobile.waitForLoadState('networkidle')
   }
   await mobile.goto(`${BASE}/admin/demand`, { waitUntil: 'load', timeout: 120000 })
@@ -831,8 +848,11 @@ INSERT INTO public.market_demand_candidates (keyword, search_volume, trend_pct) 
     return { scrolled: Math.round(window.scrollY), top: Math.round(r.top), height: Math.round(r.height), right: Math.round(r.right), hit: !!hit && el.contains(hit) }
   })
   check(pinned.scrolled > 2000 && pinned.hit && pinned.top >= 0 && pinned.top + pinned.height <= 56 && pinned.height >= 40, `внизу страницы кнопка на месте и не мелкая: прокрутка ${pinned.scrolled}, кнопка ${pinned.top}…${pinned.top + pinned.height} px, высота ${pinned.height}`)
-  if (SHOTS)
+  if (SHOTS) {
+    // Без кадра отрисовки снимок после прыжка на 3000 px выходит белым
+    await mobile.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 300)))))
     await mobile.screenshot({ path: `${SHOTS}/back-390-scrolled.png` })
+  }
   await mBack.click()
   await settle('/admin/purchasing')
   check((await mobile.evaluate(() => window.history.state?.back)) === '/admin/demand', 'по прямой ссылке назад некуда — кнопка открыла дашборд новым шагом (назад браузером — снова «Спрос на рынке»)')
