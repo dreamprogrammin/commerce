@@ -14,6 +14,7 @@ import type {
   ProductUpdate,
   ProductWithImages,
 } from '@/types'
+import type { AiProductFill } from '@/utils/aiWriter'
 import type { AgeUnit } from '@/utils/productAge'
 import type { ProductDraft } from '@/utils/supplierOfferList'
 import { debounce } from 'lodash-es'
@@ -64,6 +65,8 @@ const props = defineProps<{
   initialData?: FullProduct | null
   /** Новый товар из поста поставщика — что подставить в пустую форму */
   draft?: (ProductDraft & { photoUrl: string | null }) | null
+  /** «Тексты для сайта» — что написал ИИ; ложится в поля, которых не трогали */
+  aiFill?: AiProductFill | null
 }>()
 
 const emit = defineEmits<{
@@ -85,6 +88,8 @@ const emit = defineEmits<{
       attributeValues: AttributeValuePayload[]
     },
   ): void
+  /** Какие поля получили ответ ИИ — подписями для человека */
+  (e: 'aiFilled', fields: string[]): void
 }>()
 
 // --- 2. ИНИЦИАЛИЗАЦИЯ СТОРОВ И COMPOSABLES ---
@@ -343,6 +348,37 @@ watch(
     }
   },
   { immediate: true },
+)
+
+/*
+ * «Тексты для сайта» (23 ноября 2026): ответ ИИ ложится в поле, пока его не
+ * трогали — оно пустое, в нём прочитанное с фото или прошлый ответ ИИ.
+ * Поправленное человеком не затирается, в том числе при «Написать заново».
+ */
+type AiField = 'name' | 'description' | 'seo_description' | 'category_id' | 'brand_id'
+const aiApplied: Partial<Record<AiField, string>> = {}
+watch(
+  () => props.aiFill,
+  (fill) => {
+    if (!fill || props.initialData?.id)
+      return
+    const filled: string[] = []
+    const put = (field: AiField, label: string, value: string | null, alsoUntouched?: string | null) => {
+      const current = formData.value[field] ?? null
+      const untouched = !current?.trim() || current === alsoUntouched || current === aiApplied[field]
+      if (!value || !untouched)
+        return
+      formData.value[field] = value
+      aiApplied[field] = value
+      filled.push(label)
+    }
+    put('name', 'название', fill.name, props.draft?.name)
+    put('description', 'описание', fill.description)
+    put('seo_description', 'SEO-описание', fill.seoDescription)
+    put('category_id', 'раздел', fill.categoryId)
+    put('brand_id', 'бренд', fill.brandId)
+    emit('aiFilled', filled)
+  },
 )
 
 // --- 5. ВЫЧИСЛЯЕМЫЕ ЗНАЧЕНИЯ ---

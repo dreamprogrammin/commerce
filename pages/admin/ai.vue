@@ -27,6 +27,8 @@ interface TaskRow {
   hint: string
   model: string | null
   default: string
+  /** Каким провайдерам задача по силам; null — любым */
+  providers: ProviderRow['id'][] | null
   updatedAt: string | null
 }
 interface AiModel { id: string, label: string, vision: boolean | null }
@@ -87,6 +89,10 @@ async function deleteKey(p: ProviderRow) {
 
 // --- Модель на задачу ---
 const configured = computed(() => (data.value?.providers ?? []).filter(p => p.configured))
+/** Провайдеры с ключом, которым задача по силам («Тексты для сайта» — только Claude) */
+const providersFor = (t: TaskRow) => configured.value.filter(p => !t.providers || t.providers.includes(p.id))
+/** Чей ключ нужен задаче с одним провайдером — для подсказки, пока ключа нет */
+const neededKeys = (t: TaskRow) => (data.value?.providers ?? []).filter(p => t.providers?.includes(p.id)).map(p => p.label).join(', ')
 const choice = reactive<Record<string, { provider: string, model: string }>>({})
 const models = reactive<Record<string, AiModel[]>>({})
 const loadingModels = ref<string | null>(null)
@@ -112,8 +118,9 @@ async function loadModels(provider: string) {
 watch(data, (d) => {
   for (const t of d?.tasks ?? []) {
     const [provider = '', ...rest] = (t.model ?? t.default).split('/')
-    const usable = configured.value.some(p => p.id === provider)
-    choice[t.task] = usable ? { provider, model: rest.join('/') } : { provider: configured.value[0]?.id ?? '', model: '' }
+    const allowed = providersFor(t)
+    const usable = allowed.some(p => p.id === provider)
+    choice[t.task] = usable ? { provider, model: rest.join('/') } : { provider: allowed[0]?.id ?? '', model: '' }
     if (choice[t.task]!.provider)
       loadModels(choice[t.task]!.provider)
   }
@@ -231,7 +238,7 @@ const selectClass = 'h-10 w-full rounded-md border border-input bg-background px
           </CardContent>
         </Card>
 
-        <Card v-for="t in data.tasks" :key="t.task">
+        <Card v-for="t in data.tasks" :key="t.task" :data-testid="`ai-task-${t.task}`">
           <CardHeader>
             <CardTitle class="flex items-center gap-2">
               <Sparkles class="w-5 h-5" />
@@ -246,14 +253,14 @@ const selectClass = 'h-10 w-full rounded-md border border-input bg-background px
               <span v-if="t.updatedAt" class="text-muted-foreground"> · выбрана {{ date(t.updatedAt) }}</span>
             </p>
             <p v-if="keyMissing(t)" class="text-sm text-destructive">
-              Ключа для этой модели нет — задайте ключ выше или выберите модель другого провайдера.
+              Ключа для этой модели нет — {{ t.providers ? 'задайте его выше.' : 'задайте ключ выше или выберите модель другого провайдера.' }}
             </p>
-            <p v-if="!configured.length" class="text-sm text-muted-foreground">
-              Чтобы выбрать модель, сначала задайте хотя бы один ключ.
+            <p v-if="!providersFor(t).length" class="text-sm text-muted-foreground">
+              {{ t.providers ? `Чтобы выбрать модель, сначала задайте ключ ${neededKeys(t)}.` : 'Чтобы выбрать модель, сначала задайте хотя бы один ключ.' }}
             </p>
             <form v-else class="grid gap-2 sm:grid-cols-[12rem_1fr_auto]" @submit.prevent="saveModel(t)">
               <select v-model="choice[t.task]!.provider" :class="selectClass" aria-label="Провайдер" @change="onProviderChange(t.task)">
-                <option v-for="p in configured" :key="p.id" :value="p.id">
+                <option v-for="p in providersFor(t)" :key="p.id" :value="p.id">
                   {{ p.label }}
                 </option>
               </select>

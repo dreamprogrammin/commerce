@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
         updatedAt: key?.updated_at ?? null,
       }
     }),
-    tasks: (Object.keys(AI_TASKS) as (keyof typeof AI_TASKS)[]).map((task) => {
+    tasks: (Object.keys(AI_TASKS) as AiTaskKey[]).map((task) => {
       const row = settingRows.find(s => s.key === task)
       return {
         task,
@@ -37,6 +37,8 @@ export default defineEventHandler(async (event) => {
         hint: AI_TASKS[task].hint,
         model: typeof row?.value === 'string' ? row.value : null,
         default: AI_TASKS[task].default,
+        /** Каким провайдерам задача по силам; null — любым */
+        providers: AI_TASKS[task].providers,
         updatedAt: row?.updated_at ?? null,
       }
     }),

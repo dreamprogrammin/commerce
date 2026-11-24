@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import process from 'node:process'
 
 /*
@@ -28,14 +29,48 @@ export function isAiProvider(value: unknown): value is AiProvider {
   return typeof value === 'string' && Object.hasOwn(AI_PROVIDERS, value)
 }
 
+export type AiTaskKey = 'supplier_vision_model' | 'content_writer_model'
+
+export interface AiTask {
+  label: string
+  hint: string
+  default: string
+  /** Задача шлёт модели фото — модель должна понимать картинки */
+  vision: boolean
+  /** Каким провайдерам задача по силам; null — любым */
+  providers: readonly AiProvider[] | null
+}
+
 /** Задачи, под которые выбирается модель; ключ — строка в `ai_settings` */
-export const AI_TASKS = {
+export const AI_TASKS: Record<AiTaskKey, AiTask> = {
   supplier_vision_model: {
     label: 'Чтение постов поставщиков',
     hint: 'Читает артикул и цену с фото товара. Нужна модель, которая понимает картинки.',
     default: 'anthropic/claude-haiku-5-5',
+    vision: true,
+    providers: null,
   },
-} as const
+  /*
+   * «На сайт» в «Товарах поставщиков» (23 ноября 2026). Владелец: «чтобы были
+   * добавлено описание и подбираться разделы бренды а если бренд отсутствует
+   * ии должна найти ее и написать описание для сайта … добавить туда еще одну
+   * ии модель для описаний типа соннет 5.5». Только Claude: бренд ищется в
+   * интернете инструментом поиска Anthropic, у других провайдеров его здесь нет.
+   */
+  content_writer_model: {
+    label: 'Тексты для сайта',
+    hint: '«На сайт» в «Товарах поставщиков»: пишет название, описание и SEO-описание товара по фото и подписи, подбирает раздел и бренд, а бренда, которого на сайте нет, ищет в интернете и пишет его страницу. Только Claude — поиск в интернете здесь есть только у него.',
+    default: 'anthropic/claude-sonnet-5-5',
+    vision: true,
+    providers: ['anthropic'],
+  },
+}
+
+/** Модель задачи со страницы «Модели ИИ»; не выбрана — по умолчанию */
+export async function aiTaskModel(db: SupabaseClient, task: AiTaskKey): Promise<string> {
+  const { data } = await db.from('ai_settings').select('value').eq('key', task).maybeSingle()
+  return typeof data?.value === 'string' ? data.value : AI_TASKS[task].default
+}
 
 export interface AiModel {
   id: string
