@@ -107,21 +107,40 @@ export function aiUsageLines(model: string, u: AiRequestUsage): { spent: string,
   }
 }
 
-/** Сколько ушло на описания и на сколько описаний хватит остатка бюджета — по цене этого описания */
-export function aiBudgetLines(model: string, b: WriterBudget, u: AiRequestUsage): { writer: string, left: string } {
+/**
+ * Сколько ушло на описания и на сколько описаний хватит остатка бюджета — по цене такого же описания.
+ * Начало запроса (правила, разделы и бренды сайта) ИИ держит в кеше 5 минут: после перерыва оно
+ * пишется заново по 1,25 цены входа, подряд — читается по 0,05, и описание дешевле почти вдвое.
+ * Посчитай число по цене именно этого описания — оно прыгало бы вдвое от раза к разу. Поэтому
+ * число — по цене после перерыва, а сколько выйдет подряд и обе цены — отдельно (`cache`).
+ */
+export function aiBudgetLines(model: string, b: WriterBudget, u: AiRequestUsage): { writer: string, left: string, cache: string | null } {
   const period = b.budgetUsd == null ? 'за 30 дней' : `с ${dayMonth(b.since)}`
   const tokens = count(b.writer.input + b.writer.output, 'токен', 'токена', 'токенов')
   const writer = `Описания (${modelLabel(model)}) ${period}: ${tokens}`
   if (b.budgetUsd == null)
-    return { writer, left: 'Бюджет ИИ не задан — задайте сумму на счёте Anthropic в «Умном закупе», карточка «Бюджет ИИ»: здесь будет видно, на сколько описаний хватит' }
+    return { writer, left: 'Бюджет ИИ не задан — задайте сумму на счёте Anthropic в «Умном закупе», карточка «Бюджет ИИ»: здесь будет видно, на сколько описаний хватит', cache: null }
   if (b.spentUsd == null)
-    return { writer, left: 'Остаток бюджета не посчитать: цены одной из моделей нет в таблице' }
+    return { writer, left: 'Остаток бюджета не посчитать: цены одной из моделей нет в таблице', cache: null }
   const rest = b.budgetUsd - b.spentUsd
   if (rest <= 0)
-    return { writer, left: `Бюджет ИИ по журналу исчерпан (${formatAiUsd(b.spentUsd)} из ${formatAiUsd(b.budgetUsd)}) — пополните счёт Anthropic и задайте сумму заново в «Умном закупе»` }
+    return { writer, left: `Бюджет ИИ по журналу исчерпан (${formatAiUsd(b.spentUsd)} из ${formatAiUsd(b.budgetUsd)}) — пополните счёт Anthropic и задайте сумму заново в «Умном закупе»`, cache: null }
   const of = `${formatAiUsd(rest)} из ${formatAiUsd(b.budgetUsd)}`
-  const per = aiRequestUsd(model, u)
-  const n = per ? Math.floor(rest / per) : null
-  const enough = n == null ? '' : n ? ` — примерно на ${count(n, 'такое описание', 'таких описания', 'таких описаний')}` : ' — меньше, чем на одно такое описание'
-  return { writer, left: `Бюджет ИИ: осталось ≈ ${u.rate ? `${formatAiKzt(rest * u.rate.kzt)} (${of})` : of}${enough}` }
+  const left = `Бюджет ИИ: осталось ≈ ${u.rate ? `${formatAiKzt(rest * u.rate.kzt)} (${of})` : of}`
+  const cached = u.cacheWrite + u.cacheRead
+  const afterPause = aiRequestUsd(model, { ...u, cacheWrite: cached, cacheRead: 0 })
+  const inRow = aiRequestUsd(model, { ...u, cacheWrite: 0, cacheRead: cached })
+  if (!afterPause || !inRow)
+    return { writer, left, cache: null }
+  const n = Math.floor(rest / afterPause)
+  const enough = n ? `примерно на ${count(n, 'такое описание', 'таких описания', 'таких описаний')}` : 'меньше, чем на одно такое описание'
+  const m = Math.floor(rest / inRow)
+  if (m <= n)
+    return { writer, left: `${left} — ${enough}`, cache: null }
+  const money = (usd: number) => u.rate ? formatAiKzt(usd * u.rate.kzt) : formatAiUsd(usd)
+  return {
+    writer,
+    left: `${left} — ${enough}, подряд — на ${m.toLocaleString('ru-RU')}`,
+    cache: `Описание после перерыва больше 5 минут ≈ ${money(afterPause)}, а подряд ≈ ${money(inRow)} — ИИ ещё помнит правила, разделы и бренды сайта`,
+  }
 }

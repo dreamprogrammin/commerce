@@ -1362,12 +1362,16 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   check(ai.writerRetrieved <= 1, `справка о модели текстов — не больше одной на сервер: ${ai.writerRetrieved}`)
   const lines13 = await usageLines(page)
   check(ai.rates <= 1 && lines13[0] === SPENT_LINE && lines13.at(-1) === RATE_LINE, `курс — не больше одного запроса за день на сервер (${ai.rates}), расход второго описания — той же строкой`)
-  // Ждём: $1 минус весь журнал с сегодняшнего дня по ценам Haiku 5.5 и Sonnet 5.5; описаний — по $0,01805, цене этого
+  // Ждём: $1 минус весь журнал с сегодняшнего дня по ценам Haiku 5.5 и Sonnet 5.5. Описаний — по цене после перерыва:
+  // 4 500 токенов начала запроса пишутся в кеш заново — $0,01925; подряд они читаются из кеша — $0,00845
+  const AFTER_PAUSE = 0.01925
+  const IN_ROW = 0.00845
+  const CACHE_LINE = 'Описание после перерыва больше 5 минут ≈ 8,7 ₸, а подряд ≈ 3,8 ₸ — ИИ ещё помнит правила, разделы и бренды сайта'
   const PRICES = { 'anthropic/claude-haiku-5-5': [0.1, 0.5], 'anthropic/claude-sonnet-5-5': [2, 10] }
   const journal = JSON.parse(psql(`SELECT coalesce(json_agg(json_build_object('m', model, 'i', input_tokens, 'o', output_tokens)), '[]') FROM public.ai_usage_daily WHERE day >= '${almatyToday}';`))
   const rest = 1 - journal.reduce((sum, r) => sum + (r.i * (PRICES[r.m]?.[0] ?? Number.NaN) + r.o * (PRICES[r.m]?.[1] ?? Number.NaN)) / 1e6, 0)
-  const left13 = /^Бюджет ИИ: осталось ≈ ([\d ]+) ₸ \(\$0,(\d{3}) из \$1,00\) — примерно на (\d+) (?:такое описание|таких описани[йя])$/.exec(lines13[2] ?? '')
-  check(lines13.length === 4 && writerLineOk(lines13[1], `с ${todayWords}`) && left13 && Math.abs(Number(left13[1].replace(/ /g, '')) - rest * 450) <= 0.6 && Math.abs(Number(`0.${left13[2]}`) - rest) < 0.0006 && Number(left13[3]) === Math.floor(rest / 0.01805), `бюджет $1 — на описания с сегодняшнего дня, осталось ≈ $${rest.toFixed(3)} по журналу (${journal.map(r => r.m.split('/')[1]).join(', ')}), на ${Math.floor(rest / 0.01805)} таких описаний: ${JSON.stringify(lines13.slice(1, 3))}`)
+  const left13 = /^Бюджет ИИ: осталось ≈ ([\d ]+) ₸ \(\$0,(\d{3}) из \$1,00\) — примерно на (\d+) (?:такое описание|таких описани[йя]), подряд — на ([\d ]+)$/.exec(lines13[2] ?? '')
+  check(lines13.length === 5 && writerLineOk(lines13[1], `с ${todayWords}`) && left13 && Math.abs(Number(left13[1].replace(/ /g, '')) - rest * 450) <= 0.6 && Math.abs(Number(`0.${left13[2]}`) - rest) < 0.0006 && Number(left13[3]) === Math.floor(rest / AFTER_PAUSE) && Number(left13[4].replace(/ /g, '')) === Math.floor(rest / IN_ROW) && lines13[3] === CACHE_LINE, `бюджет $1 — на описания с сегодняшнего дня, осталось ≈ $${rest.toFixed(3)} по журналу (${journal.map(r => r.m.split('/')[1]).join(', ')}): ${Math.floor(rest / AFTER_PAUSE)} описаний после перерыва, ${Math.floor(rest / IN_ROW)} подряд и строка цен: ${JSON.stringify(lines13.slice(1, 4))}`)
   psql(`DELETE FROM public.ai_settings WHERE key = 'ai_budget';`)
 
   console.log('\n== бренда на сайте нет — заполняется вручную')

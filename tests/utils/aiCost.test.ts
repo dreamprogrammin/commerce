@@ -69,35 +69,51 @@ describe('строки карточки', () => {
 })
 
 describe('бюджет в карточке', () => {
-  // Запрос стража: $0,01805 по ценам Sonnet 5.5
+  // Запрос стража: 4 500 токенов начала запроса в кеше. После перерыва — $0,01925, подряд — $0,00845
   const usage = { input: 1000, cacheWrite: 4000, cacheRead: 500, output: 600, rate: { kzt: 450, date: '23.11.2026' } }
   const prod = { budgetUsd: 3.34, since: '2026-11-05', spentUsd: 0.714, writer: { input: 115260, output: 6299 } }
+  const WRITER = `Описания (Claude Sonnet 5.5) с 5 ноября: 121${NBSP}559 токенов`
 
-  it('токены описаний с начала бюджета — без денег; остаток — в тенге и на сколько таких описаний хватит', () => {
+  it('токены описаний с начала бюджета — без денег; остаток в тенге; число описаний — по цене после перерыва, подряд — отдельно', () => {
     expect(aiBudgetLines(SONNET, prod, usage)).toEqual({
-      writer: `Описания (Claude Sonnet 5.5) с 5 ноября: 121${NBSP}559 токенов`,
-      left: `Бюджет ИИ: осталось ≈ 1${NBSP}182${NBSP}₸ ($2,63 из $3,34) — примерно на 145 таких описаний`,
+      writer: WRITER,
+      left: `Бюджет ИИ: осталось ≈ 1${NBSP}182${NBSP}₸ ($2,63 из $3,34) — примерно на 136 таких описаний, подряд — на 310`,
+      cache: `Описание после перерыва больше 5 минут ≈ 8,7${NBSP}₸, а подряд ≈ 3,8${NBSP}₸ — ИИ ещё помнит правила, разделы и бренды сайта`,
     })
   })
 
-  it('без курса — остаток в долларах', () => {
+  it('число не прыгает: у этого описания кеш записан или прочитан — строки те же', () => {
+    const lines = aiBudgetLines(SONNET, prod, usage)
+    expect(aiBudgetLines(SONNET, prod, { ...usage, cacheWrite: 4500, cacheRead: 0 })).toEqual(lines)
+    expect(aiBudgetLines(SONNET, prod, { ...usage, cacheWrite: 0, cacheRead: 4500 })).toEqual(lines)
+  })
+
+  it('без курса — в долларах', () => {
     expect(aiBudgetLines(SONNET, prod, { ...usage, rate: null })).toEqual({
-      writer: `Описания (Claude Sonnet 5.5) с 5 ноября: 121${NBSP}559 токенов`,
-      left: 'Бюджет ИИ: осталось ≈ $2,63 из $3,34 — примерно на 145 таких описаний',
+      writer: WRITER,
+      left: 'Бюджет ИИ: осталось ≈ $2,63 из $3,34 — примерно на 136 таких описаний, подряд — на 310',
+      cache: 'Описание после перерыва больше 5 минут ≈ $0,019, а подряд ≈ $0,008 — ИИ ещё помнит правила, разделы и бренды сайта',
     })
   })
 
-  it('описание по числу: одно, два, много', () => {
-    const left = (spentUsd: number) => aiBudgetLines(SONNET, { ...prod, budgetUsd: 0.05, spentUsd }, usage).left
-    expect(left(0.03)).toMatch(/— примерно на 1 такое описание$/)
-    expect(left(0.01)).toMatch(/— примерно на 2 таких описания$/)
-    expect(left(0.049)).toMatch(/— меньше, чем на одно такое описание$/)
+  it('без кеша — одно число и без строки про «подряд»; описание по числу: одно, два, много', () => {
+    // $0,008 за описание
+    const lines = (spentUsd: number) => aiBudgetLines(SONNET, { ...prod, budgetUsd: 0.05, spentUsd }, { ...usage, cacheWrite: 0, cacheRead: 0 })
+    expect(lines(0.04)).toEqual({ writer: WRITER, left: `Бюджет ИИ: осталось ≈ 4,5${NBSP}₸ ($0,010 из $0,050) — примерно на 1 такое описание`, cache: null })
+    expect(lines(0.03).left).toMatch(/— примерно на 2 таких описания$/)
+    expect(lines(0).left).toMatch(/— примерно на 6 таких описаний$/)
+    expect(lines(0.045).left).toMatch(/— меньше, чем на одно такое описание$/)
+  })
+
+  it('после перерыва не хватит и на одно — так и сказано; подряд — сколько выйдет', () => {
+    expect(aiBudgetLines(SONNET, { ...prod, budgetUsd: 0.05, spentUsd: 0.035 }, usage).left).toMatch(/— меньше, чем на одно такое описание, подряд — на 1$/)
   })
 
   it('бюджет не задан — за 30 дней и подсказка, где задать', () => {
     const lines = aiBudgetLines(SONNET, { ...prod, budgetUsd: null, since: '2026-10-26' }, usage)
     expect(lines.writer).toBe(`Описания (Claude Sonnet 5.5) за 30 дней: 121${NBSP}559 токенов`)
     expect(lines.left).toBe('Бюджет ИИ не задан — задайте сумму на счёте Anthropic в «Умном закупе», карточка «Бюджет ИИ»: здесь будет видно, на сколько описаний хватит')
+    expect(lines.cache).toBeNull()
   })
 
   it('бюджет исчерпан; цены модели нет — так и сказано', () => {
