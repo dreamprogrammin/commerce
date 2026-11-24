@@ -76,8 +76,9 @@ const brandAi = ref<BrandState | null>(null)
 const aiFill = ref<AiProductFill | null>(null)
 
 async function writeTexts() {
-  // Товар не прочитан — писать не из чего; карточка «Из поста» об этом уже говорит
-  if (!offerId || !draft.value?.name || writer.value?.state === 'writing')
+  // Товар не прочитан — писать не из чего; карточка «Из поста» об этом уже говорит.
+  // Пока ищется бренд — тоже нет: второй поиск платный, а первый лёг бы поверх нового ответа
+  if (!offerId || !draft.value?.name || writer.value?.state === 'writing' || brandAi.value?.state === 'searching')
     return
   writer.value = { state: 'writing' }
   // «Написать заново» — бренд не ищем второй раз: поиск в интернете платный
@@ -525,6 +526,7 @@ async function createFromForm(payload: {
             type="button"
             variant="outline"
             size="sm"
+            :disabled="brandAi?.state === 'searching'"
             data-testid="ai-writer-retry"
             @click="writeTexts"
           >
