@@ -1909,7 +1909,8 @@ const seoKeywordsString = computed({
             </Popover>
 
             <Dialog v-model:open="isBrandDialogOpen">
-              <DialogContent class="sm:max-w-[625px]">
+              <!-- Форма бренда выше экрана: без прокрутки «Сохранить бренд» уходила за край (24.11.2026) -->
+              <DialogContent class="max-h-[90dvh] overflow-y-auto sm:max-w-[625px]">
                 <DialogHeader>
                   <DialogTitle>Создать новый бренд</DialogTitle>
                 </DialogHeader>
@@ -2003,7 +2004,7 @@ const seoKeywordsString = computed({
             </Popover>
 
             <Dialog v-model:open="isProductLineDialogOpen">
-              <DialogContent class="sm:max-w-[525px]">
+              <DialogContent class="max-h-[90dvh] overflow-y-auto sm:max-w-[525px]">
                 <DialogHeader>
                   <DialogTitle>Создать новую линейку</DialogTitle>
                   <DialogDescription>
