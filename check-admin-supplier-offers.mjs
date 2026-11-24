@@ -63,7 +63,10 @@
  *     создаётся вместе с товаром; не бренд — не создаётся; пока бренд ищется,
  *     «Написать заново» закрыта; отказ модели — «Повторить»; «Написать
  *     заново» бренд второй раз не ищет; расход — в журнал своей строкой, вход
- *     вместе с кешем, и бюджет считает его тоже.
+ *     вместе с кешем, и бюджет считает его тоже;
+ * 16) форма товара (24.11.2026): выбранный бренд не сужает список брендов;
+ *     «➕ Создать новый бренд» и «…новую линейку» — окно с набранным в
+ *     поиске названием и слагом по нему.
  *
  * Данные заводит сам — администратор, покупатель, два поставщика с каналами,
  * вход подделки Telegram, ключ ИИ для заглушки, раздел и бренд для «Текстов
@@ -128,6 +131,9 @@ const NEW_BRAND = 'Probetoys'
 const FOUND_BRAND = 'ProbeToys Kids'
 // «Бренд» PO-1024 — поиск не подтверждает, что это бренд
 const NOT_BRAND = 'Фабрика Пробная'
+// Набирается в поиске бренда и линейки формы товара — окна «Создать…» закрываются без сохранения
+const TYPED_BRAND = 'Probe Typed Brand'
+const TYPED_LINE = 'Probe Typed Line'
 // SEO-описание PO-1014, которое человек пишет сам, пока ИИ отвечает
 const OWN_SEO = 'Своё SEO-описание — написано руками, пока ИИ отвечал'
 
@@ -562,7 +568,7 @@ async function removeProbeProducts() {
 async function cleanup() {
   await removeProbeProducts()
   // Раздел и бренды «Текстов для сайта» — после товаров: товары держат бренд
-  psql(`DELETE FROM public.brands WHERE name IN (:'b1', :'b2'); DELETE FROM public.categories WHERE slug LIKE 'probe-ai-texts-%';`, { b1: PROBE_BRAND, b2: FOUND_BRAND })
+  psql(`DELETE FROM public.product_lines WHERE name = :'l'; DELETE FROM public.brands WHERE name IN (:'b1', :'b2', :'b3'); DELETE FROM public.categories WHERE slug LIKE 'probe-ai-texts-%';`, { b1: PROBE_BRAND, b2: FOUND_BRAND, b3: TYPED_BRAND, l: TYPED_LINE })
   psql(`DELETE FROM public.market_demand_topics WHERE name LIKE 'Проверка спроса%'; DELETE FROM public.market_demand_keywords WHERE keyword IN ('проверка спроса po-1016', 'проверка спроса po-1013', 'проверка спроса po-1014');`)
   const ids = psql(`SELECT coalesce(string_agg(c.id::text, ','), '') FROM public.supplier_channels c JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
   for (const id of new Set([...channelIds, ...ids.split(',').filter(Boolean), ORPHAN]))
@@ -1423,6 +1429,41 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
     await sleep(100)
   const rewrote = await appeared(f24.locator('[data-testid=ai-writer-filled]'))
   check(rewrote && ai.writes.length === writesBefore + 1 && ai.searches.length === searchesBefore && (await textOf(f24.locator('[data-testid=ai-brand]'))).includes('поиск не подтвердил'), `«Написать заново» — тексты заново, бренд второй раз не ищем — поиск платный: запросов текстов +${ai.writes.length - writesBefore}, поиска +${ai.searches.length - searchesBefore}`)
+
+  // Форма товара (24.11.2026): выбор и поиск бренда и линейки. Было: Command держал выбранный пункт в той же
+  // ref, что и поиск, — после выбора список сужался до одного бренда, окно «Создать…» получало прошлый
+  // выбор вместо набранного, а слаг в окне оставался пустым («Сохранить» — «обязательные поля»)
+  console.log('\n== форма товара: выбор и создание бренда и линейки')
+  await f24.locator('button[role=combobox]').filter({ hasText: 'Выберите бренд' }).click()
+  const brandOptions = f24.locator('[role=option]')
+  await appeared(brandOptions.first(), 10000)
+  const optionsBefore = await brandOptions.count()
+  await brandOptions.filter({ hasText: PROBE_BRAND }).first().click()
+  await sleep(300)
+  const optionsAfter = await brandOptions.count()
+  check(optionsBefore >= 3 && optionsAfter === optionsBefore && await f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }).count() === 1, `выбранный бренд — в поле, список брендов не сужается до него: пунктов ${optionsBefore} → ${optionsAfter}`)
+  const typedIn = async (trigger, placeholder, value, create, nameId, slugId) => {
+    if (!await f24.getByPlaceholder(placeholder).count())
+      await trigger.click()
+    await f24.getByPlaceholder(placeholder).fill(value)
+    // Не нажалось — проверка ниже скажет «null», а не оборвёт страж
+    await f24.getByText(create).first().click({ timeout: 10000 }).catch(() => {})
+    const dialog = f24.getByRole('dialog')
+    const shown = await appeared(dialog.locator(slugId), 10000)
+      ? { name: await dialog.locator(nameId).inputValue(), slug: await dialog.locator(slugId).inputValue() }
+      : null
+    for (let i = 0; i < 3 && await f24.locator('[role=dialog], [role=listbox]').count(); i++)
+      await f24.keyboard.press('Escape')
+    // Окно и список уходят с анимацией и потом возвращают фокус своей кнопке: список, открытый раньше, тут же закрылся бы
+    await f24.locator('[role=dialog], [role=listbox]').first().waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+    await sleep(500)
+    return shown
+  }
+  const newBrandForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }), 'Поиск или создание бренда...', TYPED_BRAND, '➕ Создать новый бренд', '#brand-name', '#brand-slug')
+  check(newBrandForm?.name === TYPED_BRAND && newBrandForm.slug === 'probe-typed-brand', `«➕ Создать новый бренд» — набранное название и слаг по нему: ${JSON.stringify(newBrandForm)}`)
+  const newLineForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: 'Выберите линейку' }), 'Поиск или создание линейки...', TYPED_LINE, '➕ Создать новую линейку', '#line-name', '#line-slug')
+  check(newLineForm?.name === TYPED_LINE && newLineForm.slug === 'probe-typed-line', `«➕ Создать новую линейку» — набранное название и слаг по нему: ${JSON.stringify(newLineForm)}`)
+  check(psql(`SELECT (SELECT count(*) FROM public.brands WHERE name = :'b') + (SELECT count(*) FROM public.product_lines WHERE name = :'l');`, { b: TYPED_BRAND, l: TYPED_LINE }) === '0', 'окна закрыты без сохранения — ни бренда, ни линейки не создано')
   await f24.context().close()
   // Отказ модели выше — ожидаемый ответ, а не сбой страницы
   failedResponses.splice(0, failedResponses.length, ...failedResponses.filter(r => r !== '502 /api/admin/content-writer/product'))

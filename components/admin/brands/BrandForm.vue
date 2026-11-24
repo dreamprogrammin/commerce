@@ -28,9 +28,11 @@ const supabase = useSupabaseClient<Database>()
 // Парсим page_layout из initialData
 const initialLayout = (props.initialData as any)?.page_layout as BrandPageLayout | null
 
+const startName = props.initialName || props.initialData?.name || ''
 const formData = ref<Partial<BrandInsert | BrandUpdate>>({
-  name: props.initialName || props.initialData?.name || '',
-  slug: props.initialData?.slug || '',
+  name: startName,
+  // Название из формы товара — и слаг по нему сразу: наблюдатель ниже ловит только правку названия
+  slug: props.initialData?.slug || slugify(startName),
   description: props.initialData?.description || null,
   logo_url: props.initialData?.logo_url || null,
   is_custom_page: (props.initialData as any)?.is_custom_page || false,
