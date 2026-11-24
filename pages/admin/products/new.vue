@@ -369,6 +369,7 @@ async function createFromForm(payload: {
               <template v-if="writerBudgetLines">
                 <span class="block">{{ writerBudgetLines.writer }}</span>
                 <span class="block font-medium text-foreground" data-testid="ai-writer-budget">{{ writerBudgetLines.left }}</span>
+                <span v-if="writerBudgetLines.cache" class="block text-xs">{{ writerBudgetLines.cache }}</span>
               </template>
               <span v-if="writerUsage.rate" class="block text-xs">{{ writerUsage.rate }}</span>
             </p>
