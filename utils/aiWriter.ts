@@ -1,3 +1,5 @@
+import type { AiRequestUsage } from './aiCost'
+
 /**
  * «Тексты для сайта» (23 ноября 2026) — что отвечает сервер
  * (server/utils/contentWriter.ts) форме нового товара
@@ -28,6 +30,8 @@ export interface WrittenOfferProduct extends WrittenProduct {
   model: string
   /** Фото поста ушло модели */
   photo: boolean
+  /** Токены и курс — строка «Расход» в карточке (24.11.2026); нет — ответ сервера старой сборки */
+  usage?: AiRequestUsage
 }
 
 /** Что подставить в форму товара: поле получает значение, пока его не трогали */

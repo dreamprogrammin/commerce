@@ -7,6 +7,7 @@ import { toast } from 'vue-sonner'
 import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 import { adminFetch } from '@/utils/adminFetch'
+import { aiUsageLines } from '@/utils/aiCost'
 import { modelLabel, productDraft } from '@/utils/supplierOfferList'
 
 definePageMeta({ layout: 'admin' })
@@ -68,6 +69,10 @@ const aiFill = ref<AiProductFill | null>(null)
 const productForm = ref<InstanceType<typeof ProductForm> | null>(null)
 /** Бренд, созданный в окне формы, — карточка говорит, что он выбран */
 const createdBrand = ref<{ id: string, name: string } | null>(null)
+/** «Расход: … токенов ≈ … ₸» под ответом ИИ (24.11.2026); ответ старой сборки без usage — строки нет */
+const writerUsage = computed(() => writer.value?.state === 'done' && writer.value.result.usage
+  ? aiUsageLines(writer.value.result.model, writer.value.result.usage)
+  : null)
 
 async function writeTexts() {
   // Товар не прочитан — писать не из чего; карточка «Из поста» об этом уже говорит
@@ -355,6 +360,10 @@ async function createFromForm(payload: {
                 {{ w }}
               </li>
             </ul>
+            <p v-if="writerUsage" class="text-muted-foreground" data-testid="ai-writer-usage">
+              <span class="block">{{ writerUsage.spent }}</span>
+              <span v-if="writerUsage.rate" class="block text-xs">{{ writerUsage.rate }}</span>
+            </p>
           </template>
 
           <div v-if="writer.state === 'done' && writer.result.newBrand" class="space-y-2 rounded-md border p-3" data-testid="ai-brand">
