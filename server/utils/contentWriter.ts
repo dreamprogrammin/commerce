@@ -384,12 +384,14 @@ export async function writeOfferProduct(db: SupabaseClient, offerId: string, ite
   }
   if (!photo)
     written.warnings.unshift('Фото поста не скачалось — текст написан только по подписи и прочитанному')
+  // Бюджет — после записи расхода: этот запрос уже в журнале (server/utils/usageMeters.ts)
+  const [usdKzt, budget] = await Promise.all([rate, writerBudget(db, claude.spec)])
   const usage = {
     input: reply.usage.input_tokens,
     cacheWrite: reply.usage.cache_creation_input_tokens ?? 0,
     cacheRead: reply.usage.cache_read_input_tokens ?? 0,
     output: reply.usage.output_tokens,
-    rate: await rate,
+    rate: usdKzt,
   }
-  return { ...written, model: claude.spec, photo: Boolean(photo), usage }
+  return { ...written, model: claude.spec, photo: Boolean(photo), usage, budget }
 }

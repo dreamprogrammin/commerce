@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aiRequestUsd, aiUsageLines, formatAiKzt, formatAiUsd } from '~/utils/aiCost'
+import { aiBudgetLines, aiRequestUsd, aiUsageLines, formatAiKzt, formatAiUsd } from '~/utils/aiCost'
 
 /*
  * Строка «Расход» в карточке «Тексты от ИИ» (24 ноября 2026): токены
@@ -65,5 +65,43 @@ describe('строки карточки', () => {
   it('курса нет — только доллары; цены модели нет — только токены', () => {
     expect(aiUsageLines(SONNET, { ...million, input: 21, rate: null })).toEqual({ spent: 'Расход: 21 токен (запрос 21, ответ 0) ≈ $0,000', rate: null })
     expect(aiUsageLines('openai/gpt-5', { ...million, input: 2, rate })).toEqual({ spent: 'Расход: 2 токена (запрос 2, ответ 0) — цены этой модели в таблице нет', rate: null })
+  })
+})
+
+describe('бюджет в карточке', () => {
+  // Запрос стража: $0,01805 по ценам Sonnet 5.5
+  const usage = { input: 1000, cacheWrite: 4000, cacheRead: 500, output: 600, rate: { kzt: 450, date: '23.11.2026' } }
+  const prod = { budgetUsd: 3.34, since: '2026-11-05', spentUsd: 0.714, writer: { input: 115260, output: 6299 } }
+
+  it('токены описаний с начала бюджета — без денег; остаток — в тенге и на сколько таких описаний хватит', () => {
+    expect(aiBudgetLines(SONNET, prod, usage)).toEqual({
+      writer: `Описания (Claude Sonnet 5.5) с 5 ноября: 121${NBSP}559 токенов`,
+      left: `Бюджет ИИ: осталось ≈ 1${NBSP}182${NBSP}₸ ($2,63 из $3,34) — примерно на 145 таких описаний`,
+    })
+  })
+
+  it('без курса — остаток в долларах', () => {
+    expect(aiBudgetLines(SONNET, prod, { ...usage, rate: null })).toEqual({
+      writer: `Описания (Claude Sonnet 5.5) с 5 ноября: 121${NBSP}559 токенов`,
+      left: 'Бюджет ИИ: осталось ≈ $2,63 из $3,34 — примерно на 145 таких описаний',
+    })
+  })
+
+  it('описание по числу: одно, два, много', () => {
+    const left = (spentUsd: number) => aiBudgetLines(SONNET, { ...prod, budgetUsd: 0.05, spentUsd }, usage).left
+    expect(left(0.03)).toMatch(/— примерно на 1 такое описание$/)
+    expect(left(0.01)).toMatch(/— примерно на 2 таких описания$/)
+    expect(left(0.049)).toMatch(/— меньше, чем на одно такое описание$/)
+  })
+
+  it('бюджет не задан — за 30 дней и подсказка, где задать', () => {
+    const lines = aiBudgetLines(SONNET, { ...prod, budgetUsd: null, since: '2026-10-26' }, usage)
+    expect(lines.writer).toBe(`Описания (Claude Sonnet 5.5) за 30 дней: 121${NBSP}559 токенов`)
+    expect(lines.left).toBe('Бюджет ИИ не задан — задайте сумму на счёте Anthropic в «Умном закупе», карточка «Бюджет ИИ»: здесь будет видно, на сколько описаний хватит')
+  })
+
+  it('бюджет исчерпан; цены модели нет — так и сказано', () => {
+    expect(aiBudgetLines(SONNET, { ...prod, spentUsd: 3.4 }, usage).left).toBe('Бюджет ИИ по журналу исчерпан ($3,40 из $3,34) — пополните счёт Anthropic и задайте сумму заново в «Умном закупе»')
+    expect(aiBudgetLines(SONNET, { ...prod, spentUsd: null }, usage).left).toBe('Остаток бюджета не посчитать: цены одной из моделей нет в таблице')
   })
 })
