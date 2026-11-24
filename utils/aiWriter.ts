@@ -17,7 +17,7 @@ export interface WrittenProduct {
   seoDescription: string
   category: WriterCategory | null
   brand: { id: string, name: string } | null
-  /** Бренд с товара, которого на сайте нет, — его ищет «бренд в интернете» */
+  /** Бренд с товара, которого на сайте нет: ИИ его не ищет — человек создаёт его в окне формы (24.11.2026) */
   newBrand: string | null
   /** Что поправить руками: длины, вырезанная разметка, вода */
   warnings: string[]
@@ -29,32 +29,6 @@ export interface WrittenOfferProduct extends WrittenProduct {
   /** Фото поста ушло модели */
   photo: boolean
 }
-
-/** Страница бренда — поля как в таблице brands */
-export interface BrandPage {
-  name: string
-  slug: string
-  meta_title: string
-  seo_h1: string
-  seo_description: string
-  seo_keywords: string[]
-  description: string
-}
-
-export type BrandResearch
-  = | { found: false, name: string, reason: string, searches: number, model: string }
-    | {
-      found: true
-      /** Бренд нашёлся на сайте под другим написанием — его и выбрать */
-      existing: { id: string, name: string } | null
-      page: BrandPage | null
-      /** Что нашёл поиск — человеку для проверки */
-      facts: string
-      sources: { url: string, title: string }[]
-      warnings: string[]
-      searches: number
-      model: string
-    }
 
 /** Что подставить в форму товара: поле получает значение, пока его не трогали */
 export interface AiProductFill {

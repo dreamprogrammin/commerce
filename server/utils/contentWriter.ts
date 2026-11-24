@@ -1,11 +1,10 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { BrandPage, BrandResearch, WriterCategory, WrittenOfferProduct, WrittenProduct } from '~/utils/aiWriter'
+import type { WriterCategory, WrittenOfferProduct, WrittenProduct } from '~/utils/aiWriter'
 import type { OfferItem } from '~/utils/supplierOfferList'
 import { Buffer } from 'node:buffer'
 import { adminPromptTask, PROMPT_SHOP_RULES } from '~/constants/adminPrompts'
-import { slugify } from '~/utils/slugify'
-import { checkLengths, sanitizeBrandHtml } from '../../supabase/functions/generate-brand-seo/validate'
+import { sanitizeBrandHtml } from '../../supabase/functions/generate-brand-seo/validate'
 
 /**
  * «Тексты для сайта» (23 ноября 2026). Владелец: «чтобы кнопка на сайт
@@ -16,9 +15,12 @@ import { checkLengths, sanitizeBrandHtml } from '../../supabase/functions/genera
  * задачи «Тексты для сайта» со страницы «Модели ИИ» (по умолчанию Claude
  * Sonnet 5.5) пишет по фото и подписи поста название, описание и
  * SEO-описание, выбирает раздел и бренд из тех, что есть на сайте. Бренда на
- * сайте нет — researchBrand ищет его в интернете (инструмент поиска
- * Anthropic) и пишет страницу бренда; создаётся бренд вместе с товаром, по
- * «Создать товар».
+ * сайте нет — модель только называет его (new_brand), а создаёт бренд
+ * человек, в окне формы товара. Поиск бренда в интернете с его страницей был
+ * (23.11) и убран 24.11.2026 по слову владельца: «если бренд отсутствует то
+ * мы его вручную заполняем чтобы не уходила много денег на бренд» — первый
+ * же бренд съел ~7 центов токенов и поиски сверху, а товар — ~2. Код поиска —
+ * в коммите 1afd0ace.
  *
  * Правила магазина и задания — те же, что у кнопки «Скопировать промпт»
  * (constants/adminPrompts.ts): меняются там — меняются и здесь. Отличие одно:
@@ -41,8 +43,6 @@ const loadCore = () => import('../../supabase/functions/_shared/supplierVisionCo
 
 /** Ответа ждём не дольше: дальше «Повторить» в карточке над формой */
 const WRITE_TIMEOUT_MS = 90_000
-/** Поиск бренда — несколько запросов в интернет подряд, ему дольше */
-const RESEARCH_TIMEOUT_MS = 120_000
 /** Потолок ответа; в него входят и размышления модели. Платится только выданное */
 const MAX_TOKENS = 8000
 /**
@@ -51,10 +51,6 @@ const MAX_TOKENS = 8000
  * думает на high — дольше и дороже.
  */
 const EFFORT = 'low'
-/** Поисков в интернете на бренд: у Anthropic $10 за 1000, то есть цент за поиск */
-const BRAND_SEARCHES = 4
-/** Сколько раз продолжать поиск, поставленный сервером на паузу (pause_turn) */
-const MAX_CONTINUES = 2
 /** Подписи поставщика модели хватит начала: дальше обычно условия опта */
 const CAPTION_CHARS = 1500
 /** Закрытый бакет фото постов — как в supplierOffers.ts */
@@ -306,13 +302,12 @@ async function claudeFor(db: SupabaseClient, timeout: number): Promise<Claude> {
   return { client, spec, model, effort: await core.supportsEffort(client, model) }
 }
 
-interface Spent { input: number, output: number, searches: number }
+interface Spent { input: number, output: number }
 
 function addUsage(spent: Spent, usage: Anthropic.Usage) {
   // Чтение из кеша дешевле в 10 раз, но журнал считает токены одной ценой — оценка с запасом
   spent.input += usage.input_tokens + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0)
   spent.output += usage.output_tokens
-  spent.searches += usage.server_tool_use?.web_search_requests ?? 0
 }
 
 /** Расход — в журнал «батареек», как у чтения постов; постов не прибавляем */
@@ -367,7 +362,7 @@ export async function writeOfferProduct(db: SupabaseClient, offerId: string, ite
   }).catch(providerFailure)
 
   // Токены платятся и за отказ — в журнал до разбора
-  const spent: Spent = { input: 0, output: 0, searches: 0 }
+  const spent: Spent = { input: 0, output: 0 }
   addUsage(spent, reply.usage)
   await recordUsage(db, claude.spec, spent)
 
@@ -387,173 +382,4 @@ export async function writeOfferProduct(db: SupabaseClient, offerId: string, ite
   if (!photo)
     written.warnings.unshift('Фото поста не скачалось — текст написан только по подписи и прочитанному')
   return { ...written, model: claude.spec, photo: Boolean(photo) }
-}
-
-// ---------- бренд, которого на сайте нет ----------
-
-export const RESEARCH_PROMPT = `Ты помогаешь интернет-магазину детских игрушек «Ухтышка» (Алматы, Казахстан) завести страницу бренда, которого на сайте ещё нет. Найди в интернете, что это за бренд: кто и где его выпускает, что именно (виды игрушек, известные серии), для какого возраста, страна и год основания — только если их называют надёжные источники: сайт самого бренда, Википедия, крупные магазины и издания об игрушках. Отзывы, объявления и карточки маркетплейсов без сведений о бренде — не источник.
-
-Ответь коротко, по-русски, списком фактов; у каждого факта — адрес источника. Первой строкой — как пишется название бренда у самого бренда.
-
-Если поиск не подтвердил, что это бренд игрушек или детских товаров (это название поставщика, магазина, фабрики без торговой марки, серии или персонажа другого бренда — или о нём ничего не нашлось), начни ответ словами «НЕ НАЙДЕН» и объясни одной фразой почему. Не додумывай: лучше «НЕ НАЙДЕН», чем чужие факты.`
-
-const BRAND_SCHEMA = {
-  type: 'object',
-  properties: {
-    found: { type: 'boolean' },
-    name: { type: 'string' },
-    meta_title: { type: 'string' },
-    seo_h1: { type: 'string' },
-    seo_description: { type: 'string' },
-    seo_keywords: { type: 'array', items: { type: 'string' } },
-    description: { type: 'string' },
-  },
-  required: ['found', 'name', 'meta_title', 'seo_h1', 'seo_description', 'seo_keywords', 'description'],
-  additionalProperties: false,
-} as const
-
-export const BRAND_SYSTEM = `${PROMPT_SHOP_RULES}
-
-${adminPromptTask('brand')}
-
-Бренда на сайте ещё нет: факты о нём найдены поиском в интернете и даны в ДАННЫХ вместе с адресами. Используй только их — чего там нет, того не пиши.
-
-ОТВЕТ — JSON по схеме, а не строки «Имя поля:»:
-- found — false, если по ДАННЫМ не видно, что это бренд игрушек или детских товаров; тогда остальные поля — пустые;
-- name — название бренда, как его пишет сам бренд;
-- meta_title — «Заголовок страницы (title)»;
-- seo_h1 — «Заголовок на странице (H1)»;
-- seo_description — «SEO описание»;
-- seo_keywords — «Ключевые слова», по одной фразе в элементе;
-- description — «Описание», HTML по формату из правил.`
-
-/** Страница бренда из ответа модели; found=false или без названия — бренда нет */
-export function parseBrandReply(raw: string): { page: BrandPage | null, warnings: string[] } {
-  let data: Record<string, unknown>
-  try {
-    data = JSON.parse(raw)
-  }
-  catch {
-    throw new Error('Ответ модели не разобрался')
-  }
-  const str = (v: unknown) => (typeof v === 'string' ? plainText(v) : '')
-  const name = str(data.name).slice(0, 60)
-  if (data.found !== true || !name)
-    return { page: null, warnings: [] }
-  const { html: description, warnings } = sanitizeBrandHtml(typeof data.description === 'string' ? data.description.trim() : '')
-  const keywords = Array.isArray(data.seo_keywords) ? data.seo_keywords.map(str).filter(Boolean) : []
-  const page: BrandPage = {
-    name,
-    slug: slugify(name),
-    meta_title: str(data.meta_title).slice(0, 120),
-    seo_h1: str(data.seo_h1).slice(0, 120),
-    seo_description: str(data.seo_description).slice(0, 300),
-    seo_keywords: [...new Set(keywords)].slice(0, 10),
-    description,
-  }
-  warnings.push(...checkLengths({ brand_id: '', ...page }))
-  return { page, warnings }
-}
-
-const NOT_FOUND = /^[\s*#_«"]*НЕ\s+НАЙДЕН[\s.:—-]*/i
-
-/**
- * Бренд, которого нет на сайте: поиск в интернете, потом страница бренда по
- * найденному — двумя запросами. Одним нельзя: ответ по схеме (output_config)
- * несовместим с цитатами, а поиск Anthropic всегда отвечает с цитатами.
- * Ничего не создаёт — страница уходит в форму товара.
- */
-export async function researchBrand(db: SupabaseClient, input: { name: string, product: string, article: string | null }): Promise<BrandResearch> {
-  const { brands } = await siteLists(db)
-  const already = matchSiteBrand(brands, input.name)
-  if (already)
-    return { found: true, existing: { id: already.id, name: already.name }, page: null, facts: '', sources: [], warnings: [], searches: 0, model: '' }
-  const claude = await claudeFor(db, RESEARCH_TIMEOUT_MS)
-
-  const spent: Spent = { input: 0, output: 0, searches: 0 }
-  try {
-    // 1. Поиск: факты с адресами
-    const messages: Anthropic.MessageParam[] = [{
-      role: 'user',
-      content: `Бренд: «${input.name}». Товар этого бренда у поставщика: «${input.product}»${input.article ? `, артикул ${input.article}` : ''}.`,
-    }]
-    const texts: string[] = []
-    const sources = new Map<string, string>()
-    for (let turn = 0; ; turn++) {
-      const reply = await claude.client.messages.create({
-        model: claude.model,
-        max_tokens: MAX_TOKENS,
-        system: RESEARCH_PROMPT,
-        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: BRAND_SEARCHES }],
-        ...(claude.effort ? { output_config: { effort: EFFORT } } : {}),
-        messages,
-      }).catch(providerFailure)
-      addUsage(spent, reply.usage)
-      for (const block of reply.content) {
-        if (block.type !== 'text')
-          continue
-        texts.push(block.text)
-        for (const c of block.citations ?? []) {
-          if (c.type === 'web_search_result_location' && !sources.has(c.url))
-            sources.set(c.url, c.title || c.url)
-        }
-      }
-      const problem = stopProblem(reply, 'искать этот бренд')
-      if (reply.stop_reason === 'refusal')
-        throw createError({ statusCode: 502, message: problem! })
-      // Сервер поставил поиск на паузу — отправить ход назад как есть, он продолжит
-      if (reply.stop_reason === 'pause_turn' && turn < MAX_CONTINUES) {
-        messages.push({ role: 'assistant', content: reply.content })
-        continue
-      }
-      break
-    }
-    const facts = texts.join('').trim()
-    if (!facts || NOT_FOUND.test(facts)) {
-      const reason = facts.replace(NOT_FOUND, '').split('\n')[0]!.trim().slice(0, 300)
-      return { found: false, name: input.name, reason: reason || 'Поиск ничего не нашёл', searches: spent.searches, model: claude.spec }
-    }
-
-    // 2. Страница бренда по найденному
-    const reply = await claude.client.messages.create({
-      model: claude.model,
-      max_tokens: MAX_TOKENS,
-      system: BRAND_SYSTEM,
-      output_config: { format: { type: 'json_schema', schema: BRAND_SCHEMA }, ...(claude.effort ? { effort: EFFORT } : {}) },
-      messages: [{
-        role: 'user',
-        content: [
-          'ДАННЫЕ:',
-          `- Бренд: ${input.name}`,
-          `- Что выпускает (по товарам в магазине): у нас пока один товар этого бренда — «${input.product}»`,
-          `- Факты о бренде из надёжного источника (страна, год, чем известен) — с источником:\n${facts}`,
-        ].join('\n'),
-      }],
-    }).catch(providerFailure)
-    addUsage(spent, reply.usage)
-    const problem = stopProblem(reply, 'писать страницу бренда')
-    if (problem)
-      throw createError({ statusCode: 502, message: problem })
-    const block = reply.content.find(b => b.type === 'text')
-    if (!block || block.type !== 'text' || !block.text)
-      throw createError({ statusCode: 502, message: 'Модель вернула пустой ответ — нажмите «Повторить»' })
-    let parsed: ReturnType<typeof parseBrandReply>
-    try {
-      parsed = parseBrandReply(block.text)
-    }
-    catch (e) {
-      throw createError({ statusCode: 502, message: `${(e as Error).message} — нажмите «Повторить»` })
-    }
-    const list = [...sources].slice(0, 6).map(([url, title]) => ({ url, title }))
-    if (!parsed.page)
-      return { found: false, name: input.name, reason: 'По найденному не видно, что это бренд игрушек', searches: spent.searches, model: claude.spec }
-    // Поиск назвал бренд так, как он уже записан на сайте
-    const known = matchSiteBrand(brands, parsed.page.name)
-    if (known)
-      return { found: true, existing: { id: known.id, name: known.name }, page: null, facts, sources: list, warnings: [], searches: spent.searches, model: claude.spec }
-    return { found: true, existing: null, page: parsed.page, facts, sources: list, warnings: parsed.warnings, searches: spent.searches, model: claude.spec }
-  }
-  finally {
-    await recordUsage(db, claude.spec, spent)
-  }
 }
