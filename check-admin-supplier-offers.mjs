@@ -1313,10 +1313,23 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   // Расход (24.11.2026): заглушка отвечает 1000 токенов мимо кеша, 4000 в кеш, 500 из кеша и 600 ответа —
   // по ценам Sonnet 5.5 это $0,01805, по курсу заглушки 450 ₸ — 8,1 ₸
   // Строки — блоками, без пробела между ними: textContent всей строки их склеивает, сверять по одной
-  const usageLines = async root => JSON.stringify((await root.locator('[data-testid=ai-writer-usage] > span').allTextContents()).map(sp))
-  const usage14 = await usageLines(form)
-  check(usage14 === JSON.stringify(['Расход: 6 100 токенов (запрос 5 500, ответ 600) ≈ 8,1 ₸ · $0,018', 'Курс Нацбанка на 23.11.2026: 450,00 ₸ за $']), `под ответом — расход в токенах, тенге и долларах и курс с датой — курс заглушки, не nationalbank.kz и не из кода: ${usage14}`)
+  const usageLines = async root => (await root.locator('[data-testid=ai-writer-usage] > span').allTextContents()).map(sp)
+  const SPENT_LINE = 'Расход: 6 100 токенов (запрос 5 500, ответ 600) ≈ 8,1 ₸ · $0,018'
+  const RATE_LINE = 'Курс Нацбанка на 23.11.2026: 450,00 ₸ за $'
+  // «Описания …: N токенов» — журнал модели описаний, вход вместе с кешем; денег в строке нет — они в остатке бюджета
+  const writerLineOk = (line, period) => {
+    const m = new RegExp(`^Описания \\(Claude Sonnet 5\\.5\\) ${period}: ([\\d ]+) токен[а-я]*$`).exec(line ?? '')
+    return !!m && Number(m[1].replace(/ /g, '')) === ai.textSpent.in + ai.textSpent.out
+  }
+  const lines14 = await usageLines(form)
+  check(lines14[0] === SPENT_LINE && lines14.at(-1) === RATE_LINE, `под ответом — расход в токенах, тенге и долларах и курс с датой — курс заглушки, не nationalbank.kz и не из кода: ${JSON.stringify([lines14[0], lines14.at(-1)])}`)
+  check(lines14.length === 4 && writerLineOk(lines14[1], 'за 30 дней') && lines14[2] === 'Бюджет ИИ не задан — задайте сумму на счёте Anthropic в «Умном закупе», карточка «Бюджет ИИ»: здесь будет видно, на сколько описаний хватит', `бюджета нет — всё на описания за 30 дней по журналу (${ai.textSpent.in}/${ai.textSpent.out}) и подсказка, где задать бюджет: ${JSON.stringify(lines14.slice(1, 3))}`)
   await form.context().close()
+
+  // Бюджет ИИ на время второго описания (24.11.2026) — строка «осталось»; батарейке ниже нужен «не задан», после проверки убрать
+  const almatyToday = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Almaty' }).format(new Date())
+  const todayWords = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Almaty', day: 'numeric', month: 'long' }).format(new Date())
+  psql(`INSERT INTO public.ai_settings (key, value) VALUES ('ai_budget', '{"usd": 1, "since": "${almatyToday}", "resetDay": null}');`)
 
   // Клик со страницы, а не переход по адресу: ссылка ведёт куда надо
   await page.route('**/api/seo/notify-indexing', r => r.fulfill({ json: { success: true, indexnow: { submitted: false, urls_count: 0 }, yandex_ping: { submitted: false }, bing_ping: { submitted: false } } }))
@@ -1347,7 +1360,15 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   check(w13?.rules && !w13.clipboardAnswer && w13.listed, 'в промпте — правила и задание кнопки «Скопировать промпт», без строк «Имя поля:», со списками разделов и брендов сайта')
   check(JSON.stringify(w13?.images) === '["base64 image/png как отдано"]' && w13.data.includes('- Код модели (артикул с коробки): PO-1013') && !/₸|Цена \d/.test(w13.data), `модели — фото поста из бакета и подпись без цены: ${JSON.stringify(w13?.images)}`)
   check(ai.writerRetrieved <= 1, `справка о модели текстов — не больше одной на сервер: ${ai.writerRetrieved}`)
-  check(ai.rates <= 1 && await usageLines(page) === usage14, `курс — не больше одного запроса за день на сервер (${ai.rates}), расход второго товара — той же строкой`)
+  const lines13 = await usageLines(page)
+  check(ai.rates <= 1 && lines13[0] === SPENT_LINE && lines13.at(-1) === RATE_LINE, `курс — не больше одного запроса за день на сервер (${ai.rates}), расход второго описания — той же строкой`)
+  // Ждём: $1 минус весь журнал с сегодняшнего дня по ценам Haiku 5.5 и Sonnet 5.5; описаний — по $0,01805, цене этого
+  const PRICES = { 'anthropic/claude-haiku-5-5': [0.1, 0.5], 'anthropic/claude-sonnet-5-5': [2, 10] }
+  const journal = JSON.parse(psql(`SELECT coalesce(json_agg(json_build_object('m', model, 'i', input_tokens, 'o', output_tokens)), '[]') FROM public.ai_usage_daily WHERE day >= '${almatyToday}';`))
+  const rest = 1 - journal.reduce((sum, r) => sum + (r.i * (PRICES[r.m]?.[0] ?? Number.NaN) + r.o * (PRICES[r.m]?.[1] ?? Number.NaN)) / 1e6, 0)
+  const left13 = /^Бюджет ИИ: осталось ≈ ([\d ]+) ₸ \(\$0,(\d{3}) из \$1,00\) — примерно на (\d+) (?:такое описание|таких описани[йя])$/.exec(lines13[2] ?? '')
+  check(lines13.length === 4 && writerLineOk(lines13[1], `с ${todayWords}`) && left13 && Math.abs(Number(left13[1].replace(/ /g, '')) - rest * 450) <= 0.6 && Math.abs(Number(`0.${left13[2]}`) - rest) < 0.0006 && Number(left13[3]) === Math.floor(rest / 0.01805), `бюджет $1 — на описания с сегодняшнего дня, осталось ≈ $${rest.toFixed(3)} по журналу (${journal.map(r => r.m.split('/')[1]).join(', ')}), на ${Math.floor(rest / 0.01805)} таких описаний: ${JSON.stringify(lines13.slice(1, 3))}`)
+  psql(`DELETE FROM public.ai_settings WHERE key = 'ai_budget';`)
 
   console.log('\n== бренда на сайте нет — заполняется вручную')
   const brandLine = await textOf(page.locator('[data-testid=ai-writer-brand]'))

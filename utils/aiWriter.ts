@@ -1,4 +1,4 @@
-import type { AiRequestUsage } from './aiCost'
+import type { AiRequestUsage, WriterBudget } from './aiCost'
 
 /**
  * «Тексты для сайта» (23 ноября 2026) — что отвечает сервер
@@ -32,6 +32,8 @@ export interface WrittenOfferProduct extends WrittenProduct {
   photo: boolean
   /** Токены и курс — строка «Расход» в карточке (24.11.2026); нет — ответ сервера старой сборки */
   usage?: AiRequestUsage
+  /** Бюджет ИИ после этого ответа (24.11.2026); null — журнала нет или база не ответила */
+  budget?: WriterBudget | null
 }
 
 /** Что подставить в форму товара: поле получает значение, пока его не трогали */
