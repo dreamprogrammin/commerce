@@ -18,10 +18,12 @@ const emit = defineEmits<{
 
 const { getVariantUrl } = useSupabaseStorage()
 
+const startName = props.initialName || props.initialData?.name || ''
 const formData = ref<Partial<ProductLineInsert>>({
   brand_id: props.brandId,
-  name: props.initialName || props.initialData?.name || '',
-  slug: props.initialData?.slug || '',
+  name: startName,
+  // Название из формы товара — и слаг по нему сразу: наблюдатель ниже ловит только правку названия
+  slug: props.initialData?.slug || slugify(startName),
   description: props.initialData?.description || null,
   logo_url: props.initialData?.logo_url || null,
   seo_description: props.initialData?.seo_description || null,

@@ -173,8 +173,17 @@ const linkedAccessories = ref<(ProductWithImages | ProductSearchResult)[]>([])
 const accessorySearchQuery = ref('')
 const accessorySearchResults = ref<ProductSearchResult[]>([])
 const isSearchingAccessories = ref(false)
+/*
+ * Что набрано в поиске бренда и линейки — этим «➕ Создать…» подписывает
+ * новое (24.11.2026). Раньше эти ref стояли в v-model самого Command, а там
+ * выбранный пункт, не поиск: окно получало прошлый выбранный бренд, а список
+ * после выбора сужался до него одного. Список по поиску фильтрует сам Command.
+ */
 const brandSearchQuery = ref('')
 const productLineSearchQuery = ref('')
+/** С каким названием открыто окно «Создать новый бренд» / «…линейку» */
+const brandDialogName = ref('')
+const productLineDialogName = ref('')
 const brandProductLines = ref<ProductLine[]>([])
 const isProductLineDialogOpen = ref(false)
 const isLoadingProductLines = ref(false)
@@ -383,27 +392,17 @@ watch(
 
 // --- 5. ВЫЧИСЛЯЕМЫЕ ЗНАЧЕНИЯ ---
 
-const filteredBrands = computed(() => {
-  if (!brandSearchQuery.value) {
-    return brands.value
-  }
-  return brands.value.filter(brand =>
-    brand.name.toLowerCase().includes(brandSearchQuery.value.toLowerCase()),
-  )
-})
-
-const filteredProductLines = computed(() => {
-  if (!productLineSearchQuery.value) {
-    return brandProductLines.value
-  }
-  return brandProductLines.value.filter(line =>
-    line.name
-      .toLowerCase()
-      .includes(productLineSearchQuery.value.toLowerCase()),
-  )
-})
-
 // --- 6. ОБРАБОТЧИКИ СОБЫТИЙ ---
+
+function openBrandDialog(name: string) {
+  brandDialogName.value = name.trim()
+  isBrandDialogOpen.value = true
+}
+
+function openProductLineDialog(name: string) {
+  productLineDialogName.value = name.trim()
+  isProductLineDialogOpen.value = true
+}
 
 async function handleBrandCreate(payload: {
   data: BrandInsert | BrandUpdate
@@ -1861,17 +1860,13 @@ const seoKeywordsString = computed({
                 </Button>
               </PopoverTrigger>
               <PopoverContent class="w-[--radix-popover-trigger-width] p-0">
-                <Command v-model:model-value="brandSearchQuery">
-                  <CommandInput placeholder="Поиск или создание бренда..." />
+                <Command>
+                  <CommandInput placeholder="Поиск или создание бренда..." @update:model-value="brandSearchQuery = String($event ?? '')" />
                   <CommandList>
                     <CommandEmpty>
                       <div
                         class="relative cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
-                        @click="
-                          () => {
-                            isBrandDialogOpen = true;
-                          }
-                        "
+                        @click="openBrandDialog(brandSearchQuery)"
                       >
                         ➕ Создать новый бренд
                       </div>
@@ -1888,7 +1883,7 @@ const seoKeywordsString = computed({
                         Без бренда
                       </CommandItem>
                       <CommandItem
-                        v-for="brand in filteredBrands"
+                        v-for="brand in brands"
                         :key="brand.id"
                         :value="brand.name"
                         @select="
@@ -1919,7 +1914,7 @@ const seoKeywordsString = computed({
                   <DialogTitle>Создать новый бренд</DialogTitle>
                 </DialogHeader>
                 <BrandForm
-                  :initial-name="brandSearchQuery"
+                  :initial-name="brandDialogName"
                   @submit="handleBrandCreate"
                 />
               </DialogContent>
@@ -1959,17 +1954,13 @@ const seoKeywordsString = computed({
                 </Button>
               </PopoverTrigger>
               <PopoverContent class="w-[--radix-popover-trigger-width] p-0">
-                <Command v-model:model-value="productLineSearchQuery">
-                  <CommandInput placeholder="Поиск или создание линейки..." />
+                <Command>
+                  <CommandInput placeholder="Поиск или создание линейки..." @update:model-value="productLineSearchQuery = String($event ?? '')" />
                   <CommandList>
                     <CommandEmpty>
                       <div
                         class="relative cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
-                        @click="
-                          () => {
-                            isProductLineDialogOpen = true;
-                          }
-                        "
+                        @click="openProductLineDialog(productLineSearchQuery)"
                       >
                         ➕ Создать новую линейку
                       </div>
@@ -1986,7 +1977,7 @@ const seoKeywordsString = computed({
                         Без линейки
                       </CommandItem>
                       <CommandItem
-                        v-for="line in filteredProductLines"
+                        v-for="line in brandProductLines"
                         :key="line.id"
                         :value="line.name"
                         @select="
@@ -2022,7 +2013,7 @@ const seoKeywordsString = computed({
                 </DialogHeader>
                 <ProductLineForm
                   :brand-id="formData.brand_id!"
-                  :initial-name="productLineSearchQuery"
+                  :initial-name="productLineDialogName"
                   @submit="handleProductLineCreate"
                 />
               </DialogContent>
