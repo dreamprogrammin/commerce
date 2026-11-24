@@ -182,6 +182,13 @@ const isSearchingAccessories = ref(false)
  * после выбора сужался до него одного. Список по поиску фильтрует сам Command.
  */
 const brandSearchQuery = ref('')
+/*
+ * Открыт ли список брендов и линеек (24.11.2026). Раньше у Popover не было
+ * v-model:open: выбранный пункт оставлял список открытым до клика мимо, а
+ * «➕ Создать…» — висеть под окном. Теперь выбор и «Создать…» его закрывают.
+ */
+const isBrandListOpen = ref(false)
+const isProductLineListOpen = ref(false)
 const productLineSearchQuery = ref('')
 /** С каким названием открыто окно «Создать новый бренд» / «…линейку» */
 const brandDialogName = ref('')
@@ -398,12 +405,26 @@ watch(
 
 function openBrandDialog(name: string) {
   brandDialogName.value = name.trim()
+  isBrandListOpen.value = false
   isBrandDialogOpen.value = true
 }
 
 function openProductLineDialog(name: string) {
   productLineDialogName.value = name.trim()
+  isProductLineListOpen.value = false
   isProductLineDialogOpen.value = true
+}
+
+/** Выбор в списке брендов — в форму, список закрывается */
+function pickBrand(id: string | null) {
+  formData.value.brand_id = id
+  isBrandListOpen.value = false
+}
+
+/** Выбор в списке линеек — в форму, список закрывается */
+function pickProductLine(id: string | null) {
+  formData.value.product_line_id = id
+  isProductLineListOpen.value = false
 }
 
 /*
@@ -1854,7 +1875,7 @@ const seoKeywordsString = computed({
 
           <div>
             <Label>Бренд (опционально)</Label>
-            <Popover>
+            <Popover v-model:open="isBrandListOpen">
               <PopoverTrigger as-child>
                 <Button
                   variant="outline"
@@ -1884,11 +1905,7 @@ const seoKeywordsString = computed({
                     <CommandGroup>
                       <CommandItem
                         value=""
-                        @select="
-                          () => {
-                            formData.brand_id = null;
-                          }
-                        "
+                        @select="pickBrand(null)"
                       >
                         Без бренда
                       </CommandItem>
@@ -1896,11 +1913,7 @@ const seoKeywordsString = computed({
                         v-for="brand in brands"
                         :key="brand.id"
                         :value="brand.name"
-                        @select="
-                          () => {
-                            formData.brand_id = brand.id;
-                          }
-                        "
+                        @select="pickBrand(brand.id)"
                       >
                         <Check
                           :class="
@@ -1939,7 +1952,7 @@ const seoKeywordsString = computed({
             <p class="text-xs text-muted-foreground mb-2">
               Например: Barbie, Hot Wheels для Mattel
             </p>
-            <Popover>
+            <Popover v-model:open="isProductLineListOpen">
               <PopoverTrigger as-child>
                 <Button
                   variant="outline"
@@ -1980,11 +1993,7 @@ const seoKeywordsString = computed({
                     <CommandGroup>
                       <CommandItem
                         value=""
-                        @select="
-                          () => {
-                            formData.product_line_id = null;
-                          }
-                        "
+                        @select="pickProductLine(null)"
                       >
                         Без линейки
                       </CommandItem>
@@ -1992,11 +2001,7 @@ const seoKeywordsString = computed({
                         v-for="line in brandProductLines"
                         :key="line.id"
                         :value="line.name"
-                        @select="
-                          () => {
-                            formData.product_line_id = line.id;
-                          }
-                        "
+                        @select="pickProductLine(line.id)"
                       >
                         <Check
                           :class="

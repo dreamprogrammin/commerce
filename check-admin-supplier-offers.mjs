@@ -65,9 +65,10 @@
  *     запросов поиска и страницы бренда заглушка не получает; отказ модели —
  *     «Повторить»; расход — в журнал своей строкой, вход вместе с кешем, и
  *     бюджет считает его тоже;
- * 16) форма товара (24.11.2026): выбранный бренд не сужает список брендов;
- *     «➕ Создать новый бренд» и «…новую линейку» — окно с набранным в
- *     поиске названием и слагом по нему; окно выше экрана прокручивается, и
+ * 16) форма товара (24.11.2026): выбор в списке бренда и линейки закрывает
+ *     список, открытый заново список брендов не сужен до выбранного;
+ *     «➕ Создать новый бренд» и «…новую линейку» — список закрывается, окно
+ *     с набранным в поиске названием и слагом по нему, курсор в окне; окно выше экрана прокручивается, и
  *     «Сохранить» в нём можно нажать; на телефоне 390 px оба окна в ширину
  *     экрана, а на странице правки бренда кнопки строки «SEO оптимизация»
  *     не уезжают за край.
@@ -1400,14 +1401,23 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   // ref, что и поиск, — после выбора список сужался до одного бренда, окно «Создать…» получало прошлый
   // выбор вместо набранного, а слаг в окне оставался пустым («Сохранить» — «обязательные поля»)
   console.log('\n== форма товара: выбор и создание бренда и линейки')
+  // Список закрылся: ни списка, ни его обёртки — PopoverContent тоже role=dialog
+  const listGone = () => f24.locator('[role=listbox]').first().waitFor({ state: 'detached', timeout: 3000 }).then(() => true, () => false)
   await f24.locator('button[role=combobox]').filter({ hasText: 'Выберите бренд' }).click()
   const brandOptions = f24.locator('[role=option]')
   await appeared(brandOptions.first(), 10000)
   const optionsBefore = await brandOptions.count()
   await brandOptions.filter({ hasText: PROBE_BRAND }).first().click()
-  await sleep(300)
+  // Было: выбранный пункт оставлял список открытым — закрывался он только кликом мимо
+  const brandListClosed = await listGone()
+  check(brandListClosed && await f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }).count() === 1, `выбранный бренд — в поле, список брендов закрылся: ${brandListClosed ? 'закрыт' : 'открыт'}`)
+  // Открытый заново список — все бренды, а не один выбранный (не закрылся — считать в нём же)
+  await sleep(500)
+  if (brandListClosed)
+    await f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }).click()
+  await appeared(brandOptions.first(), 10000)
   const optionsAfter = await brandOptions.count()
-  check(optionsBefore >= 3 && optionsAfter === optionsBefore && await f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }).count() === 1, `выбранный бренд — в поле, список брендов не сужается до него: пунктов ${optionsBefore} → ${optionsAfter}`)
+  check(optionsBefore >= 3 && optionsAfter === optionsBefore, `список брендов после выбора не сужается до выбранного: пунктов ${optionsBefore} → ${optionsAfter}`)
   // Кнопку окна можно нажать: прокруткой окна она доходит до экрана, и сверху её ничто не закрывает
   const reachable = async (button) => {
     await button.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {})
@@ -1430,8 +1440,13 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
       const out = [...d.querySelectorAll('button, input, textarea, h2')].map(el => el.getBoundingClientRect()).filter(b => b.width > 0 && (b.right > r.right + 0.5 || b.left < r.left - 0.5)).length
       return { fits: d.scrollWidth <= d.clientWidth + 1 && r.left >= 0 && r.right <= window.innerWidth + 0.5 && !out, wide: `${d.scrollWidth}/${d.clientWidth}`, out }
     }).catch(() => ({ fits: false }))
-    const shown = await appeared(dialog.locator(slugId), 10000)
-      ? { name: await dialog.locator(nameId).inputValue(), slug: await dialog.locator(slugId).inputValue(), ...await width(), save: await reachable(dialog.getByRole('button', { name: save })) }
+    const opened = await appeared(dialog.locator(slugId), 10000)
+    // Список под окном закрылся, а курсор остался в окне: список, уходя, возвращает фокус своей кнопке за окном
+    const listClosed = opened && await listGone()
+    await sleep(300)
+    const focus = await f24.evaluate(sel => Boolean(document.activeElement?.closest('[role=dialog]')?.querySelector(sel)), slugId)
+    const shown = opened
+      ? { name: await dialog.locator(nameId).inputValue(), slug: await dialog.locator(slugId).inputValue(), listClosed, focus, ...await width(), save: await reachable(dialog.getByRole('button', { name: save })) }
       : null
     // Окно и список уходят с анимацией и потом возвращают фокус своей кнопке: список, открытый раньше, тут же
     // закрылся бы, а закрытый бывает, что открывается снова (телефон) — закрывать по одному, пока не уйдёт всё
@@ -1445,9 +1460,22 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   const newBrandForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }), 'Поиск или создание бренда...', TYPED_BRAND, '➕ Создать новый бренд', '#brand-name', '#brand-slug', 'Сохранить бренд')
   check(newBrandForm?.name === TYPED_BRAND && newBrandForm.slug === 'probe-typed-brand', `«➕ Создать новый бренд» — набранное название и слаг по нему: ${JSON.stringify(newBrandForm)}`)
   check(newBrandForm?.save === true, `окно бренда выше экрана прокручивается — «Сохранить бренд» можно нажать: ${JSON.stringify(newBrandForm)}`)
+  check(newBrandForm?.listClosed === true && newBrandForm.focus === true, `«➕ Создать новый бренд» — список брендов закрылся, курсор в окне: ${JSON.stringify({ listClosed: newBrandForm?.listClosed, focus: newBrandForm?.focus })}`)
   const newLineForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: 'Выберите линейку' }), 'Поиск или создание линейки...', TYPED_LINE, '➕ Создать новую линейку', '#line-name', '#line-slug', 'Сохранить линейку')
   check(newLineForm?.name === TYPED_LINE && newLineForm.slug === 'probe-typed-line', `«➕ Создать новую линейку» — набранное название и слаг по нему: ${JSON.stringify(newLineForm)}`)
   check(newLineForm?.save === true, `«Сохранить линейку» в окне можно нажать: ${JSON.stringify(newLineForm)}`)
+  check(newLineForm?.listClosed === true && newLineForm.focus === true, `«➕ Создать новую линейку» — список линеек закрылся, курсор в окне: ${JSON.stringify({ listClosed: newLineForm?.listClosed, focus: newLineForm?.focus })}`)
+  // Выбор в списке линеек тоже закрывает его
+  await f24.locator('button[role=combobox]').filter({ hasText: 'Выберите линейку' }).click()
+  await appeared(f24.locator('[role=option]').first(), 10000)
+  await f24.locator('[role=option]').filter({ hasText: 'Без линейки' }).first().click()
+  const lineListClosed = await listGone()
+  check(lineListClosed, `выбор в списке линеек закрывает список: ${lineListClosed ? 'закрыт' : 'открыт'}`)
+  for (let i = 0; i < 6 && await f24.locator('[role=dialog], [role=listbox]').count(); i++) {
+    await f24.keyboard.press('Escape')
+    await f24.locator('[role=dialog], [role=listbox]').first().waitFor({ state: 'detached', timeout: 2000 }).catch(() => {})
+    await sleep(500)
+  }
   // Телефон. Было: колонку сетки окна бренда распирала неразрывная строка формы — окно 356 px, содержимое 457,
   // «Промпт для нейросети» уезжала за край
   await f24.setViewportSize({ width: 390, height: 844 })
