@@ -66,7 +66,8 @@
  *     вместе с кешем, и бюджет считает его тоже;
  * 16) форма товара (24.11.2026): выбранный бренд не сужает список брендов;
  *     «➕ Создать новый бренд» и «…новую линейку» — окно с набранным в
- *     поиске названием и слагом по нему.
+ *     поиске названием и слагом по нему; окно выше экрана прокручивается, и
+ *     «Сохранить» в нём можно нажать.
  *
  * Данные заводит сам — администратор, покупатель, два поставщика с каналами,
  * вход подделки Telegram, ключ ИИ для заглушки, раздел и бренд для «Текстов
@@ -1442,7 +1443,16 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   await sleep(300)
   const optionsAfter = await brandOptions.count()
   check(optionsBefore >= 3 && optionsAfter === optionsBefore && await f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }).count() === 1, `выбранный бренд — в поле, список брендов не сужается до него: пунктов ${optionsBefore} → ${optionsAfter}`)
-  const typedIn = async (trigger, placeholder, value, create, nameId, slugId) => {
+  // Кнопку окна можно нажать: прокруткой окна она доходит до экрана, и сверху её ничто не закрывает
+  const reachable = async (button) => {
+    await button.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {})
+    return button.evaluate((b) => {
+      const r = b.getBoundingClientRect()
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+      return r.top >= 0 && r.bottom <= window.innerHeight && Boolean(hit && (hit === b || b.contains(hit)))
+    }).catch(() => false)
+  }
+  const typedIn = async (trigger, placeholder, value, create, nameId, slugId, save) => {
     if (!await f24.getByPlaceholder(placeholder).count())
       await trigger.click()
     await f24.getByPlaceholder(placeholder).fill(value)
@@ -1450,7 +1460,7 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
     await f24.getByText(create).first().click({ timeout: 10000 }).catch(() => {})
     const dialog = f24.getByRole('dialog')
     const shown = await appeared(dialog.locator(slugId), 10000)
-      ? { name: await dialog.locator(nameId).inputValue(), slug: await dialog.locator(slugId).inputValue() }
+      ? { name: await dialog.locator(nameId).inputValue(), slug: await dialog.locator(slugId).inputValue(), save: await reachable(dialog.getByRole('button', { name: save })) }
       : null
     for (let i = 0; i < 3 && await f24.locator('[role=dialog], [role=listbox]').count(); i++)
       await f24.keyboard.press('Escape')
@@ -1459,10 +1469,12 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
     await sleep(500)
     return shown
   }
-  const newBrandForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }), 'Поиск или создание бренда...', TYPED_BRAND, '➕ Создать новый бренд', '#brand-name', '#brand-slug')
+  const newBrandForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }), 'Поиск или создание бренда...', TYPED_BRAND, '➕ Создать новый бренд', '#brand-name', '#brand-slug', 'Сохранить бренд')
   check(newBrandForm?.name === TYPED_BRAND && newBrandForm.slug === 'probe-typed-brand', `«➕ Создать новый бренд» — набранное название и слаг по нему: ${JSON.stringify(newBrandForm)}`)
-  const newLineForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: 'Выберите линейку' }), 'Поиск или создание линейки...', TYPED_LINE, '➕ Создать новую линейку', '#line-name', '#line-slug')
+  check(newBrandForm?.save === true, `окно бренда выше экрана прокручивается — «Сохранить бренд» можно нажать: ${JSON.stringify(newBrandForm)}`)
+  const newLineForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: 'Выберите линейку' }), 'Поиск или создание линейки...', TYPED_LINE, '➕ Создать новую линейку', '#line-name', '#line-slug', 'Сохранить линейку')
   check(newLineForm?.name === TYPED_LINE && newLineForm.slug === 'probe-typed-line', `«➕ Создать новую линейку» — набранное название и слаг по нему: ${JSON.stringify(newLineForm)}`)
+  check(newLineForm?.save === true, `«Сохранить линейку» в окне можно нажать: ${JSON.stringify(newLineForm)}`)
   check(psql(`SELECT (SELECT count(*) FROM public.brands WHERE name = :'b') + (SELECT count(*) FROM public.product_lines WHERE name = :'l');`, { b: TYPED_BRAND, l: TYPED_LINE }) === '0', 'окна закрыты без сохранения — ни бренда, ни линейки не создано')
   await f24.context().close()
   // Отказ модели выше — ожидаемый ответ, а не сбой страницы
