@@ -305,7 +305,8 @@ async function claudeFor(db: SupabaseClient, timeout: number): Promise<Claude> {
 interface Spent { input: number, output: number }
 
 function addUsage(spent: Spent, usage: Anthropic.Usage) {
-  // Чтение из кеша дешевле в 10 раз, но журнал считает токены одной ценой — оценка с запасом
+  // Журнал считает весь вход одной ценой, хотя запись в кеш в 1,25 раза дороже, а чтение у Sonnet 5.5 — в 20 раз
+  // дешевле: это оценка. Точная цена запроса — в ответе (usage) и в карточке «Тексты от ИИ» (utils/aiCost.ts)
   spent.input += usage.input_tokens + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0)
   spent.output += usage.output_tokens
 }
@@ -347,6 +348,8 @@ export async function writeOfferProduct(db: SupabaseClient, offerId: string, ite
     throw createError({ statusCode: 409, message: 'ИИ ещё не прочитал этот товар — нажмите «Прочитать» в «Товарах поставщиков»' })
 
   const claude = await claudeFor(db, WRITE_TIMEOUT_MS)
+  // Курс для строки «Расход» — пока модель пишет; не бросает (server/utils/usdKzt.ts)
+  const rate = usdKztRate()
   const reply = await claude.client.messages.create({
     model: claude.model,
     max_tokens: MAX_TOKENS,
@@ -381,5 +384,12 @@ export async function writeOfferProduct(db: SupabaseClient, offerId: string, ite
   }
   if (!photo)
     written.warnings.unshift('Фото поста не скачалось — текст написан только по подписи и прочитанному')
-  return { ...written, model: claude.spec, photo: Boolean(photo) }
+  const usage = {
+    input: reply.usage.input_tokens,
+    cacheWrite: reply.usage.cache_creation_input_tokens ?? 0,
+    cacheRead: reply.usage.cache_read_input_tokens ?? 0,
+    output: reply.usage.output_tokens,
+    rate: await rate,
+  }
+  return { ...written, model: claude.spec, photo: Boolean(photo), usage }
 }

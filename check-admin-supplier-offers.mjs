@@ -258,7 +258,7 @@ await new Promise(r => server.listen(WEB_PORT, '127.0.0.1', r))
  * провайдер отвечает 429, 'down' — рвёт соединение. Фото в журнал не пишется —
  * только тип и совпало ли с отданным заглушкой t.me и подделкой Telegram.
  */
-const ai = { mode: 'ok', requests: [], queries: [], guesses: [], retrieved: 0, tries: new Map(), writes: [], searches: [], writerRetrieved: 0, textSpent: { in: 0, out: 0 }, hold: null, release: null }
+const ai = { mode: 'ok', requests: [], queries: [], guesses: [], retrieved: 0, tries: new Map(), writes: [], searches: [], writerRetrieved: 0, textSpent: { in: 0, out: 0 }, rates: 0, hold: null, release: null }
 
 /*
  * «Тексты для сайта» (23.11.2026) — ответы по артикулу из ДАННЫХ. Раздел и
@@ -335,6 +335,13 @@ const aiServer = http.createServer((req, res) => {
   const chunks = []
   req.on('data', c => chunks.push(c))
   req.on('end', () => {
+    // Курс Нацбанка для строки «Расход» (24.11.2026): сервер стенда берёт его здесь, а не на nationalbank.kz.
+    // Курс и дата — не те, что зашиты в код (455,12 на 24.11.2026): строка в карточке покажет, откуда курс
+    if (req.method === 'GET' && pathname === '/nbk/rates_all.xml') {
+      ai.rates++
+      res.writeHead(200, { 'content-type': 'text/xml; charset=utf-8' })
+      return res.end('<?xml version="1.0" encoding="utf-8"?><rss version="2.0"><channel><item><title>EUR</title><pubDate>23.11.2026</pubDate><description>520.00</description><quant>1</quant></item><item><title>USD</title><pubDate>23.11.2026</pubDate><description>450.00</description><quant>1</quant></item></channel></rss>')
+    }
     if (req.headers['x-api-key'] !== AI_KEY)
       return send(401, { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } })
     const model = { type: 'model', id: VISION, display_name: 'Claude Haiku 5.5', created_at: '2026-01-01T00:00:00Z' }
@@ -1303,6 +1310,12 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   const filled14 = await textOf(form.locator('[data-testid=ai-writer-filled]'))
   check(wrote14 && filled14 === 'Подставлено в форму: название, описание, раздел, бренд.' && f14.name === t14.name && f14.description === t14.description && f14.seo === OWN_SEO, `SEO-описание, написанное, пока ИИ отвечал, — не затёрто, остальное подставлено: «${filled14}»`)
   check(await textOf(form.locator('[data-testid=ai-writer-brand]')) === `Бренд: ${PROBE_BRAND}` && await form.getByRole('combobox').filter({ hasText: PROBE_BRAND }).count() === 1 && await form.locator('[data-testid=ai-brand]').count() === 0 && !ai.searches.length, 'бренд из списка сайта — выбран в форме, «Создать бренд» нет')
+  // Расход (24.11.2026): заглушка отвечает 1000 токенов мимо кеша, 4000 в кеш, 500 из кеша и 600 ответа —
+  // по ценам Sonnet 5.5 это $0,01805, по курсу заглушки 450 ₸ — 8,1 ₸
+  // Строки — блоками, без пробела между ними: textContent всей строки их склеивает, сверять по одной
+  const usageLines = async root => JSON.stringify((await root.locator('[data-testid=ai-writer-usage] > span').allTextContents()).map(sp))
+  const usage14 = await usageLines(form)
+  check(usage14 === JSON.stringify(['Расход: 6 100 токенов (запрос 5 500, ответ 600) ≈ 8,1 ₸ · $0,018', 'Курс Нацбанка на 23.11.2026: 450,00 ₸ за $']), `под ответом — расход в токенах, тенге и долларах и курс с датой — курс заглушки, не nationalbank.kz и не из кода: ${usage14}`)
   await form.context().close()
 
   // Клик со страницы, а не переход по адресу: ссылка ведёт куда надо
@@ -1334,6 +1347,7 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   check(w13?.rules && !w13.clipboardAnswer && w13.listed, 'в промпте — правила и задание кнопки «Скопировать промпт», без строк «Имя поля:», со списками разделов и брендов сайта')
   check(JSON.stringify(w13?.images) === '["base64 image/png как отдано"]' && w13.data.includes('- Код модели (артикул с коробки): PO-1013') && !/₸|Цена \d/.test(w13.data), `модели — фото поста из бакета и подпись без цены: ${JSON.stringify(w13?.images)}`)
   check(ai.writerRetrieved <= 1, `справка о модели текстов — не больше одной на сервер: ${ai.writerRetrieved}`)
+  check(ai.rates <= 1 && await usageLines(page) === usage14, `курс — не больше одного запроса за день на сервер (${ai.rates}), расход второго товара — той же строкой`)
 
   console.log('\n== бренда на сайте нет — заполняется вручную')
   const brandLine = await textOf(page.locator('[data-testid=ai-writer-brand]'))
