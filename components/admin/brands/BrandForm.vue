@@ -410,7 +410,9 @@ onBeforeUnmount(() => {
 
     <!-- 🔍 SEO секция -->
     <div class="space-y-4 pt-6 border-t">
-      <div class="flex items-center justify-between gap-3">
+      <!-- С переносом: на телефоне кнопки уходят на вторую строку. Без него «Сгенерировать» на странице бренда
+           уезжала за правый край, а в окне формы товара строка распирала окно шире экрана (24.11.2026) -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <h3 class="font-semibold flex items-center gap-2">
           <Icon name="lucide:search" class="w-4 h-4" />
           SEO оптимизация

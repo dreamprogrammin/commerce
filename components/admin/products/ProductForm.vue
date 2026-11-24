@@ -1909,8 +1909,9 @@ const seoKeywordsString = computed({
             </Popover>
 
             <Dialog v-model:open="isBrandDialogOpen">
-              <!-- Форма бренда выше экрана: без прокрутки «Сохранить бренд» уходила за край (24.11.2026) -->
-              <DialogContent class="max-h-[90dvh] overflow-y-auto sm:max-w-[625px]">
+              <!-- Форма бренда выше экрана: без прокрутки «Сохранить бренд» уходила за край. Колонка сетки — по ширине
+                   окна (grid-cols-1): иначе её распирает неразрывная строка формы, на телефоне окно шире экрана (24.11.2026) -->
+              <DialogContent class="grid-cols-1 max-h-[90dvh] overflow-y-auto sm:max-w-[625px]">
                 <DialogHeader>
                   <DialogTitle>Создать новый бренд</DialogTitle>
                 </DialogHeader>
@@ -2004,7 +2005,7 @@ const seoKeywordsString = computed({
             </Popover>
 
             <Dialog v-model:open="isProductLineDialogOpen">
-              <DialogContent class="max-h-[90dvh] overflow-y-auto sm:max-w-[525px]">
+              <DialogContent class="grid-cols-1 max-h-[90dvh] overflow-y-auto sm:max-w-[525px]">
                 <DialogHeader>
                   <DialogTitle>Создать новую линейку</DialogTitle>
                   <DialogDescription>

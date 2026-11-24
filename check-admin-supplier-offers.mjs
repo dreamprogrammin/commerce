@@ -67,7 +67,9 @@
  * 16) форма товара (24.11.2026): выбранный бренд не сужает список брендов;
  *     «➕ Создать новый бренд» и «…новую линейку» — окно с набранным в
  *     поиске названием и слагом по нему; окно выше экрана прокручивается, и
- *     «Сохранить» в нём можно нажать.
+ *     «Сохранить» в нём можно нажать; на телефоне 390 px оба окна в ширину
+ *     экрана, а на странице правки бренда кнопки строки «SEO оптимизация»
+ *     не уезжают за край.
  *
  * Данные заводит сам — администратор, покупатель, два поставщика с каналами,
  * вход подделки Telegram, ключ ИИ для заглушки, раздел и бренд для «Текстов
@@ -1459,14 +1461,22 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
     // Не нажалось — проверка ниже скажет «null», а не оборвёт страж
     await f24.getByText(create).first().click({ timeout: 10000 }).catch(() => {})
     const dialog = f24.getByRole('dialog')
+    // Ширина окна: содержимое не шире окна, окно и его кнопки и поля — в экране
+    const width = () => dialog.filter({ has: f24.locator(slugId) }).evaluate((d) => {
+      const r = d.getBoundingClientRect()
+      const out = [...d.querySelectorAll('button, input, textarea, h2')].map(el => el.getBoundingClientRect()).filter(b => b.width > 0 && (b.right > r.right + 0.5 || b.left < r.left - 0.5)).length
+      return { fits: d.scrollWidth <= d.clientWidth + 1 && r.left >= 0 && r.right <= window.innerWidth + 0.5 && !out, wide: `${d.scrollWidth}/${d.clientWidth}`, out }
+    }).catch(() => ({ fits: false }))
     const shown = await appeared(dialog.locator(slugId), 10000)
-      ? { name: await dialog.locator(nameId).inputValue(), slug: await dialog.locator(slugId).inputValue(), save: await reachable(dialog.getByRole('button', { name: save })) }
+      ? { name: await dialog.locator(nameId).inputValue(), slug: await dialog.locator(slugId).inputValue(), ...await width(), save: await reachable(dialog.getByRole('button', { name: save })) }
       : null
-    for (let i = 0; i < 3 && await f24.locator('[role=dialog], [role=listbox]').count(); i++)
+    // Окно и список уходят с анимацией и потом возвращают фокус своей кнопке: список, открытый раньше, тут же
+    // закрылся бы, а закрытый бывает, что открывается снова (телефон) — закрывать по одному, пока не уйдёт всё
+    for (let i = 0; i < 6 && await f24.locator('[role=dialog], [role=listbox]').count(); i++) {
       await f24.keyboard.press('Escape')
-    // Окно и список уходят с анимацией и потом возвращают фокус своей кнопке: список, открытый раньше, тут же закрылся бы
-    await f24.locator('[role=dialog], [role=listbox]').first().waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
-    await sleep(500)
+      await f24.locator('[role=dialog], [role=listbox]').first().waitFor({ state: 'detached', timeout: 2000 }).catch(() => {})
+      await sleep(500)
+    }
     return shown
   }
   const newBrandForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }), 'Поиск или создание бренда...', TYPED_BRAND, '➕ Создать новый бренд', '#brand-name', '#brand-slug', 'Сохранить бренд')
@@ -1475,7 +1485,24 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   const newLineForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: 'Выберите линейку' }), 'Поиск или создание линейки...', TYPED_LINE, '➕ Создать новую линейку', '#line-name', '#line-slug', 'Сохранить линейку')
   check(newLineForm?.name === TYPED_LINE && newLineForm.slug === 'probe-typed-line', `«➕ Создать новую линейку» — набранное название и слаг по нему: ${JSON.stringify(newLineForm)}`)
   check(newLineForm?.save === true, `«Сохранить линейку» в окне можно нажать: ${JSON.stringify(newLineForm)}`)
+  // Телефон. Было: колонку сетки окна бренда распирала неразрывная строка формы — окно 356 px, содержимое 457,
+  // «Промпт для нейросети» уезжала за край
+  await f24.setViewportSize({ width: 390, height: 844 })
+  const phoneBrandForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }), 'Поиск или создание бренда...', TYPED_BRAND, '➕ Создать новый бренд', '#brand-name', '#brand-slug', 'Сохранить бренд')
+  check(phoneBrandForm?.fits === true && phoneBrandForm.save === true, `окно бренда на телефоне 390 px — в ширину экрана, «Сохранить бренд» можно нажать: ${JSON.stringify(phoneBrandForm)}`)
+  const phoneLineForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: 'Выберите линейку' }), 'Поиск или создание линейки...', TYPED_LINE, '➕ Создать новую линейку', '#line-name', '#line-slug', 'Сохранить линейку')
+  check(phoneLineForm?.fits === true && phoneLineForm.save === true, `окно линейки на телефоне 390 px — в ширину экрана: ${JSON.stringify(phoneLineForm)}`)
   check(psql(`SELECT (SELECT count(*) FROM public.brands WHERE name = :'b') + (SELECT count(*) FROM public.product_lines WHERE name = :'l');`, { b: TYPED_BRAND, l: TYPED_LINE }) === '0', 'окна закрыты без сохранения — ни бренда, ни линейки не создано')
+  // Страница правки бренда на телефоне. Было: строка «SEO оптимизация» без переноса — «Сгенерировать» уезжала
+  // за правый край (до 550 px при ширине 390), а прокрутки вбок у страницы нет
+  await f24.goto(`${BASE}/admin/brands/${probeBrandId}`, { waitUntil: 'networkidle', timeout: 120000 })
+  const seoRow = f24.locator('h3', { hasText: 'SEO оптимизация' }).locator('xpath=..')
+  const measureRow = row => row.evaluate((el) => {
+    const buttons = [...el.querySelectorAll('button')].map(b => b.getBoundingClientRect())
+    return { buttons: buttons.length, fits: el.scrollWidth <= el.clientWidth + 1 && buttons.every(b => b.left >= 0 && b.right <= window.innerWidth + 0.5), rights: buttons.map(b => Math.round(b.right)) }
+  }).catch(() => null)
+  const rowWidth = await appeared(seoRow, 30000) ? await measureRow(seoRow) : null
+  check(rowWidth?.fits === true && rowWidth.buttons >= 2, `страница бренда на телефоне 390 px — кнопки строки «SEO оптимизация» на экране: ${JSON.stringify(rowWidth)}`)
   await f24.context().close()
   // Отказ модели выше — ожидаемый ответ, а не сбой страницы
   failedResponses.splice(0, failedResponses.length, ...failedResponses.filter(r => r !== '502 /api/admin/content-writer/product'))
