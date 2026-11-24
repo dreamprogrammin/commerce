@@ -238,7 +238,7 @@ const selectClass = 'h-10 w-full rounded-md border border-input bg-background px
           </CardContent>
         </Card>
 
-        <Card v-for="t in data.tasks" :key="t.task">
+        <Card v-for="t in data.tasks" :key="t.task" :data-testid="`ai-task-${t.task}`">
           <CardHeader>
             <CardTitle class="flex items-center gap-2">
               <Sparkles class="w-5 h-5" />
