@@ -2,13 +2,11 @@ import type { OfferItem } from '~/utils/supplierOfferList'
 import { describe, expect, it } from 'vitest'
 import { buildAdminPrompt, PROMPT_SHOP_RULES } from '~/constants/adminPrompts'
 import {
-  BRAND_SYSTEM,
   categoryPaths,
   cleanCaption,
   matchSiteBrand,
   normBrandName,
   offerProductData,
-  parseBrandReply,
   parseProductReply,
   productSystem,
 } from '~/server/utils/contentWriter'
@@ -113,8 +111,6 @@ describe('запрос к модели', () => {
     expect(system).toContain('Название товара: схема «Тип + бренд/серия')
     expect(system).toContain('5. Мальчикам › Машинки › Радиоуправляемые машинки')
     expect(system).toContain('1. L.O.L. Surprise!')
-    expect(BRAND_SYSTEM).toContain('Заголовок страницы (title)')
-    expect(BRAND_SYSTEM).not.toContain('Отвечай строго по полям из задания')
   })
 })
 
@@ -178,37 +174,5 @@ describe('ответ модели о товаре', () => {
 
   it('не JSON — ошибка, а не пустая форма', () => {
     expect(() => parseProductReply('Не могу помочь', categories, brands)).toThrow('Ответ модели не разобрался')
-  })
-})
-
-describe('ответ модели о бренде', () => {
-  const reply = (over: Record<string, unknown> = {}) => JSON.stringify({
-    found: true,
-    name: 'Roadster Toys',
-    meta_title: 'Машинки Roadster Toys — купить в Алматы | Ухтышка',
-    seo_h1: 'Машинки Roadster Toys',
-    seo_description: 'Машинки Roadster Toys на радиоуправлении: модели для детей от 3 лет. Доставка по Алматы за 1–3 рабочих дня и самовывоз из Шапагата.',
-    seo_keywords: ['roadster toys', 'машинки roadster', 'roadster toys', ' '],
-    description: '<h2>О бренде</h2><p>Машинки.</p><img src=x onerror=alert(1)>',
-    ...over,
-  })
-
-  it('страница бренда: слаг из названия, ключевые слова без повторов и пустых, разметка вычищена', () => {
-    const { page, warnings } = parseBrandReply(reply())
-    expect(page).toMatchObject({ name: 'Roadster Toys', slug: 'roadster-toys', seo_h1: 'Машинки Roadster Toys' })
-    expect(page?.seo_keywords).toEqual(['roadster toys', 'машинки roadster'])
-    expect(page?.description).toBe('<h2>О бренде</h2><p>Машинки.</p>')
-    expect(warnings.join(' ')).toMatch(/вырезаны неразрешённые теги: img/)
-  })
-
-  it('found=false или без названия — бренда нет', () => {
-    expect(parseBrandReply(reply({ found: false })).page).toBeNull()
-    expect(parseBrandReply(reply({ name: '  ' })).page).toBeNull()
-  })
-
-  it('проверки длины — те же, что у генератора страниц брендов', () => {
-    const { warnings } = parseBrandReply(reply({ meta_title: 'Машинки Roadster Toys на радиоуправлении — купить в Алматы с доставкой' }))
-    expect(warnings.join(' ')).toMatch(/Google обрежет после 60/)
-    expect(warnings.join(' ')).toMatch(/нет названия магазина/)
   })
 })

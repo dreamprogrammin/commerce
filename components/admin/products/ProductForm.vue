@@ -90,6 +90,8 @@ const emit = defineEmits<{
   ): void
   /** Какие поля получили ответ ИИ — подписями для человека */
   (e: 'aiFilled', fields: string[]): void
+  /** Бренд создан в окне формы и выбран в ней */
+  (e: 'brandCreated', brand: { id: string, name: string }): void
 }>()
 
 // --- 2. ИНИЦИАЛИЗАЦИЯ СТОРОВ И COMPOSABLES ---
@@ -404,6 +406,13 @@ function openProductLineDialog(name: string) {
   isProductLineDialogOpen.value = true
 }
 
+/*
+ * «Тексты для сайта» (24.11.2026): бренда, которого на сайте нет, ИИ не ищет —
+ * карточка над формой открывает это окно с названием от ИИ, человек
+ * заполняет бренд сам (кнопка «Промпт для нейросети» в окне).
+ */
+defineExpose({ openBrandDialog })
+
 async function handleBrandCreate(payload: {
   data: BrandInsert | BrandUpdate
   file: File | null
@@ -419,6 +428,7 @@ async function handleBrandCreate(payload: {
     await nextTick()
     formData.value.brand_id = newBrand.id
     brandSearchQuery.value = ''
+    emit('brandCreated', { id: newBrand.id, name: newBrand.name })
   }
 }
 
