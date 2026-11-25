@@ -9,7 +9,8 @@
  * На телефоне (с 25.11.2026, владелец: «тост на мобилке слишком большой»)
  * карточка плотнее макета: по макету она была 113px в высоту, теперь ~75 —
  * чип 30, фото 34, заголовок 13px, название товара одной строкой, крестик 24.
- * Проверяется на 390 и 360.
+ * Проверяется на 390 и 360 — на тосте удаления: тоста о добавлении на
+ * телефоне нет, о нём говорит нижняя панель (check-mobile-nav.mjs).
  */
 import { chromium } from 'playwright'
 
@@ -165,12 +166,18 @@ async function open(opts) {
 }
 
 // ---------- 3. Мобильный: снизу, над таб-баром, плотнее макета ----------
+// С 25.11.2026 на телефоне тоста о добавлении нет — говорит нижняя панель
+// (MobileNav.dc.html, вариант 1c; страж check-mobile-nav.mjs). Плотный тост
+// проверяется на удалении: он на телефоне остался, и с «Вернуть».
 for (const width of [390, 360]) {
   const { ctx, page } = await open({ viewport: { width, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
   await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
   const add = page.locator('button.pc-add').first()
   await add.scrollIntoViewIfNeeded()
   await add.click()
+  await page.waitForTimeout(1500)
+  const addedToasts = await page.evaluate(() => document.querySelectorAll('[data-sonner-toast]').length)
+  await page.locator('button[aria-label="Уменьшить количество"]').first().click()
   await settled(page)
   const t = await page.evaluate(readToast)
   const navTop = await page.evaluate(() => {
@@ -179,10 +186,11 @@ for (const width of [390, 360]) {
     const nav = document.querySelector('nav.mbn-bar')
     return nav ? Math.round(nav.getBoundingClientRect().top) : null
   })
-  const toastBottom = await page.evaluate(() => Math.round(document.querySelector('[data-sonner-toast]').getBoundingClientRect().bottom))
+  const toastBottom = await page.evaluate(() => Math.round(document.querySelector('[data-sonner-toast]')?.getBoundingClientRect().bottom ?? -1))
 
   console.log(`\n3) мобильный, ${width}px`)
-  check(!!t, 'тост показан')
+  check(addedToasts === 0, `тоста о добавлении нет (${addedToasts})`)
+  check(t?.title === 'Товар убрали из корзины', `тост удаления показан («${t?.title}»)`)
   if (t) {
     check(t.width === width - 20, `во всю ширину минус отступы (${t.width})`)
     check(Math.abs(t.bottom - 96) <= 1, `снизу, над таб-баром (${t.bottom})`)
@@ -223,13 +231,14 @@ for (const width of [390, 360]) {
 }
 
 // ---------- 5. Страница товара: одно уведомление, а не два ----------
+// На десктопе: на телефоне тоста о добавлении нет вовсе (сценарий 3).
 {
-  const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
+  const { ctx, page } = await open({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 })
   await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
   await page.locator('a[href^="/catalog/products/"]').first().click()
   await page.waitForURL('**/catalog/products/**')
   await page.waitForTimeout(2500)
-  await page.locator('.pdp-cta--pill').first().click()
+  await page.locator('button.pdp-cta:not(.pdp-cta--pill)').first().click()
   // Добавление ходит в базу — ждём появления первого тоста, а не «на глазок».
   await page.waitForSelector('[data-sonner-toast]', { timeout: 15000 })
   await page.waitForTimeout(1200)

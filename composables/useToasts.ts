@@ -1,6 +1,7 @@
 import { Icon } from '#components'
 import { h } from 'vue'
 import { toast } from 'vue-sonner'
+import { isBottomNavShown } from '@/composables/useCartAdded'
 
 /**
  * Уведомления по макету «Тосты.dc.html».
@@ -61,8 +62,17 @@ function show({ title, description, icon, thumbUrl, accentClass, product, type, 
 
 export function useToasts() {
   return {
-    /** Товар положили в корзину. */
+    /**
+     * Товар положили в корзину.
+     *
+     * Только там, где нет нижней панели (десктоп, админка): на телефоне и
+     * планшете о добавлении говорит она сама — подсказкой над корзиной и
+     * кольцом пути до бесплатной доставки (макет MobileNav.dc.html, см.
+     * `composables/useCartAdded.ts`).
+     */
     cartAdded(name: string, thumbUrl?: string | null) {
+      if (isBottomNavShown())
+        return
       show({
         title: 'Добавили в корзину',
         description: name,
