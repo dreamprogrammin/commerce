@@ -5,6 +5,11 @@
  * на радиусе 14, чип иконки с фотографией товара, название второй строкой,
  * действие в цвете акцента, полоса времени жизни и её остановка под курсором,
  * стопка не длиннее трёх, позиция снизу справа и снизу над таб-баром.
+ *
+ * На телефоне (с 25.11.2026, владелец: «тост на мобилке слишком большой»)
+ * карточка плотнее макета: по макету она была 113px в высоту, теперь ~75 —
+ * чип 30, фото 34, заголовок 13px, название товара одной строкой, крестик 24.
+ * Проверяется на 390 и 360.
  */
 import { chromium } from 'playwright'
 
@@ -45,19 +50,26 @@ function readToast() {
   const bar = getComputedStyle(pick('[data-content]'), '::after')
   const action = style(pick('[data-button]'))
   const chip = style(pick('.uh-toast-chip'))
+  const thumb = style(pick('.uh-toast-thumb'))
   const close = style(pick('[data-close-button]'))
   return {
     width: Math.round(rect.width),
+    height: Math.round(rect.height),
+    product: t.classList.contains('uh-toast--product'),
     right: Math.round(window.innerWidth - rect.right),
     bottom: Math.round(window.innerHeight - rect.bottom),
     radius: getComputedStyle(t).borderRadius,
     title: pick('[data-title]')?.textContent?.trim(),
     description: pick('[data-description]')?.textContent?.trim() || '',
     descriptionClamp: style(pick('[data-description]'))?.webkitLineClamp,
+    descriptionHeight: Math.round(pick('[data-description]')?.getBoundingClientRect().height ?? 0),
+    titleSize: style(pick('[data-title]'))?.fontSize,
+    titleHeight: Math.round(pick('[data-title]')?.getBoundingClientRect().height ?? 0),
     action: pick('[data-button]')?.textContent?.trim() || '',
     actionColor: action?.color,
     actionBg: action?.backgroundColor,
     chipSize: chip ? `${chip.width}×${chip.height}` : null,
+    thumbSize: thumb ? `${thumb.width}×${thumb.height}` : null,
     hasThumb: !!pick('.uh-toast-thumb img'),
     closeSize: close ? `${close.width}×${close.height}` : null,
     bar: { height: bar.height, animation: bar.animationName, duration: bar.animationDuration, state: bar.animationPlayState },
@@ -68,6 +80,12 @@ const browser = await chromium.launch()
 
 async function open(opts) {
   const ctx = await browser.newContext(opts)
+  // Гостевая корзина в базу не пишется, аналитика не шлётся; по превью или
+  // бою (`--base=https://…`) не грузятся и картинки хранилища — трафик Supabase.
+  const local = /localhost|127\.0\.0\.1/.test(BASE)
+  await ctx.route(local
+    ? /\/rest\/v1\/rpc\/save_guest_cart|googletagmanager\.com|google-analytics\.com/
+    : /\/rest\/v1\/rpc\/save_guest_cart|googletagmanager\.com|google-analytics\.com|\/storage\/v1\//, route => route.abort())
   await ctx.addInitScript(() => {
     try {
       localStorage.setItem('tg_modal_dismissed_at', String(Date.now()))
@@ -146,9 +164,9 @@ async function open(opts) {
   await ctx.close()
 }
 
-// ---------- 3. Мобильный: снизу, над таб-баром ----------
-{
-  const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
+// ---------- 3. Мобильный: снизу, над таб-баром, плотнее макета ----------
+for (const width of [390, 360]) {
+  const { ctx, page } = await open({ viewport: { width, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
   await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
   const add = page.locator('button.pc-add').first()
   await add.scrollIntoViewIfNeeded()
@@ -156,16 +174,24 @@ async function open(opts) {
   await settled(page)
   const t = await page.evaluate(readToast)
   const navTop = await page.evaluate(() => {
-    const nav = document.querySelector('.mbn-bar, nav')
+    // Именно нижняя панель: прежний селектор '.mbn-bar, nav' брал первый nav
+    // в разметке — навигацию подвала на 6500px, — и проверка проходила всегда.
+    const nav = document.querySelector('nav.mbn-bar')
     return nav ? Math.round(nav.getBoundingClientRect().top) : null
   })
   const toastBottom = await page.evaluate(() => Math.round(document.querySelector('[data-sonner-toast]').getBoundingClientRect().bottom))
 
-  console.log('\n3) мобильный')
+  console.log(`\n3) мобильный, ${width}px`)
   check(!!t, 'тост показан')
   if (t) {
-    check(t.width === 370, `во всю ширину минус отступы (${t.width})`)
+    check(t.width === width - 20, `во всю ширину минус отступы (${t.width})`)
     check(Math.abs(t.bottom - 96) <= 1, `снизу, над таб-баром (${t.bottom})`)
+    check(t.height <= 78, `высота не больше 78px (${t.height}; по макету было 113)`)
+    check(t.chipSize === '30px×30px' && t.thumbSize === '34px×34px', `чип 30×30 и фото 34×34 (${t.chipSize}, ${t.thumbSize})`)
+    check(t.titleSize === '13px' && t.titleHeight <= 18, `заголовок 13px в одну строку (${t.titleSize}, ${t.titleHeight}px)`)
+    check(t.product && t.descriptionClamp === '1' && t.descriptionHeight <= 17, `название товара одной строкой (обрезка ${t.descriptionClamp}, ${t.descriptionHeight}px)`)
+    check(t.closeSize === '24px×24px', `крестик 24×24 (${t.closeSize})`)
+    check(t.bar.height === '3px' && t.bar.animation === 'uh-toast-bar', `полоса времени на месте (${t.bar.height})`)
   }
   check(navTop === null || toastBottom <= navTop, `тост не заезжает на таб-бар (низ ${toastBottom}, панель ${navTop})`)
   await ctx.close()

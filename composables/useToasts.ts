@@ -34,15 +34,21 @@ interface RichToast {
   thumbUrl?: string | null
   /** Класс задаёт акцент там, где типа тоста не хватает (бонусы, избранное). */
   accentClass?: string
+  /**
+   * Описание — название товара: на телефоне оно в одну строку (тост там
+   * плотнее, см. toast.css). Остальным описаниям — ошибкам, бонусам — строки
+   * не урезаются: в них смысл, а не подпись.
+   */
+  product?: boolean
   type?: 'success' | 'info' | 'error'
   action?: { label: string, onClick: () => void }
 }
 
-function show({ title, description, icon, thumbUrl, accentClass, type, action }: RichToast) {
+function show({ title, description, icon, thumbUrl, accentClass, product, type, action }: RichToast) {
   const options = {
     description: description || undefined,
     icon: figure(icon, thumbUrl),
-    class: ['uh-toast--rich', accentClass].filter(Boolean).join(' '),
+    class: ['uh-toast--rich', product && 'uh-toast--product', accentClass].filter(Boolean).join(' '),
     action,
   }
 
@@ -62,6 +68,7 @@ export function useToasts() {
         description: name,
         icon: 'solar:cart-3-bold',
         thumbUrl,
+        product: true,
         action: {
           label: 'Перейти в корзину',
           onClick: () => {
@@ -78,6 +85,7 @@ export function useToasts() {
         description: name,
         icon: 'lucide:trash-2',
         thumbUrl,
+        product: true,
         type: 'info',
         action: { label: 'Вернуть', onClick: undo },
       })
@@ -100,6 +108,7 @@ export function useToasts() {
         description: name,
         icon: 'line-md:heart-filled',
         accentClass: 'uh-toast--wish',
+        product: true,
         action: {
           label: 'Смотреть избранное',
           onClick: () => {
@@ -115,6 +124,7 @@ export function useToasts() {
         description: name,
         icon: 'line-md:heart',
         accentClass: 'uh-toast--wish',
+        product: true,
         type: 'info',
       })
     },
