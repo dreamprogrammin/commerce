@@ -9,8 +9,14 @@
  * На телефоне (с 25.11.2026, владелец: «тост на мобилке слишком большой»)
  * карточка плотнее макета: по макету она была 113px в высоту, теперь ~75 —
  * чип 30, фото 34, заголовок 13px, название товара одной строкой, крестик 24.
- * Проверяется на 390 и 360 — на тосте удаления: тоста о добавлении на
- * телефоне нет, о нём говорит нижняя панель (check-mobile-nav.mjs).
+ *
+ * О корзине на телефоне тосты не говорят вовсе — ни о добавлении, ни об
+ * удалении, ни об очистке: говорит нижняя панель (MobileNav.dc.html, вариант
+ * 1c; удаление — по просьбе владельца 25.11.2026; страж check-mobile-nav.mjs).
+ * Плотный тост на 390 и 360 проверяется на «Ссылка скопирована» в шапке
+ * карточки товара — простом тосте, без чипа и фото. Богатые тосты на
+ * телефоне остались только у избранного, а оно без входа недоступно, так что
+ * чип 30 и фото 34 этот страж больше не проверяет.
  */
 import { chromium } from 'playwright'
 
@@ -93,9 +99,31 @@ async function open(opts) {
     }
     catch {}
   })
+  // Каждый тост с загрузки страницы: на экране он живёт 4 с, и «тоста нет»
+  // по одному взгляду проходило бы и там, где он успел уйти.
+  await ctx.addInitScript(() => {
+    window.__seenToasts = []
+    const seen = new WeakSet()
+    const scan = () => {
+      for (const toast of document.querySelectorAll('[data-sonner-toast]')) {
+        const title = toast.querySelector('[data-title]')?.textContent.trim()
+        if (title && !seen.has(toast)) {
+          seen.add(toast)
+          window.__seenToasts.push(title)
+        }
+      }
+    }
+    const start = () => new MutationObserver(scan).observe(document.body, { childList: true, subtree: true })
+    if (document.body)
+      start()
+    else
+      document.addEventListener('DOMContentLoaded', start)
+  })
   const page = await ctx.newPage()
   return { ctx, page }
 }
+
+const seenToasts = () => window.__seenToasts ?? []
 
 // ---------- 1. Десктоп: тост добавления в корзину ----------
 {
@@ -165,43 +193,53 @@ async function open(opts) {
   await ctx.close()
 }
 
-// ---------- 3. Мобильный: снизу, над таб-баром, плотнее макета ----------
-// С 25.11.2026 на телефоне тоста о добавлении нет — говорит нижняя панель
-// (MobileNav.dc.html, вариант 1c; страж check-mobile-nav.mjs). Плотный тост
-// проверяется на удалении: он на телефоне остался, и с «Вернуть».
+// ---------- 3. Мобильный: снизу, плотнее макета; о корзине — ни слова ----------
+// Тост — «Ссылка скопирована» на карточке товара (см. шапку файла). Там над
+// таб-баром стоит панель покупки, и тостер поднят над ней: низ на 168px.
 for (const width of [390, 360]) {
   const { ctx, page } = await open({ viewport: { width, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
+  await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(BASE).origin })
+  // Системного «Поделиться» в браузере стража нет и не должно быть: иначе
+  // страница отдала бы ссылку ему, а не в буфер с тостом.
+  await ctx.addInitScript(() => {
+    try {
+      Object.defineProperty(Navigator.prototype, 'share', { value: undefined, configurable: true })
+    }
+    catch {}
+  })
   await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
   const add = page.locator('button.pc-add').first()
   await add.scrollIntoViewIfNeeded()
   await add.click()
   await page.waitForTimeout(1500)
-  const addedToasts = await page.evaluate(() => document.querySelectorAll('[data-sonner-toast]').length)
   await page.locator('button[aria-label="Уменьшить количество"]').first().click()
+  await page.waitForTimeout(1200)
+  const cartToasts = await page.evaluate(seenToasts)
+
+  await page.locator('a[href^="/catalog/products/"]').first().click()
+  await page.waitForURL('**/catalog/products/**')
+  await page.waitForTimeout(2500)
+  await page.locator('button[aria-label="Поделиться"]').first().click()
   await settled(page)
   const t = await page.evaluate(readToast)
-  const navTop = await page.evaluate(() => {
-    // Именно нижняя панель: прежний селектор '.mbn-bar, nav' брал первый nav
-    // в разметке — навигацию подвала на 6500px, — и проверка проходила всегда.
-    const nav = document.querySelector('nav.mbn-bar')
-    return nav ? Math.round(nav.getBoundingClientRect().top) : null
+  const buybarTop = await page.evaluate(() => {
+    const bar = document.querySelector('.pdp-buybar')
+    return bar ? Math.round(bar.getBoundingClientRect().top) : null
   })
   const toastBottom = await page.evaluate(() => Math.round(document.querySelector('[data-sonner-toast]')?.getBoundingClientRect().bottom ?? -1))
 
   console.log(`\n3) мобильный, ${width}px`)
-  check(addedToasts === 0, `тоста о добавлении нет (${addedToasts})`)
-  check(t?.title === 'Товар убрали из корзины', `тост удаления показан («${t?.title}»)`)
+  check(cartToasts.length === 0, `тостов о корзине нет — ни о добавлении, ни об удалении (${cartToasts.join(' | ') || '—'})`)
+  check(t?.title === 'Ссылка скопирована', `тост показан («${t?.title}»)`)
   if (t) {
     check(t.width === width - 20, `во всю ширину минус отступы (${t.width})`)
-    check(Math.abs(t.bottom - 96) <= 1, `снизу, над таб-баром (${t.bottom})`)
+    check(Math.abs(t.bottom - 168) <= 1, `снизу, над панелью покупки (${t.bottom})`)
     check(t.height <= 78, `высота не больше 78px (${t.height}; по макету было 113)`)
-    check(t.chipSize === '30px×30px' && t.thumbSize === '34px×34px', `чип 30×30 и фото 34×34 (${t.chipSize}, ${t.thumbSize})`)
     check(t.titleSize === '13px' && t.titleHeight <= 18, `заголовок 13px в одну строку (${t.titleSize}, ${t.titleHeight}px)`)
-    check(t.product && t.descriptionClamp === '1' && t.descriptionHeight <= 17, `название товара одной строкой (обрезка ${t.descriptionClamp}, ${t.descriptionHeight}px)`)
     check(t.closeSize === '24px×24px', `крестик 24×24 (${t.closeSize})`)
     check(t.bar.height === '3px' && t.bar.animation === 'uh-toast-bar', `полоса времени на месте (${t.bar.height})`)
   }
-  check(navTop === null || toastBottom <= navTop, `тост не заезжает на таб-бар (низ ${toastBottom}, панель ${navTop})`)
+  check(buybarTop !== null && toastBottom <= buybarTop, `тост не заезжает на панель покупки (низ ${toastBottom}, панель ${buybarTop})`)
   await ctx.close()
 }
 
@@ -248,7 +286,12 @@ for (const width of [390, 360]) {
   await ctx.close()
 }
 
-// ---------- 6. Корзина: тост не закрывает кнопку оформления ----------
+// ---------- 6. Корзина на телефоне: тостов нет ----------
+// До 25.11.2026 здесь проверялось, что тост не закрывает кнопку оформления.
+// Теперь «Меньше», × и «Очистить» на телефоне показывают подсказку у корзины
+// нижней панели, а не тост; её место над кнопкой оформления проверяет
+// check-mobile-nav.mjs. Подъём тостера над кнопкой (toast.css) общий с
+// панелью покупки и проверяется в сценарии 3.
 {
   const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
   await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
@@ -260,25 +303,21 @@ for (const width of [390, 360]) {
   }
   await page.goto(`${BASE}/cart`, { waitUntil: 'networkidle' })
   await page.waitForTimeout(2000)
-  await page.locator('button[aria-label="Меньше"]').first().click()
-  await settled(page)
-  const boxes = await page.evaluate(() => {
-    const box = (sel) => {
-      const el = document.querySelector(sel)
-      if (!el)
-        return null
-      const r = el.getBoundingClientRect()
-      return { top: Math.round(r.top), bottom: Math.round(r.bottom) }
-    }
-    return { toast: box('[data-sonner-toast]'), cta: box('.cart-mobile-cta') }
+  await page.evaluate(() => document.querySelector('button[aria-label="Меньше"]')?.click())
+  await page.waitForTimeout(800)
+  await page.evaluate(() => document.querySelector('button[aria-label="Убрать из корзины"]')?.click())
+  await page.waitForTimeout(800)
+  await page.evaluate(() => {
+    const label = [...document.querySelectorAll('button span')].find(s => s.textContent.trim() === 'Очистить' && s.offsetParent !== null)
+    label?.closest('button')?.click()
   })
+  await page.waitForTimeout(1200)
+  const seen = await page.evaluate(seenToasts)
+  const left = await page.evaluate(() => document.querySelectorAll('button[aria-label="Убрать из корзины"]').length)
 
   console.log('\n6) корзина на мобильном')
-  check(!!boxes.cta, 'кнопка оформления на месте')
-  check(
-    !!boxes.toast && !!boxes.cta && boxes.toast.bottom <= boxes.cta.top,
-    `тост выше кнопки оформления (тост ${boxes.toast?.bottom}, кнопка ${boxes.cta?.top})`,
-  )
+  check(left === 0, `корзину очистили (позиций ${left})`)
+  check(seen.length === 0, `тостов не было — ни «Меньше», ни ×, ни «Очистить» (${seen.join(' | ') || '—'})`)
   await ctx.close()
 }
 

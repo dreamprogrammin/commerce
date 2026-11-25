@@ -1,7 +1,7 @@
 import { Icon } from '#components'
 import { h } from 'vue'
 import { toast } from 'vue-sonner'
-import { isBottomNavShown } from '@/composables/useCartAdded'
+import { isBottomNavShown } from '@/composables/useCartChange'
 
 /**
  * Уведомления по макету «Тосты.dc.html».
@@ -68,7 +68,7 @@ export function useToasts() {
      * Только там, где нет нижней панели (десктоп, админка): на телефоне и
      * планшете о добавлении говорит она сама — подсказкой над корзиной и
      * кольцом пути до бесплатной доставки (макет MobileNav.dc.html, см.
-     * `composables/useCartAdded.ts`).
+     * `composables/useCartChange.ts`).
      */
     cartAdded(name: string, thumbUrl?: string | null) {
       if (isBottomNavShown())
@@ -88,8 +88,16 @@ export function useToasts() {
       })
     },
 
-    /** Товар убрали из корзины — с возвратом, пока тост на экране. */
+    /**
+     * Товар убрали из корзины — с возвратом, пока тост на экране.
+     *
+     * Тоже только без нижней панели: на телефоне об удалении говорит она —
+     * красным «−1» над корзиной и с «Вернуть» (владелец 25.11.2026: тост при
+     * удалении убрать, сделать как при добавлении).
+     */
     cartRemoved(name: string, undo: () => void, thumbUrl?: string | null) {
+      if (isBottomNavShown())
+        return
       show({
         title: 'Товар убрали из корзины',
         description: name,
