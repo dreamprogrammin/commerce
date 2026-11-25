@@ -72,7 +72,7 @@ const count = computed(() => products.value.length)
         <span
           class="mb-4 inline-grid size-[72px] place-content-center rounded-full bg-blue-50 text-primary"
         >
-          <Icon name="line-md:heart" class="size-[34px]" />
+          <Icon name="uhti:heart" class="size-[34px]" />
         </span>
         <p class="mb-1.5 text-[19px] font-extrabold text-foreground">
           В избранном пока пусто

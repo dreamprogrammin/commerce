@@ -332,7 +332,7 @@ async function onWish() {
         @click.stop.prevent="onWish"
       >
         <Icon
-          :name="isWishlisted ? 'line-md:heart-filled' : 'line-md:heart'"
+          :name="isWishlisted ? 'uhti:heart-filled' : 'uhti:heart'"
           class="size-[21px]"
           :class="isWishlisted ? 'text-red-500' : 'text-muted-foreground'"
         />
