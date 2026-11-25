@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
+import { useBottomNavReveal } from '@/composables/useBottomNavReveal'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
@@ -238,6 +239,9 @@ function handleItemClick(event: MouseEvent, item: NavItem, navigate: (e?: MouseE
 
 // Scroll-aware visibility: hide once scrolled past 280px while moving down,
 // reveal again on any upward scroll or once back near the top.
+// Ещё панель выезжает, когда товар летит в корзину (useCartFly): на телефоне
+// товар летит в её корзину, даже если прокрутка её спрятала. Липкие панели
+// страниц едут вместе с ней и ловят то же событие (useBottomNavReveal).
 const isHidden = ref(false)
 let lastScrollY = 0
 let ticking = false
@@ -265,6 +269,9 @@ onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true })
 })
 onUnmounted(() => window.removeEventListener('scroll', onScroll))
+useBottomNavReveal(() => {
+  isHidden.value = false
+})
 </script>
 
 <template>
@@ -272,6 +279,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     ref="barEl"
     class="flex items-center lg:hidden z-50 mbn-bar"
     :class="isHidden ? 'mbn-bar--hidden' : ''"
+    data-cart-dock
     aria-label="Основная навигация"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"

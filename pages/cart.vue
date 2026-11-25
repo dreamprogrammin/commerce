@@ -4,6 +4,7 @@ import type { BaseProduct, ProductWithImages } from '@/types'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useBottomNavReveal } from '@/composables/useBottomNavReveal'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { useHaptic } from '@/composables/useHaptic'
 import { BUCKET_NAME_PRODUCT, FREE_SHIPPING_THRESHOLD } from '@/constants'
@@ -448,6 +449,11 @@ onMounted(() => {
   window.addEventListener('scroll', handleScroll, { passive: true })
 })
 onUnmounted(() => window.removeEventListener('scroll', handleScroll))
+// Навигация выезжает и без прокрутки — когда товар летит в корзину (здесь —
+// из «Рекомендуем»); панель едет за ней, иначе навигация встанет поверх.
+useBottomNavReveal(() => {
+  isNavVisible.value = true
+})
 </script>
 
 <template>
