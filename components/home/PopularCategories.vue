@@ -109,11 +109,16 @@ function tintFor(index: number): string {
  *
  * Идиома взята из CatalogMobileSections: `src` = sm, `srcset` = sm 400w +
  * md 800w, `sizes` — по фактической ширине КАРТИНКИ, а не плитки. Разница
- * решающая: при layout="corner" картинка занимает 132px в плитке 150px, и
- * на экране с DPR 3 это 396px против порога варианта sm в 400px. Объяви
- * здесь 150px — и браузер возьмёт md на 800px, то есть впятеро тяжелее.
- * Замерено в браузере: 132×111 в плитке 150×150 на 390px; на 1440px
- * 278×315 в большой плитке и 147×144 в малой.
+ * решающая: на экране с DPR 3 заявленные 132px — это 396px против порога
+ * варианта sm в 400px. Объяви здесь ширину плитки — и браузер возьмёт md на
+ * 800px, то есть впятеро тяжелее.
+ *
+ * С 25 ноября 2026 мобильная плитка до 164px (была 150), и коробка картинки
+ * в ней 144×121. Но картинки категорий не шире квадрата, `contain` вписывает
+ * их по высоте, и видно не больше 121px. Поэтому заявлены прежние 132px, и
+ * вариант остался sm. Замерено в браузере на 390px, DPR 3: все плитки на всех вкладках в
+ * sm, самая широкая видимая картинка — 121px. На 1440px 278×315 в большой
+ * плитке и 147×144 в малой.
  */
 function imageOf(item: CategoryMenuItem): string | null {
   if (!item.image_url)
@@ -221,10 +226,10 @@ const seeAllHref = '/catalog/all'
       </h2>
       <NuxtLink
         :to="seeAllHref"
-        class="inline-flex items-center gap-1.5 text-primary font-semibold text-sm whitespace-nowrap hover:underline"
+        class="inline-flex items-center gap-[5px] text-primary font-semibold text-[15px] whitespace-nowrap hover:underline"
       >
         Все категории
-        <Icon name="lucide:arrow-right" class="size-4" />
+        <Icon name="lucide:arrow-right" class="size-[15px]" />
       </NuxtLink>
     </div>
 
@@ -244,7 +249,7 @@ const seeAllHref = '/catalog/all'
           :class="{ 'cats-tab--active': tab.key === activeTab }"
           @click="activeTab = tab.key"
         >
-          <Icon :name="tab.icon" class="size-4" />
+          <Icon :name="tab.icon" class="size-[17px]" />
           {{ tab.name }}
         </button>
       </div>
@@ -342,19 +347,21 @@ const seeAllHref = '/catalog/all'
     }
   }
 
+  /* Размеры вкладки и шрифта — из прототипа (PopularCategories.dc.html,
+     25 ноября 2026): было 40px и 14px. */
   .cats-tab {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    height: 40px;
-    padding: 0 16px;
+    height: 44px;
+    padding: 0 18px;
     border: 1px solid var(--border);
     border-radius: 999px;
     background: #fff;
     color: var(--foreground);
     font-weight: 600;
-    font-size: 14px;
+    font-size: 15px;
     white-space: nowrap;
     cursor: pointer;
     transition:
@@ -451,11 +458,20 @@ const seeAllHref = '/catalog/all'
       display: none;
     }
 
+    /* Плитка 164px — из прототипа (25 ноября 2026): выросла со 150 вместе
+       с заголовком, который стал 15px вместо 11.
+
+       На телефонах уже 392px она сжимается — добавка сверх прототипа. Справа
+       должен выглядывать край третьей колонки: это подсказка, что ленту
+       можно листать. При 164px на 360px его не видно вовсе, на 375 — 7px
+       (было 20 и 35 при 150px). Формула оставляет 24px: ширина окна минус
+       левый отступ, два зазора по 12 и сами 24, пополам. */
     .cats-focus-grid {
+      --cats-rail-tile: min(164px, (100vw - var(--page-gutter) - 48px) / 2);
       grid-auto-flow: column;
       grid-template-columns: none;
-      grid-template-rows: repeat(2, 150px);
-      grid-auto-columns: 150px;
+      grid-template-rows: repeat(2, var(--cats-rail-tile));
+      grid-auto-columns: var(--cats-rail-tile);
       grid-auto-rows: auto;
       gap: 12px;
       width: max-content;
