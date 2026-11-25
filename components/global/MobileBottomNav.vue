@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { revealBottomNav, useBottomNavReveal } from '@/composables/useBottomNavReveal'
-import { useCartAdded } from '@/composables/useCartAdded'
+import { useCartChange } from '@/composables/useCartChange'
 import { FREE_SHIPPING_THRESHOLD } from '@/constants'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
@@ -284,6 +284,11 @@ useBottomNavReveal(() => {
  * на экране): товар долетает до корзины панели, и над ней на 2,2 с всплывает
  * «+1 ещё N ₸ до бесплатной». Кольцо видно всё время, пока корзина не пуста.
  *
+ * Удаление — так же, но красным «−1», с коротким «проседанием» корзины и, если
+ * позиция ушла целиком, с «Вернуть» (тост удаления на телефоне тоже убран;
+ * владелец 25.11.2026: «товары, которые убираются, — убрать тост и сделать
+ * такой, как при добавлении, только чтобы сигнализировал правильно»).
+ *
  * Порог — про курьера по Алматы. Посылке в другой город цену называют после
  * взвешивания, порога у неё нет: тогда ни кольца, ни счёта до бесплатной —
  * так же, как на странице корзины.
@@ -305,26 +310,39 @@ const ringStyle = computed(() => ({
 }))
 
 const TIP_MS = 2200
+/** С «Вернуть» подсказка живёт дольше, как жил тост удаления: успеть нажать. */
+const TIP_UNDO_MS = 4000
 const tipShown = ref(false)
-/** Сколько положили, пока подсказка на экране: быстрые «+» складываются. */
+/** Положили или убрали — от этого знак, его цвет и текст. */
+const tipKind = ref<'add' | 'remove'>('add')
+/** Сколько штук, пока подсказка на экране: быстрые «+» и «−» складываются. */
 const tipCount = ref(0)
+/** Вернуть убранную позицию. Остаётся и на угасание — кнопка тогда выключена. */
+const tipUndo = shallowRef<(() => void) | null>(null)
 /** Текст для экранного диктора: сама подсказка от него спрятана, она обрывочна. */
 const tipAnnouncement = ref('')
 let tipTimer: ReturnType<typeof setTimeout> | null = null
+/** Штук в корзине после последнего сигнала — чтобы узнать убыль без сигнала. */
+let signalledCount = -1
 
 const tipText = computed(() => {
+  if (tipKind.value === 'remove' && cartCount.value === 0)
+    return 'корзина пуста'
   if (isDeliveryByWeight.value)
-    return 'в корзине'
+    return tipKind.value === 'add' ? 'в корзине' : 'из корзины'
   return freeLeft.value > 0
     ? `ещё ${formatPrice(freeLeft.value)}\u00A0₸ до бесплатной`
     : 'Доставка по Алматы бесплатная'
 })
-// «+N» — пока до порога не дошли; рядом с «бесплатная» счёт уже ни к чему.
-const tipPlus = computed(() =>
-  tipCount.value > 0 && (freeLeft.value > 0 || isDeliveryByWeight.value)
-    ? `+${tipCount.value}`
-    : '',
-)
+// «+N» — пока до порога не дошли: рядом с «бесплатная» счёт уже ни к чему.
+// «−N» — всегда: он и есть сигнал, что убрали, а не положили.
+const tipSign = computed(() => {
+  if (!tipCount.value)
+    return ''
+  if (tipKind.value === 'remove')
+    return `−${tipCount.value}`
+  return freeLeft.value > 0 || isDeliveryByWeight.value ? `+${tipCount.value}` : ''
+})
 
 function hideTip() {
   tipShown.value = false
@@ -335,29 +353,64 @@ function hideTip() {
   }
 }
 
-useCartAdded((count) => {
-  tipCount.value = tipShown.value ? tipCount.value + count : count
+function announce(kind: 'add' | 'remove') {
+  const done = kind === 'add' ? 'Добавили в корзину' : 'Убрали из корзины'
+  if (kind === 'remove' && cartCount.value === 0)
+    return `${done}. Корзина пуста`
+  if (isDeliveryByWeight.value)
+    return done
+  return freeLeft.value > 0
+    ? `${done}. До бесплатной доставки по Алматы ещё ${formatPrice(freeLeft.value)} тенге`
+    : `${done}. Доставка по Алматы бесплатная`
+}
+
+/**
+ * Убрали — корзина на миг «проседает». Зеркально пульсу при прилёте товара
+ * (useCartFly: 1 → 1,24 → 0,96 → 1): там она подрастает, здесь сжимается.
+ */
+function dipCart() {
+  const cart = barEl.value?.querySelector<HTMLElement>('[data-cart-target]')
+  if (!cart || window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    return
+  cart.animate(
+    [{ transform: 'scale(1)' }, { transform: 'scale(0.8)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }],
+    { duration: 420, easing: 'cubic-bezier(0.34, 1.4, 0.5, 1)' },
+  )
+}
+
+useCartChange(({ delta, undo }) => {
+  const kind = delta > 0 ? 'add' : 'remove'
+  const count = Math.abs(delta)
+  // Складываются только простые шаги: у «−3, Вернуть» возврат один, и
+  // сложенный счёт обещал бы вернуть больше, чем вернёт.
+  const adds = tipShown.value && tipKind.value === kind && !undo && !tipUndo.value
+  tipCount.value = adds ? tipCount.value + count : count
+  tipKind.value = kind
+  tipUndo.value = undo ?? null
   tipShown.value = true
+  signalledCount = cartCount.value
   if (tipTimer)
     clearTimeout(tipTimer)
-  tipTimer = setTimeout(hideTip, TIP_MS)
-
-  if (isDeliveryByWeight.value)
-    tipAnnouncement.value = 'Добавили в корзину'
-  else if (freeLeft.value > 0)
-    tipAnnouncement.value = `Добавили в корзину. До бесплатной доставки по Алматы ещё ${formatPrice(freeLeft.value)} тенге`
-  else
-    tipAnnouncement.value = 'Добавили в корзину. Доставка по Алматы бесплатная'
+  tipTimer = setTimeout(hideTip, undo ? TIP_UNDO_MS : TIP_MS)
+  tipAnnouncement.value = announce(kind)
+  if (kind === 'remove')
+    dipCart()
 
   // Подсказка живёт в панели, а прокрутка могла её спрятать. Липкие панели
   // страниц едут следом — у них тот же показ (useBottomNavReveal).
   revealBottomNav()
 })
 
-// Из корзины убрали, пока подсказка на экране: её «+1 ещё N ₸» уже неверна, а
-// на её место над панелью встаёт тост удаления с «Вернуть» — уходит сразу.
+function undoRemoval() {
+  const undo = tipUndo.value
+  hideTip()
+  undo?.()
+}
+
+// Корзина убыла не по сигналу — очистка после заказа, сверка с сервером:
+// подсказка о прошлом действии уже неверна и уходит.
 watch(cartCount, (count, previous) => {
-  if (count < previous)
+  if (count < previous && count !== signalledCount)
     hideTip()
 })
 onUnmounted(hideTip)
@@ -414,10 +467,26 @@ onUnmounted(hideTip)
       </a>
     </NuxtLink>
 
-    <!-- Подсказка над корзиной после добавления. Стрелка — ::after. -->
-    <span class="mbn-tip" :class="{ 'mbn-tip--shown': tipShown }" aria-hidden="true">
-      <span v-if="tipPlus" class="mbn-tip__plus">{{ tipPlus }}</span>
-      <span>{{ tipText }}</span>
+    <!-- Подсказка над корзиной: положили или убрали. Стрелка — ::after. -->
+    <span
+      class="mbn-tip"
+      :class="{ 'mbn-tip--shown': tipShown, 'mbn-tip--remove': tipKind === 'remove' }"
+    >
+      <span v-if="tipSign" class="mbn-tip__sign" aria-hidden="true">{{ tipSign }}</span>
+      <span class="mbn-tip__text" aria-hidden="true">{{ tipText }}</span>
+      <!-- pointerdown не пускаем к панели: иначе нажатие подхватит линза. -->
+      <button
+        v-if="tipUndo"
+        type="button"
+        class="mbn-tip__undo"
+        aria-label="Вернуть товар в корзину"
+        :disabled="!tipShown"
+        :aria-hidden="!tipShown"
+        @pointerdown.stop
+        @click.stop="undoRemoval"
+      >
+        Вернуть
+      </button>
     </span>
     <span class="sr-only" role="status">{{ tipAnnouncement }}</span>
   </nav>
@@ -572,6 +641,13 @@ onUnmounted(hideTip)
     white-space: nowrap;
     box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
     pointer-events: none;
+    /* Потолок ширины — до 8px от левого края экрана. Без него подсказка
+       шире места не сжимается: строки без переносов дают ей минимальную
+       ширину, а она у абсолютного блока сильнее доступной, — и на 320px
+       «−1 Доставка по Алматы бесплатная Вернуть» (316px) уезжала за край на
+       22px. Панель начинается в 17px от края (16 + рамка), правый край
+       подсказки — в 90% + 20px от начала панели: 17 + 90% + 20 − 8 = 90% + 29px. */
+    max-width: calc(90% + 29px);
     opacity: 0;
     transform: translateY(6px) scale(0.94);
     transform-origin: calc(100% - 20px) 100%;
@@ -597,8 +673,42 @@ onUnmounted(hideTip)
     border-radius: 2px;
   }
 
-  .mbn-tip__plus {
+  .mbn-tip__sign {
+    flex: none;
     color: #8ec5ff;
+  }
+
+  /* Убрали — знак красный: с первого взгляда не спутать с «+1». Бледный
+     red-300 на тёмном читался розовым, red-400 — уже красный (контраст 6:1). */
+  .mbn-tip--remove .mbn-tip__sign {
+    color: #f87171;
+  }
+
+  /* Упёрлась в потолок ширины (320px) — уступает текст: обрезается
+     многоточием, а «−1» и «Вернуть» остаются целыми. */
+  .mbn-tip__text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Во всю высоту подсказки — в неё легче попасть пальцем. */
+  .mbn-tip__undo {
+    flex: none;
+    height: 32px;
+    margin-right: -6px;
+    padding: 0 6px;
+    border: 0;
+    background: none;
+    color: #8ec5ff;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* Подсказка сквозная для пальца, кроме «Вернуть» — и та, лишь пока видна. */
+  .mbn-tip--shown .mbn-tip__undo {
+    pointer-events: auto;
   }
 
   /*

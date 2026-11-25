@@ -5,7 +5,7 @@ import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBottomNavReveal } from '@/composables/useBottomNavReveal'
-import { isBottomNavShown } from '@/composables/useCartAdded'
+import { isBottomNavShown, notifyCartChange } from '@/composables/useCartChange'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { useHaptic } from '@/composables/useHaptic'
 import { BUCKET_NAME_PRODUCT, FREE_SHIPPING_THRESHOLD } from '@/constants'
@@ -166,8 +166,13 @@ function decrease(item: ICartItem) {
 }
 
 async function handleClearCart() {
+  const removed = totalItems.value
   await cartStore.clearCart()
-  toast.info('Корзина очищена')
+  // На телефоне вместо тоста — подсказка у корзины нижней панели. Стор сам
+  // не сигналит: clearCart зовут и после оформления заказа.
+  notifyCartChange(-removed)
+  if (!isBottomNavShown())
+    toast.info('Корзина очищена')
 }
 
 function handleLogin() {
@@ -359,10 +364,12 @@ function getProductImageUrl(product: any, variant: 'sm' | 'md' = 'sm') {
   )
 }
 
-// Добавить аксессуар в корзину
+// Добавить аксессуар в корзину. На телефоне о добавлении говорит нижняя
+// панель (подсказка у корзины) — свой тост здесь только без неё.
 async function addAccessoryToCart(accessory: ProductWithImages) {
   await cartStore.addItem(accessory, 1)
-  toast.success('Товар добавлен в корзину')
+  if (!isBottomNavShown())
+    toast.success('Товар добавлен в корзину')
 }
 
 // Добавить выбранные аксессуары в корзину
@@ -378,11 +385,13 @@ async function addSelectedAccessoriesToCart() {
     }
   }
 
-  toast.success(
-    selected.length === 1
-      ? 'Аксессуар добавлен в корзину'
-      : `${selected.length} аксессуара добавлено в корзину`,
-  )
+  if (!isBottomNavShown()) {
+    toast.success(
+      selected.length === 1
+        ? 'Аксессуар добавлен в корзину'
+        : `${selected.length} аксессуара добавлено в корзину`,
+    )
+  }
 
   // Очищаем выбор
   selectedAccessoryIds.value = []
