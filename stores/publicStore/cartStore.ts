@@ -2,6 +2,7 @@ import type { Database, ICheckoutData, ProductWithImages } from '@/types'
 import type { CartLine, ServerSyncMark } from '@/utils/cartSync'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { notifyCartAdded } from '@/composables/useCartAdded'
 import { BUCKET_NAME_PRODUCT, COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from '@/constants'
 import { cartSignature, decideCartSync, mergeCartLines } from '@/utils/cartSync'
 import {
@@ -280,6 +281,7 @@ export const useCartStore = defineStore(
       if (existingItem) {
         existingItem.quantity += quantity
         cartAdded(existingItem.product.name, thumbUrl(existingItem.product))
+        notifyCartAdded(quantity)
         // 🔥 Открываем корзину при добавлении товара
         isCartOpen.value = true
         // 🔥 Сбрасываем бонусы при изменении корзины
@@ -320,6 +322,7 @@ export const useCartStore = defineStore(
             quantity,
           })
           cartAdded(fullProduct.name, thumbUrl(fullProduct as ProductWithImages))
+          notifyCartAdded(quantity)
           // 🔥 Открываем корзину при добавлении нового товара
           isCartOpen.value = true
           // 🔥 Сбрасываем бонусы при изменении корзины
@@ -397,9 +400,12 @@ export const useCartStore = defineStore(
       const item = items.value.find(i => i.product.id === productId)
       if (item) {
         if (quantity > 0) {
+          const added = quantity - item.quantity
           item.quantity = quantity
           // 🔥 Сбрасываем бонусы при изменении корзины
           bonusesToSpend.value = 0
+          // «+» в степпере — тоже добавление: подсказка у корзины на телефоне
+          notifyCartAdded(added)
         }
         else {
           removeItem(productId)

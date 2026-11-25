@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { useBottomNavReveal } from '@/composables/useBottomNavReveal'
+import { revealBottomNav, useBottomNavReveal } from '@/composables/useBottomNavReveal'
+import { useCartAdded } from '@/composables/useCartAdded'
+import { FREE_SHIPPING_THRESHOLD } from '@/constants'
 import { useAuthStore } from '@/stores/core/useAuthStore'
 import { useModalStore } from '@/stores/modal/useModalStore'
 import { useCartStore } from '@/stores/publicStore/cartStore'
 import { useWishlistStore } from '@/stores/publicStore/wishlistStore'
+import { formatPrice } from '@/utils/formatPrice'
 
 interface NavItem {
   path: string
@@ -39,7 +42,7 @@ const modalStore = useModalStore()
 const isPageLoading = usePageLoading()
 
 const { isLoggedIn } = storeToRefs(authStore)
-const { totalItems: cartCount } = storeToRefs(cartStore)
+const { totalItems: cartCount, subtotal, isDeliveryByWeight } = storeToRefs(cartStore)
 const wishCount = computed(() => wishlistStore.wishlistProductIds.length)
 
 function isActivePath(path: string) {
@@ -272,6 +275,92 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 useBottomNavReveal(() => {
   isHidden.value = false
 })
+
+/*
+ * Путь до бесплатной доставки: кольцо вокруг корзины и подсказка над ней.
+ *
+ * Макет MobileNav.dc.html — вариант 1c холста «Тосты мобилка» в Claude
+ * Design. Тоста «Добавили в корзину» здесь нет (useToasts молчит, пока панель
+ * на экране): товар долетает до корзины панели, и над ней на 2,2 с всплывает
+ * «+1 ещё N ₸ до бесплатной». Кольцо видно всё время, пока корзина не пуста.
+ *
+ * Порог — про курьера по Алматы. Посылке в другой город цену называют после
+ * взвешивания, порога у неё нет: тогда ни кольца, ни счёта до бесплатной —
+ * так же, как на странице корзины.
+ *
+ * Отличия от макета. Линза и залитая активная иконка — прежние: макет нарисован
+ * с панели до 1 сентября, а их ввели позже, по просьбе владельца. «+1» — сколько
+ * положили на самом деле: быстрые «+» складываются, выбор «5 шт» из списка
+ * даёт «+4». У порога — «Доставка по Алматы бесплатная», как на странице
+ * корзины: «бесплатная» без города обещала бы лишнее посылке в другой город.
+ * Кольцо наполняется плавно (@property ниже) — в макете переход объявлен, но
+ * градиент без этого не анимируется и прыгает.
+ */
+const freeLeft = computed(() => Math.max(FREE_SHIPPING_THRESHOLD - subtotal.value, 0))
+const showRing = computed(() =>
+  cartCount.value > 0 && subtotal.value > 0 && !isDeliveryByWeight.value,
+)
+const ringStyle = computed(() => ({
+  '--mbn-ring': `${Math.min((subtotal.value / FREE_SHIPPING_THRESHOLD) * 100, 100)}%`,
+}))
+
+const TIP_MS = 2200
+const tipShown = ref(false)
+/** Сколько положили, пока подсказка на экране: быстрые «+» складываются. */
+const tipCount = ref(0)
+/** Текст для экранного диктора: сама подсказка от него спрятана, она обрывочна. */
+const tipAnnouncement = ref('')
+let tipTimer: ReturnType<typeof setTimeout> | null = null
+
+const tipText = computed(() => {
+  if (isDeliveryByWeight.value)
+    return 'в корзине'
+  return freeLeft.value > 0
+    ? `ещё ${formatPrice(freeLeft.value)}\u00A0₸ до бесплатной`
+    : 'Доставка по Алматы бесплатная'
+})
+// «+N» — пока до порога не дошли; рядом с «бесплатная» счёт уже ни к чему.
+const tipPlus = computed(() =>
+  tipCount.value > 0 && (freeLeft.value > 0 || isDeliveryByWeight.value)
+    ? `+${tipCount.value}`
+    : '',
+)
+
+function hideTip() {
+  tipShown.value = false
+  tipAnnouncement.value = ''
+  if (tipTimer) {
+    clearTimeout(tipTimer)
+    tipTimer = null
+  }
+}
+
+useCartAdded((count) => {
+  tipCount.value = tipShown.value ? tipCount.value + count : count
+  tipShown.value = true
+  if (tipTimer)
+    clearTimeout(tipTimer)
+  tipTimer = setTimeout(hideTip, TIP_MS)
+
+  if (isDeliveryByWeight.value)
+    tipAnnouncement.value = 'Добавили в корзину'
+  else if (freeLeft.value > 0)
+    tipAnnouncement.value = `Добавили в корзину. До бесплатной доставки по Алматы ещё ${formatPrice(freeLeft.value)} тенге`
+  else
+    tipAnnouncement.value = 'Добавили в корзину. Доставка по Алматы бесплатная'
+
+  // Подсказка живёт в панели, а прокрутка могла её спрятать. Липкие панели
+  // страниц едут следом — у них тот же показ (useBottomNavReveal).
+  revealBottomNav()
+})
+
+// Из корзины убрали, пока подсказка на экране: её «+1 ещё N ₸» уже неверна, а
+// на её место над панелью встаёт тост удаления с «Вернуть» — уходит сразу.
+watch(cartCount, (count, previous) => {
+  if (count < previous)
+    hideTip()
+})
+onUnmounted(hideTip)
 </script>
 
 <template>
@@ -310,6 +399,7 @@ useBottomNavReveal(() => {
           class="mbn-icon-wrap"
           :data-cart-target="item.badge === 'cart' ? '' : undefined"
         >
+          <span v-if="item.badge === 'cart' && showRing" class="mbn-ring" :style="ringStyle" />
           <Icon
             :name="item.isActive || item.isPressed ? item.iconActive : item.icon"
             mode="svg"
@@ -323,6 +413,13 @@ useBottomNavReveal(() => {
         </span>
       </a>
     </NuxtLink>
+
+    <!-- Подсказка над корзиной после добавления. Стрелка — ::after. -->
+    <span class="mbn-tip" :class="{ 'mbn-tip--shown': tipShown }" aria-hidden="true">
+      <span v-if="tipPlus" class="mbn-tip__plus">{{ tipPlus }}</span>
+      <span>{{ tipText }}</span>
+    </span>
+    <span class="sr-only" role="status">{{ tipAnnouncement }}</span>
   </nav>
 </template>
 
@@ -439,6 +536,87 @@ useBottomNavReveal(() => {
     height: 22px;
   }
 
+  /* Кольцо пути до бесплатной доставки: 34px вокруг иконки, толщина 3px. */
+  .mbn-ring {
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: conic-gradient(var(--primary) 0 var(--mbn-ring), rgb(43 127 255 / 0.2) var(--mbn-ring) 100%);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+    transition: --mbn-ring 0.4s ease;
+    pointer-events: none;
+  }
+
+  /*
+   * Подсказка над корзиной. Правый край — на 20px правее центра корзины
+   * (центр пятого пункта — 90% ширины панели), стрелка 10px стоит в 15px от
+   * края: её середина ровно над центром корзины. Растёт подсказка влево.
+   */
+  .mbn-tip {
+    position: absolute;
+    right: calc(10% - 20px);
+    bottom: calc(100% + 10px);
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: #0f172a;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font: 600 13px var(--font-sans);
+    white-space: nowrap;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+    transform-origin: calc(100% - 20px) 100%;
+    transition:
+      opacity 0.2s ease,
+      transform 0.3s cubic-bezier(0.34, 1.3, 0.5, 1);
+  }
+
+  .mbn-tip--shown {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  .mbn-tip::after {
+    content: '';
+    position: absolute;
+    right: 15px;
+    bottom: -4px;
+    width: 10px;
+    height: 10px;
+    background: #0f172a;
+    transform: rotate(45deg);
+    border-radius: 2px;
+  }
+
+  .mbn-tip__plus {
+    color: #8ec5ff;
+  }
+
+  /*
+   * Над навигацией стоит липкая панель страницы — покупка на карточке товара,
+   * «Оформить заказ» в корзине. Подсказка на обычном месте легла бы на её
+   * нижние 32px, прямо на «+» степпера. Встаёт над панелью, стрелка — на неё.
+   *
+   * 92 = 82 + 10. Верх обеих панелей — в 144px от низа экрана: покупка —
+   * bottom 72 + высота 72 (9 + 52 + 9 + рамка), «Оформить» — bottom 16 +
+   * подъём 68 + высота 60. Верх навигации — в 62 (12 + 50), разница 82, и
+   * ещё 10 зазора, как у подсказки над самой навигацией. Числа держатся
+   * стилями этих страниц; разъедутся — поймает check-mobile-nav.mjs.
+   */
+  :global(body:has(.pdp-buybar:not(.pdp-buybar--down)) .mbn-tip),
+  :global(body:has(.cart-mobile-cta--above-nav) .mbn-tip) {
+    bottom: calc(100% + 92px);
+  }
+
   .mbn-badge {
     position: absolute;
     top: -3px;
@@ -454,5 +632,13 @@ useBottomNavReveal(() => {
     place-content: center;
     border: 2px solid #fff;
   }
+}
+
+/* Без регистрации градиент кольца не анимируется — доля прыгала бы. Вне слоя:
+   @property от каскада не зависит. */
+@property --mbn-ring {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
 }
 </style>

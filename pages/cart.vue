@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useBottomNavReveal } from '@/composables/useBottomNavReveal'
+import { isBottomNavShown } from '@/composables/useCartAdded'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { useHaptic } from '@/composables/useHaptic'
 import { BUCKET_NAME_PRODUCT, FREE_SHIPPING_THRESHOLD } from '@/constants'
@@ -392,7 +393,10 @@ let previousSubtotal = subtotal.value
 watch(subtotal, (newSubtotal) => {
   // Порог — про курьера по Алматы; посылку в другой город он не делает
   // бесплатной (19 октября 2026), и поздравлять тут не с чем.
-  if (isDeliveryByWeight.value) {
+  // На телефоне то же самое говорит подсказка над корзиной нижней панели
+  // (макет MobileNav.dc.html: «Добавили» и «до бесплатной» — одним
+  // сообщением), второй тост стопкой не нужен.
+  if (isDeliveryByWeight.value || isBottomNavShown()) {
     previousSubtotal = newSubtotal
     return
   }
