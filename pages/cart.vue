@@ -904,7 +904,8 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
     color: var(--bonus);
   }
 
-  /* Синий градиентный степпер — общий с .pc-stepper карточки товара.
+  /* Синий градиентный степпер — тот же, что след за шаром в карточке товара
+     (.cc-trail в components/product/CartControl.vue).
      Значения записаны литералами, а не через var(--color-blue-*): Tailwind 4
      выкидывает переменную темы, если её не использует ни одна утилита. */
   .cart-stepper {

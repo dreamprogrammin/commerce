@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { BaseProduct } from '@/types'
 import { computed, ref } from 'vue'
+import CartControl from '@/components/product/CartControl.vue'
 import StockAlertButton from '@/components/product/StockAlertButton.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { useSeoAltText } from '@/composables/useSeoAltText'
@@ -171,6 +172,9 @@ const priceDetails = computed(() => {
     percent: hasDiscount ? Math.round(discountPercent) : 0,
   }
 })
+
+/** Зачёркнутая цена в плашке корзины — только при скидке. */
+const oldPrice = computed(() => priceDetails.value.hasDiscount ? priceDetails.value.originalPrice : null)
 
 const ratingLabel = computed(() => {
   const rating = props.product.avg_rating
@@ -379,64 +383,19 @@ async function onWish() {
         </span>
       </div>
 
-      <!-- 🛒 ПОКУПКА -->
+      <!-- 🛒 ПОКУПКА — цена и корзина по макету CartControl.dc.html -->
       <div class="mt-auto pt-[5px]">
         <ClientOnly>
-          <template v-if="inStock">
-            <div
-              v-if="quantityInCart > 0"
-              class="pc-stepper flex h-[52px] items-center justify-between rounded-full px-[7px]"
-            >
-              <button
-                type="button"
-                aria-label="Уменьшить количество"
-                class="pc-stepper-btn grid size-[38px] place-content-center rounded-full"
-                @click="onDec"
-              >
-                <Icon name="lucide:minus" class="size-[17px]" />
-              </button>
-              <span class="flex-1 text-center text-[15px] font-extrabold text-white">{{ quantityInCart }} шт</span>
-              <button
-                type="button"
-                aria-label="Увеличить количество"
-                class="pc-stepper-btn grid size-[38px] place-content-center rounded-full"
-                @click="onInc"
-              >
-                <Icon name="lucide:plus" class="size-[17px]" />
-              </button>
-            </div>
-
-            <div v-else class="flex h-[52px] items-center justify-between gap-2 rounded-full bg-muted pl-4 pr-[5px]">
-              <!-- whitespace-nowrap: иначе «15 890 ₸» переносится по пробелу
-                   и знак тенге уезжает на вторую строку (узкая колонка на мобильных) -->
-              <span class="flex flex-col justify-center leading-tight">
-                <span
-                  v-if="priceDetails.hasDiscount"
-                  class="whitespace-nowrap text-[13px] font-medium text-muted-foreground line-through"
-                >
-                  {{ formatPrice(priceDetails.originalPrice) }}&nbsp;₸
-                </span>
-                <span
-                  class="whitespace-nowrap text-[17px] font-extrabold"
-                  :class="priceDetails.hasDiscount ? 'text-discount' : 'text-foreground'"
-                >
-                  {{ formatPrice(priceDetails.finalPrice) }}&nbsp;₸
-                </span>
-              </span>
-              <button
-                type="button"
-                aria-label="В корзину"
-                class="pc-add grid size-11 shrink-0 place-content-center rounded-full"
-                @click="onAdd"
-              >
-                <Icon name="lucide:plus" class="size-[26px]" />
-              </button>
-            </div>
-          </template>
-
-          <template v-else>
-            <StockAlertButton :product-id="product.id" size="sm" />
-          </template>
+          <CartControl
+            v-if="inStock"
+            :qty="quantityInCart"
+            :price="priceDetails.finalPrice"
+            :old-price="oldPrice"
+            @add="onAdd"
+            @inc="onInc"
+            @dec="onDec"
+          />
+          <StockAlertButton v-else :product-id="product.id" size="sm" />
 
           <!-- Серверная разметка (и первый кадр до гидрации).
                Здесь был пульсирующий прямоугольник — из-за него цена товара
@@ -447,36 +406,18 @@ async function onWish() {
                товаров, — та же дыра.
 
                Цена и наличие считаются из props и на сервере известны, так
-               что заглушка повторяет строку с ценой один в один. Отличие
-               одно: вместо <button> здесь <span> — до гидрации нажимать
-               нечего, и фокусируемой кнопки-пустышки быть не должно.
+               что заглушка — та же плашка с ценой (CartControl с placeholder).
+               Отличие одно: шар в ней <span>, а не <button> — до гидрации
+               нажимать нечего, и фокусируемой кнопки-пустышки быть не должно.
                Высота та же, 52px, поэтому сдвига при подмене нет. -->
           <template #fallback>
-            <div
+            <CartControl
               v-if="inStock"
-              class="flex h-[52px] items-center justify-between gap-2 rounded-full bg-muted pl-4 pr-[5px]"
-            >
-              <span class="flex flex-col justify-center leading-tight">
-                <span
-                  v-if="priceDetails.hasDiscount"
-                  class="whitespace-nowrap text-[13px] font-medium text-muted-foreground line-through"
-                >
-                  {{ formatPrice(priceDetails.originalPrice) }}&nbsp;₸
-                </span>
-                <span
-                  class="whitespace-nowrap text-[17px] font-extrabold"
-                  :class="priceDetails.hasDiscount ? 'text-discount' : 'text-foreground'"
-                >
-                  {{ formatPrice(priceDetails.finalPrice) }}&nbsp;₸
-                </span>
-              </span>
-              <span
-                class="pc-add grid size-11 shrink-0 place-content-center rounded-full"
-                aria-hidden="true"
-              >
-                <Icon name="lucide:plus" class="size-[26px]" />
-              </span>
-            </div>
+              placeholder
+              :qty="0"
+              :price="priceDetails.finalPrice"
+              :old-price="oldPrice"
+            />
             <div v-else class="h-[52px] animate-pulse rounded-full bg-muted" />
           </template>
         </ClientOnly>
@@ -567,7 +508,8 @@ async function onWish() {
     display: none;
   }
 
-  /* ВНИМАНИЕ: у .pc-wish и .pc-add НЕТ backdrop-filter — и добавлять его сюда нельзя.
+  /* ВНИМАНИЕ: у .pc-wish (и у шара корзины в CartControl.vue) НЕТ backdrop-filter —
+     и добавлять его сюда нельзя.
      Карточка живёт в каруселях и сетках по 18+ штук на экран, а backdrop-filter
      заставляет браузер переснимать и блюрить подложку на каждом кадре. Замер на
      главной (390px, CPU ×6): с блюром медиана кадра 47.6ms / 42% кадров >50ms,
@@ -593,42 +535,6 @@ async function onWish() {
     content: '';
     position: absolute;
     inset: -3px;
-  }
-
-  .pc-add {
-    border: 1px solid rgb(255 255 255 / 0.9);
-    background: linear-gradient(150deg, rgb(255 255 255 / 0.97), rgb(224 233 247 / 0.85));
-    box-shadow:
-      inset 0 1px 0 #fff,
-      0 4px 12px rgb(43 127 255 / 0.2);
-    color: var(--primary);
-    transition: background 0.12s ease;
-  }
-  .pc-add:hover {
-    background: linear-gradient(150deg, #fff, rgb(191 219 254 / 0.75));
-  }
-
-  .pc-stepper {
-    border: 1px solid rgb(255 255 255 / 0.45);
-    background: linear-gradient(150deg, rgb(77 148 255 / 0.95), rgb(23 101 235 / 0.85));
-    -webkit-backdrop-filter: blur(12px) saturate(1.7);
-    backdrop-filter: blur(12px) saturate(1.7);
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.5),
-      inset 0 -2px 8px rgb(6 53 138 / 0.28),
-      0 8px 20px rgb(43 127 255 / 0.3);
-  }
-
-  .pc-stepper-btn {
-    background: rgb(255 255 255 / 0.26);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45);
-    color: #fff;
-    transition: background 0.12s ease;
-  }
-  .pc-stepper-btn:hover {
-    background: rgb(255 255 255 / 0.38);
   }
 }
 </style>

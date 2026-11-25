@@ -187,10 +187,11 @@ async function open(opts) {
   check(removal?.title === 'Товар убрали из корзины', `заголовок «${removal?.title}»`)
   check(removal?.action === 'Вернуть', `действие «${removal?.action}»`)
 
-  const emptied = await page.evaluate(() => document.querySelectorAll('.pc-stepper').length)
+  // .pc-stepper — степпер до 25.11.2026, .cc--on — плашка CartControl с товаром в корзине
+  const emptied = await page.evaluate(() => document.querySelectorAll('.pc-stepper, .cc--on').length)
   await page.locator('[data-sonner-toast] [data-button]').first().click()
   await page.waitForTimeout(700)
-  const restored = await page.evaluate(() => document.querySelectorAll('.pc-stepper').length)
+  const restored = await page.evaluate(() => document.querySelectorAll('.pc-stepper, .cc--on').length)
   check(emptied === 0 && restored === 1, `товар вернулся в корзину (степперов было ${emptied}, стало ${restored})`)
   await ctx.close()
 }
