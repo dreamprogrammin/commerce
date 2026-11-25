@@ -17,6 +17,9 @@
  * своих коллекций безопасно — а вторая половина проверки это подтверждает:
  * каждая иконка на странице получила маску или фон.
  *
+ * И третье (25 ноября 2026): в CSS-маске на странице нет SMIL-анимации —
+ * почему, сказано у этой проверки ниже.
+ *
  * Стенд — сборка:
  *   pnpm build && set -a && . ./.env && set +a && PORT=3127 node .output/server/index.mjs
  *   node check-icon-collections.mjs --base=http://localhost:3127
@@ -69,7 +72,16 @@ for (const path of ['/', '/catalog/girls/kukly', '/catalog/products/konstruktor-
         || (cs.backgroundImage && cs.backgroundImage !== 'none')
       return !painted
     })
-    return { total: els.length, blank: blank.length, sample: blank.map(el => el.className) }
+    const animated = els.filter((el) => {
+      const cs = getComputedStyle(el)
+      return /%3Canimate|<animate/i.test(`${cs.maskImage} ${cs.webkitMaskImage} ${cs.backgroundImage}`)
+    })
+    return {
+      total: els.length,
+      blank: blank.length,
+      sample: blank.map(el => el.className),
+      animated: [...new Set(animated.map(el => el.className.match(/i-[\w-]+:[\w-]+/)?.[0] ?? el.className))],
+    }
   })
   check(r.total > 0, `${path.slice(0, 40)}: иконок на странице ${r.total}`)
 
@@ -94,6 +106,15 @@ for (const path of ['/', '/catalog/girls/kukly', '/catalog/products/konstruktor-
       badData.push(`${name[1]}:${name[2]}`)
   }
   check(broken === 0, `    пустых при существующем имени: ${broken}`)
+
+  /*
+   * Анимированная иконка в режиме CSS (25 ноября 2026). line-md рисуют контур
+   * из невидимого — в первом кадре сердечка нет. В mask-image такой анимацией
+   * не управлять, как она пойдёт, решает браузер, — и владелец увидел на
+   * карточке вместо сердечка «какой-то кружочек». Анимированным иконкам —
+   * mode="svg", остальным — статичная иконка (коллекция `uhti` в nuxt.config.ts).
+   */
+  check(r.animated.length === 0, `    анимированных (SMIL) в CSS-маске: ${r.animated.length}${r.animated.length ? ` — ${r.animated.join(', ')}` : ''}`)
   if (badData.length)
     console.log(`  (к сведению) пустые из-за несуществующего имени в данных: ${[...new Set(badData)].join(', ')}`)
   await page.close()

@@ -74,7 +74,7 @@ function goBack() {
         @click="toggleWishlist"
       >
         <Icon
-          :name="isWishlisted ? 'line-md:heart-filled' : 'line-md:heart'"
+          :name="isWishlisted ? 'uhti:heart-filled' : 'uhti:heart'"
           class="size-[21px]"
         />
       </button>
