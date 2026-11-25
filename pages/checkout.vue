@@ -3,6 +3,7 @@
 import { vMaska } from 'maska/vue'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
+import { useBottomNavReveal } from '@/composables/useBottomNavReveal'
 import { FREE_SHIPPING_THRESHOLD } from '@/constants'
 import { checkoutShell } from '@/lib/shell'
 import { carouselContainerVariants } from '@/lib/variants'
@@ -610,6 +611,12 @@ onMounted(() => {
   window.addEventListener('scroll', handleScroll, { passive: true })
 })
 onUnmounted(() => window.removeEventListener('scroll', handleScroll))
+// Навигация выезжает и без прокрутки — когда товар летит в корзину. Отсюда
+// полётов нет, но страница остаётся в памяти (keepalive) и слушает и
+// прокрутку, и показ на других страницах — иначе вернётся рассинхронной.
+useBottomNavReveal(() => {
+  isNavVisible.value = true
+})
 </script>
 
 <template>
