@@ -2,12 +2,14 @@
 import type { AttributeValuePayload, Database, ProductInsert } from '@/types'
 import type { AiProductFill, SavedOfferProduct, WrittenOfferProduct } from '@/utils/aiWriter'
 import type { OfferDraftSource } from '@/utils/supplierOfferList'
+import { useLocalStorage } from '@vueuse/core'
 import { LoaderCircle, Plus, RefreshCw, Sparkles } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import ProductForm from '@/components/admin/products/ProductForm.vue'
 import { useAdminProductsStore } from '@/stores/adminStore/adminProductsStore'
 import { adminFetch } from '@/utils/adminFetch'
 import { aiBudgetLines, aiUsageLines } from '@/utils/aiCost'
+import { pluralPositions } from '@/utils/restockOrder'
 import { modelLabel, productDraft } from '@/utils/supplierOfferList'
 
 definePageMeta({ layout: 'admin' })
@@ -32,9 +34,29 @@ const draft = computed(() => offer.value && { ...productDraft(offer.value, offer
 /** Такой артикул уже есть на сайте — товар, скорее всего, выложен */
 const existingBySku = ref<{ id: string, name: string } | null>(null)
 
+/*
+ * «На сайт» → заказ поставщику (26.11.2026). Владелец: «товар, который
+ * добавляется на сайт, автоматически должен добавляться в заказ к
+ * поставщику». Сколько штук — поле здесь: из «В заказ» на «Товарах
+ * поставщиков», если там отмечено, иначе 5; 0 — не заказывать. Товар ложится
+ * в формирующийся заказ своего поставщика («Поставки») и до первой приёмки
+ * скрыт с сайта: не привезёт поставщик — пустой карточки на сайте не будет.
+ * Товар с остатком уже на складе — его не скрываем.
+ */
+const DEFAULT_ORDER_QUANTITY = 5
+const orderQuantity = ref<number | ''>(DEFAULT_ORDER_QUANTITY)
+const pickedQuantity = ref<number | null>(null)
+const picks = useLocalStorage<Record<string, { quantity?: number }>>('admin-supplier-order', {})
+// Ключ отметки — как на «Товарах поставщиков»: пост без разобранных товаров — «-»
+const pickKeys = offerId ? [`${offerId}:${offerItem}`, ...(offerItem === 0 ? [`${offerId}:-`] : [])] : []
+
 onMounted(async () => {
   if (!offerId)
     return
+  // Отмеченное в «В заказ» на «Товарах поставщиков» — сколько заказать
+  pickedQuantity.value = pickKeys.map(k => picks.value[k]?.quantity).find((q): q is number => Number.isInteger(q) && q! >= 1 && q! <= 9999) ?? null
+  if (pickedQuantity.value)
+    orderQuantity.value = pickedQuantity.value
   try {
     offer.value = await adminFetch<OfferDraftSource>('/api/admin/supplier-offers/draft', { query: { id: offerId } })
   }
@@ -145,6 +167,44 @@ function createNewBrand() {
     productForm.value?.openBrandDialog(writer.value.result.newBrand)
 }
 
+/** Уже в заказе — из таблицы «В заказ» убираем, иначе поставщику ушло бы дважды */
+function forgetPick() {
+  if (pickKeys.some(k => picks.value[k]))
+    picks.value = Object.fromEntries(Object.entries(picks.value).filter(([k]) => !pickKeys.includes(k)))
+}
+
+/** Товар — в формирующийся заказ поставщика; не вышло — скрытым он не останется */
+async function addToSupplierOrder(product: { id: string, slug: string | null }, quantity: number, showOnReceipt: boolean): Promise<{ hidden: boolean }> {
+  try {
+    const res = await adminFetch<{ number: number, positions: number, created: boolean }>('/api/admin/deliveries/add', {
+      method: 'POST',
+      body: { productId: product.id, quantity, showOnReceipt },
+    })
+    forgetPick()
+    toast.success(`В заказ №${res.number} поставщику — ${quantity} шт.`, {
+      description: [
+        `${res.created ? 'Новый заказ' : 'Заказ формируется'}: ${res.positions} ${pluralPositions(res.positions)}.`,
+        showOnReceipt ? 'Товар скрыт с сайта и появится, когда поставку примут.' : '',
+      ].filter(Boolean).join(' '),
+      action: { label: 'Поставки', onClick: () => router.push('/admin/deliveries') },
+      duration: 10000,
+    })
+    return { hidden: showOnReceipt }
+  }
+  catch (e) {
+    let hidden = false
+    if (showOnReceipt) {
+      const { error } = await supabase.from('products').update({ is_active: true }).eq('id', product.id)
+      hidden = Boolean(error)
+    }
+    toast.warning('Товар создан, но в заказ поставщику не попал', {
+      description: `${errorText(e, 'Сервер не ответил')}. ${hidden ? 'Товар скрыт с сайта — включите «Активен» в карточке товара.' : 'Он на сайте; заказать его можно в «К закупке».'}`,
+      duration: 15000,
+    })
+    return { hidden }
+  }
+}
+
 const initialSku = ref('')
 const isSearchingSku = ref(false)
 const initialBarcode = ref('')
@@ -229,6 +289,13 @@ async function createFromForm(payload: {
     payload.data.sku = sku
   }
 
+  const quantity = Math.min(Math.max(Math.round(Number(orderQuantity.value) || 0), 0), 9999)
+  const ordering = Boolean(offerId) && quantity > 0 && Boolean(payload.data.supplier_id)
+  // Скрыт до первой приёмки — если «Активен» не выключен вручную и остатка нет
+  const showOnReceipt = ordering && payload.data.is_active !== false && !(Number(payload.data.stock_quantity) > 0)
+  if (showOnReceipt)
+    payload.data.is_active = false
+
   // Вызываем обновленный метод стора, который теперь проще
   const newProduct = await adminProductsStore.createProduct(
     payload.data,
@@ -240,6 +307,15 @@ async function createFromForm(payload: {
       await adminFetch('/api/admin/supplier-offers/status', { method: 'POST', body: { ids: [offerId], status: 'added' } })
         .catch(() => toast.warning('Товар создан, но у поставщика не отмечен «Добавлен» — отметьте вручную'))
     }
+    let hidden = payload.data.is_active === false
+    if (ordering) {
+      const added = await addToSupplierOrder(newProduct, quantity, showOnReceipt)
+      if (showOnReceipt)
+        hidden = added.hidden
+    }
+    else if (offerId && quantity > 0) {
+      toast.warning('В заказ поставщику товар не попал — в форме не выбран поставщик')
+    }
     const valuesToSave = payload.attributeValues.map(value => ({
       ...value,
       product_id: newProduct.id, // Используем ID из `newProduct`
@@ -250,8 +326,8 @@ async function createFromForm(payload: {
     // Это нужно, чтобы на странице списка товаров появился новый товар
     adminProductsStore.products = []
 
-    // ✅ Уведомляем поисковики о новом товаре
-    if (newProduct.slug) {
+    // ✅ Уведомляем поисковики о новом товаре — скрытый скажет о себе при приёмке
+    if (newProduct.slug && !hidden) {
       try {
         await notifyProduct(newProduct.slug)
         toast.success('✅ Товар создан и отправлен в поисковики')
@@ -464,6 +540,37 @@ async function createFromForm(payload: {
             <RefreshCw class="mr-2 h-4 w-4" />
             {{ writer.state === 'error' ? 'Повторить' : 'Написать заново' }}
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card v-if="offer" class="mb-8" data-testid="supplier-order">
+        <CardContent class="space-y-2 text-sm">
+          <div class="flex flex-wrap items-center gap-2">
+            <Label for="supplier-order-qty" class="mb-0 font-medium">В заказ поставщику</Label>
+            <Input
+              id="supplier-order-qty"
+              v-model.number="orderQuantity"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              max="9999"
+              class="h-9 w-20 text-center tabular-nums"
+              data-testid="supplier-order-qty"
+            />
+            <span>шт.</span>
+          </div>
+          <p class="text-muted-foreground" data-testid="supplier-order-hint">
+            <template v-if="Number(orderQuantity) > 0">
+              После «Создать» товар ляжет в заказ своему поставщику — «Поставки» в «Умном закупе». До приёмки он скрыт с сайта:
+              не привезёт поставщик — пустой карточки на сайте не будет.
+            </template>
+            <template v-else>
+              0 — товар в заказ не попадёт и сразу будет на сайте.
+            </template>
+          </p>
+          <p v-if="pickedQuantity" class="text-xs text-muted-foreground" data-testid="supplier-order-picked">
+            Количество — из «В заказ» на «Товарах поставщиков».
+          </p>
         </CardContent>
       </Card>
 

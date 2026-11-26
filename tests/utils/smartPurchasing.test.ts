@@ -29,6 +29,7 @@ function status(patch: Partial<PurchasingStatus> = {}): PurchasingStatus {
     demand: demandPart(),
     ai: { providers: [], model: 'anthropic/claude-haiku-5-5', reading: null },
     restock: { atThreshold: 0, noSupplier: 0, suppliers: 0, openOrders: 0 },
+    deliveries: { forming: 0, formingPositions: 0, waiting: 0, late: 0 },
     supplierLoad: [],
     unassigned: { products: 0, toRestock: 0 },
     ...patch,
@@ -37,13 +38,13 @@ function status(patch: Partial<PurchasingStatus> = {}): PurchasingStatus {
 const step = (s: PurchasingStatus, id: string) => purchasingSteps(s).find(x => x.id === id)!
 
 describe('purchasingSteps', () => {
-  it('шаги по порядку: откуда товар → спрос → чтение постов → товары поставщиков → заказ', () => {
-    expect(purchasingSteps(status()).map(s => s.id)).toEqual(['suppliers', 'demand', 'ai', 'offers', 'order'])
+  it('шаги по порядку: откуда товар → спрос → чтение постов → товары поставщиков → заказ → поставки', () => {
+    expect(purchasingSteps(status()).map(s => s.id)).toEqual(['suppliers', 'demand', 'ai', 'offers', 'order', 'deliveries'])
   })
 
   it('как на бою 3.11: ждут владельца каналы, ключ DataForSEO и ключ ИИ', () => {
     const steps = purchasingSteps(status())
-    expect(steps.map(s => s.state)).toEqual(['action', 'action', 'action', 'later', 'done'])
+    expect(steps.map(s => s.state)).toEqual(['action', 'action', 'action', 'later', 'done', 'done'])
     expect(steps[0]!.facts).toEqual(['4 поставщика', 'каналов в Telegram нет'])
     expect(steps[0]!.next).toMatch(/«Каналы в Telegram»/)
     expect(steps[1]!.facts).toEqual(['92 темы', 'цифр ещё нет', 'ключ DataForSEO не задан'])
@@ -55,7 +56,7 @@ describe('purchasingSteps', () => {
 
   it('ссылки — на страницы шагов', () => {
     expect(purchasingSteps(status()).map(s => s.link?.to ?? null))
-      .toEqual(['/admin/suppliers', '/admin/demand', '/admin/ai', '/admin/supplier-offers', '/admin/restock'])
+      .toEqual(['/admin/suppliers', '/admin/demand', '/admin/ai', '/admin/supplier-offers', '/admin/restock', '/admin/deliveries'])
   })
 
   describe('товары поставщиков', () => {
@@ -265,6 +266,46 @@ describe('purchasingSteps', () => {
       const s = order({ openOrders: null })
       expect(s.state).toBe('done')
       expect(s.facts).toEqual(['заказывать нечего — всё выше порога остатка'])
+    })
+  })
+
+  describe('поставки (26.11.2026)', () => {
+    const deliveries = (patch: Partial<NonNullable<PurchasingStatus['deliveries']>>) =>
+      step(status({ deliveries: { forming: 0, formingPositions: 0, waiting: 0, late: 0, ...patch } }), 'deliveries')
+
+    it('формируется заказ — отправить поставщику и нажать «Заказано»', () => {
+      const s = deliveries({ forming: 2, formingPositions: 5, waiting: 1 })
+      expect(s.state).toBe('action')
+      expect(s.facts).toEqual(['формируются 2 заказа: 5 позиций', 'ждём 1 поставку'])
+      expect(s.next).toBe('Отправьте сформированный заказ поставщику и нажмите «Заказано».')
+      expect(deliveries({ forming: 1, formingPositions: 1 }).facts).toEqual(['формируется 1 заказ: 1 позиция'])
+      expect(deliveries({ forming: 21, formingPositions: 30 }).facts).toEqual(['формируется 21 заказ: 30 позиций'])
+    })
+
+    it('поставка опаздывает — уточнить у поставщика', () => {
+      const s = deliveries({ waiting: 3, late: 1 })
+      expect(s.state).toBe('action')
+      expect(s.facts).toEqual(['ждём 3 поставки', 'опаздывают: 1'])
+      expect(s.next).toMatch(/уточните у поставщика/)
+    })
+
+    it('только ждём — «идёт», приёмку делает «Принять»', () => {
+      const s = deliveries({ waiting: 5 })
+      expect(s.state).toBe('running')
+      expect(s.facts).toEqual(['ждём 5 поставок'])
+      expect(s.next).toMatch(/«Принять»/)
+    })
+
+    it('пусто — готово', () => {
+      const s = deliveries({})
+      expect(s.state).toBe('done')
+      expect(s.facts).toEqual(['открытых поставок нет'])
+    })
+
+    it('без миграции поставок — «позже»', () => {
+      const s = step(status({ deliveries: null }), 'deliveries')
+      expect(s.state).toBe('later')
+      expect(s.next).toBe('Заработает после миграции базы.')
     })
   })
 })

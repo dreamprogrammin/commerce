@@ -89,7 +89,7 @@ const OLD_LINKS = [
   '/admin/ai',
 ]
 // Страницы закупа — кнопками на дашборде, в меню их нет
-const PAGES = [['/admin/suppliers', 'Поставщики'], ['/admin/telegram', 'Аккаунт Telegram'], ['/admin/supplier-offers', 'Товары поставщиков'], ['/admin/demand', 'Спрос на рынке'], ['/admin/kaspi', 'Цифры Kaspi'], ['/admin/ai', 'Модели ИИ'], ['/admin/restock', 'К закупке']]
+const PAGES = [['/admin/suppliers', 'Поставщики'], ['/admin/telegram', 'Аккаунт Telegram'], ['/admin/supplier-offers', 'Товары поставщиков'], ['/admin/demand', 'Спрос на рынке'], ['/admin/kaspi', 'Цифры Kaspi'], ['/admin/ai', 'Модели ИИ'], ['/admin/restock', 'К закупке'], ['/admin/deliveries', 'Поставки']]
 const MENU = [...OLD_LINKS.filter(h => !PAGES.some(([p]) => p === h)), '/admin/purchasing']
 
 if (!/localhost|127\.0\.0\.1/.test(BASE))
@@ -430,9 +430,9 @@ try {
   check(!nUnassigned || sp(await page.locator('[data-testid=supplier-row-none] [data-testid=supplier-meta]').textContent()).startsWith(goods(nUnassigned)), 'строка «Без поставщика» — с числом товаров')
 
   const all = await steps(page)
-  check(all.map(s => s.id).join() === 'suppliers,demand,ai,offers,order', `пять шагов по порядку: ${all.map(s => s.id).join(', ')}`)
-  check(all.map(s => s.href).join() === '/admin/suppliers,/admin/demand,/admin/ai,/admin/supplier-offers,/admin/restock', 'ссылки шагов — на их страницы')
-  const [sup, dem, ai, offers, order] = all
+  check(all.map(s => s.id).join() === 'suppliers,demand,ai,offers,order,deliveries', `шесть шагов по порядку: ${all.map(s => s.id).join(', ')}`)
+  check(all.map(s => s.href).join() === '/admin/suppliers,/admin/demand,/admin/ai,/admin/supplier-offers,/admin/restock,/admin/deliveries', 'ссылки шагов — на их страницы')
+  const [sup, dem, ai, offers, order, deliveries] = all
   check(sup.facts.startsWith(`${nSuppliers} ${word(nSuppliers, 'поставщик', 'поставщика', 'поставщиков')}`), `шаг 1 — поставщиков столько же, сколько в базе: «${sup.facts}»`)
   if (!nChannels)
     check(sup.state === 'action' && sup.facts.includes('каналов в Telegram нет') && /«Каналы в Telegram»/.test(sup.next), `шаг 1 без каналов — ждёт владельца, как добавить: «${sup.next}»`)
@@ -446,9 +446,13 @@ try {
   const orderState = (withSupplier || restock.noSupplier) ? 'action' : restock.openOrders ? 'running' : 'done'
   check(order.state === orderState, `шаг 5 — «${order.badge}», как по остаткам: ${withSupplier} у поставщиков, ${restock.noSupplier} без поставщика`)
   check(!withSupplier || order.facts.includes(`к закупке ${withSupplier} `), `шаг 5 — к закупке ${withSupplier}: «${order.facts}»`)
+  // Поставки (26.11.2026): формируется или опаздывает — ждёт владельца, ждём — идёт; без миграции — позже
+  const dl = j.deliveries
+  const deliveriesState = !dl ? 'later' : dl.forming || dl.late ? 'action' : dl.waiting ? 'running' : 'done'
+  check(deliveries.state === deliveriesState && (dl || deliveries.next === 'Заработает после миграции базы.'), `шаг 6, поставки — «${deliveries.badge}»: ${JSON.stringify(dl)}`)
   const doneNow = all.filter(s => s.state === 'done').length
   const waitingLine = sp(await page.locator('[data-testid=purchasing-waiting]').innerText())
-  check(waitingLine === (doneNow === 5 ? 'Все шаги готовы — от вас ничего не нужно' : `${doneNow} из 5 шагов готово`), `под кольцом шагов: «${waitingLine}»`)
+  check(waitingLine === (doneNow === 6 ? 'Все шаги готовы — от вас ничего не нужно' : `${doneNow} из 6 шагов готово`), `под кольцом шагов: «${waitingLine}»`)
   // Готовые — строчками внизу, ждущие — карточками сверху, в порядке шагов
   const shownOrder = await page.locator('[data-testid=purchasing-steps] > li').evaluateAll(li => li.map(el => [el.dataset.testid, el.getBoundingClientRect().top]).sort((a, b) => a[1] - b[1]).map(x => x[0].replace('step-', '')))
   const expectedOrder = [...all.filter(s => s.state !== 'done'), ...all.filter(s => s.state === 'done')].map(s => s.id)

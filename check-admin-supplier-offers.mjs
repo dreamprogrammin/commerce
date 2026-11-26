@@ -547,7 +547,9 @@ async function cleanup() {
   const ids = psql(`SELECT coalesce(string_agg(c.id::text, ','), '') FROM public.supplier_channels c JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
   for (const id of new Set([...channelIds, ...ids.split(',').filter(Boolean), ORPHAN]))
     await removeFiles(await bucketFiles(id))
-  psql(`DELETE FROM public.suppliers WHERE name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
+  // Заказы поставщикам держат поставщика (ON DELETE RESTRICT): «На сайт» кладёт товар в формирующийся (26.11.2026)
+  psql(`DELETE FROM public.supplier_orders WHERE supplier_id IN (SELECT id FROM public.suppliers WHERE name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}'));
+DELETE FROM public.suppliers WHERE name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
   // Фразы стража — «игрушка po 1016 точно», «игрушка зк 10 купить», «набор b 2 точно»
   psql(`DELETE FROM public.market_demand_monthly WHERE keyword ~ '^(игрушка|набор) .+ (точно|купить)$' OR keyword ~ '^похожие игрушки [0-9]+$'; DELETE FROM public.market_demand_keywords WHERE keyword ~ '^(игрушка|набор) .+ (точно|купить)$' OR keyword ~ '^похожие игрушки [0-9]+$';`)
   if (started && psql(`SELECT to_regproc('public.market_demand_request_offers') IS NOT NULL;`) === 't')
@@ -1467,6 +1469,9 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   check(made.n === 1 && Number(made.cost) === 1013 && Number(made.price) === 1990 && made.supplier === supplierOpenId && made.images === 1, `товар создан: закупочная ${made.cost}, розничная ${made.price}, поставщик свой, фото ${made.images}`)
   check(made.category === categoryId && Boolean(made.brand) && made.brand === brandRow?.id && made.description === t13.description && made.seo === t13.seo_description, `у товара — раздел, новый бренд и тексты ИИ: раздел ${made.category === categoryId ? 'свой' : made.category}, бренд ${made.brand && made.brand === brandRow?.id ? 'новый' : made.brand}`)
   check(psql(`SELECT status FROM public.supplier_offers WHERE id = '${offerIdOf(1013)}';`) === 'added', 'у поставщика товар отмечен «Добавлен»')
+  // С 26.11.2026 созданный из «На сайт» ложится в формирующийся заказ своему поставщику и скрыт до приёмки («Поставки»)
+  const drafted = JSON.parse(psql(`SELECT json_build_object('active', p.is_active, 'qty', (SELECT i.quantity FROM public.supplier_order_items i JOIN public.supplier_orders o ON o.id = i.order_id WHERE i.product_id = p.id AND o.status = 'draft' AND o.supplier_id = p.supplier_id)) FROM public.products p WHERE p.sku = 'PO-1013' AND p.name = :'n';`, { n: t13.name }))
+  check(drafted.active === false && drafted.qty === 5, `товар — в формирующемся заказе поставщику (${drafted.qty} шт.) и скрыт с сайта до приёмки`)
   await page.unroute('**/api/seo/notify-indexing')
 
   console.log('\n== «Тексты для сайта»: отказ модели и «Написать заново»')
