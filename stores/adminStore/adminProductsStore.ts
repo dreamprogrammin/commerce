@@ -34,20 +34,12 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
   const supabase = useSupabaseClient<Database>()
   const { uploadFile, removeFile, generateSeoFileName } = useSupabaseStorage()
 
-  // --- SEO: Уведомление поисковиков о новых страницах ---
-  async function notifySearchEngines(productSlug: string) {
-    try {
-      const url = `/catalog/products/${productSlug}`
-      await $fetch('/api/seo/notify-indexing', {
-        method: 'POST',
-        body: { urls: [url], type: 'created' },
-      })
-      // Уведомление успешно отправлено
-    }
-    catch {
-      // Не блокируем основной флоу если SEO уведомление не прошло
-    }
-  }
+  /*
+   * Поисковикам о товаре сообщают страницы — `new.vue` и `[id].vue` через
+   * `useSeoIndexing().notifyProduct`, с тостом и с учётом «скрыт до приёмки».
+   * Стор слал то же самое ещё раз: на создание видимого товара и на каждую
+   * правку уходило по два запроса (найдено 26.11.2026).
+   */
 
   // --- СОСТОЯНИЕ (State) ---
   const products = ref<ProductListAdmin[]>([])
@@ -323,12 +315,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       // 🎯 Управляем картинками с blur (🔍 SEO: передаём имя товара для названия файлов)
       await _manageProductImages(newProduct.id, newProduct.name, newImageFiles, [], 0, [])
 
-      // 🔍 SEO: Уведомляем поисковики о новом товаре. Скрытый — нет: на сайте
-      // его не видно, а «На сайт» с заказом поставщику скрывает товар до
-      // приёмки, и о нём скажет приёмка (26.11.2026)
-      if (newProduct.slug && productData.is_active !== false) {
-        notifySearchEngines(newProduct.slug)
-      }
       revalidateProductPages({ productId: newProduct.id })
 
       toast.success(`Товар "${newProduct.name}" успешно создан.`)
@@ -379,10 +365,6 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       // 🎯 Управляем картинками с blur (🔍 SEO: передаём имя товара для названия файлов)
       await _manageProductImages(productId, updatedProduct.name, newImageFiles, imagesToDelete, existingImages.length, existingImages)
 
-      // 🔍 SEO: Уведомляем поисковики об обновлённом товаре
-      if (updatedProduct.slug) {
-        notifySearchEngines(updatedProduct.slug)
-      }
       revalidateProductPages({ productId })
       /*
        * Сменилось название — сменился и адрес. Сброс по `productId` считает
