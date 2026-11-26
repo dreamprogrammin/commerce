@@ -45,6 +45,8 @@ export interface RestockProduct {
   wishlist: number
   /** Заказано у поставщика и ещё не пришло — по открытым заказам */
   pending: number
+  /** В формирующихся заказах («Поставки»): поставщику ещё не отправлено */
+  forming: number
 }
 
 export type SupplierOrderStatus = 'ordered' | 'in_transit' | 'received' | 'cancelled'
@@ -188,7 +190,9 @@ interface OrderRow {
 }
 
 /**
- * Заказы поставщикам (шаг 2, 31.10.2026): открытые и закрытые за 30 дней.
+ * Заказы поставщикам (шаг 2, 31.10.2026): открытые и закрытые за 30 дней,
+ * плюс формирующиеся («Поставки», 26.11.2026) — их строки идут в счёт
+ * `forming`, а в список заказов «К закупке» не попадают.
  * `null` — таблиц ещё нет: миграция `20261031160000_supplier_orders` не
  * применена (превью `dev` смотрит в боевую базу). Тогда страница работает
  * как в шаге 1, без заказов, — выкатка безопасна в любом порядке.
@@ -197,7 +201,7 @@ async function loadOrders(db: SupabaseClient, now: Date): Promise<SupplierOrder[
   const since = new Date(now.getTime() - 30 * DAY).toISOString()
   const query = (dates: string) => db.from('supplier_orders')
     .select(`id, number, supplier_id, status, note, created_at, ${dates}shipped_at, closed_at, supplier_order_items(product_id, product_name, sku, quantity, received_quantity, cost_price)`)
-    .or(`status.in.(ordered,in_transit),closed_at.gte.${since}`)
+    .or(`status.in.(draft,ordered,in_transit),closed_at.gte.${since}`)
     .order('number', { ascending: false })
     .limit(500)
   // Даты «Поставок» — с миграции 20261126140000; до неё колонок нет (42703)
@@ -252,6 +256,24 @@ export function pendingByProduct(orders: Pick<SupplierOrder, 'status' | 'lines'>
   return pending
 }
 
+/**
+ * Сколько каждого товара лежит в формирующихся заказах («Поставки»):
+ * поставщику ещё не отправлено, но заказывать второй раз не нужно. Без этого
+ * «К закупке» предлагала товар, уже лежащий в таком заказе (26.11.2026).
+ */
+export function formingByProduct(orders: Pick<SupplierOrder, 'status' | 'lines'>[]): Map<string, number> {
+  const forming = new Map<string, number>()
+  for (const order of orders) {
+    if (order.status !== 'draft')
+      continue
+    for (const line of order.lines) {
+      if (line.productId && line.quantity > 0)
+        forming.set(line.productId, (forming.get(line.productId) ?? 0) + line.quantity)
+    }
+  }
+  return forming
+}
+
 export async function loadRestock(db: SupabaseClient, now = new Date()): Promise<{ suppliers: RestockSupplier[], products: RestockProduct[], orders: SupplierOrder[] | null }> {
   const [suppliersRes, products, sales, carts, alerts, wishlist, orders] = await Promise.all([
     db.from('suppliers').select('id, name, contact_person, phone, address').order('name'),
@@ -296,6 +318,7 @@ export async function loadRestock(db: SupabaseClient, now = new Date()): Promise
   const alertCount = countBy(alerts)
   const wishlistCount = countBy(wishlist)
   const pending = pendingByProduct(orders ?? [])
+  const forming = formingByProduct(orders ?? [])
 
   return {
     suppliers: (suppliersRes.data ?? []).map(s => ({
@@ -326,7 +349,9 @@ export async function loadRestock(db: SupabaseClient, now = new Date()): Promise
       alerts: alertCount.get(p.id) ?? 0,
       wishlist: wishlistCount.get(p.id) ?? 0,
       pending: pending.get(p.id) ?? 0,
+      forming: forming.get(p.id) ?? 0,
     })),
-    orders,
+    // Формирующимися занимаются «Поставки»; здесь они только в счёте `forming`
+    orders: orders && orders.filter(o => o.status !== 'draft'),
   }
 }

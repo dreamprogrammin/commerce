@@ -20,6 +20,8 @@ export interface RestockItem {
   costPrice: number | null
   /** Заказано у поставщика и ещё не пришло (шаг 2) */
   pending?: number
+  /** Лежит в формирующемся заказе («Поставки»): поставщику ещё не отправлено */
+  forming?: number
 }
 
 /** id товара → сколько брать (0 — не брать). Без записи — по правилу товара. */
@@ -35,10 +37,11 @@ export interface DraftRow<T extends RestockItem = RestockItem> {
 /**
  * Пора заказывать: остаток вместе с уже заказанным и не пришедшим не выше
  * порога. Без учёта заказанного товар висел бы «на пороге», пока заказ едет, —
- * и его заказали бы второй раз.
+ * и его заказали бы второй раз. Так же и с лежащим в формирующемся заказе
+ * («Поставки»): он уйдёт поставщику по «Заказано».
  */
-export function needsRestock(item: Pick<RestockItem, 'stock' | 'minStock' | 'pending'>): boolean {
-  return item.stock + (item.pending ?? 0) <= item.minStock
+export function needsRestock(item: Pick<RestockItem, 'stock' | 'minStock' | 'pending' | 'forming'>): boolean {
+  return item.stock + (item.pending ?? 0) + (item.forming ?? 0) <= item.minStock
 }
 
 const byName = (a: RestockItem, b: RestockItem) => a.name.localeCompare(b.name, 'ru')
