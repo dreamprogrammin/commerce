@@ -919,6 +919,76 @@ export interface Database {
         }
         Relationships: []
       }
+      kaspi_snapshots: {
+        Row: {
+          created_by: string | null
+          id: number
+          kaspi_url: string | null
+          offer_id: string | null
+          offer_item: number | null
+          price: number | null
+          rating: number | null
+          reviews: number | null
+          sellers: number | null
+          source: string
+          taken_at: string
+          title: string
+          topic_id: string | null
+        }
+        Insert: {
+          id?: never
+          created_by?: string | null
+          kaspi_url?: string | null
+          offer_id?: string | null
+          offer_item?: number | null
+          price?: number | null
+          rating?: number | null
+          reviews?: number | null
+          sellers?: number | null
+          source: string
+          taken_at?: string
+          title?: string
+          topic_id?: string | null
+        }
+        Update: {
+          id?: never
+          created_by?: string | null
+          kaspi_url?: string | null
+          offer_id?: string | null
+          offer_item?: number | null
+          price?: number | null
+          rating?: number | null
+          reviews?: number | null
+          sellers?: number | null
+          source?: string
+          taken_at?: string
+          title?: string
+          topic_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'kaspi_snapshots_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'kaspi_snapshots_offer_id_fkey'
+            columns: ['offer_id']
+            isOneToOne: false
+            referencedRelation: 'supplier_offers'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'kaspi_snapshots_topic_id_fkey'
+            columns: ['topic_id']
+            isOneToOne: false
+            referencedRelation: 'market_demand_topics'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       magic_links: {
         Row: {
           created_at: string | null
@@ -1644,6 +1714,57 @@ export interface Database {
             referencedColumns: ['id']
           },
         ]
+      }
+      paid_services: {
+        Row: {
+          cost: number | null
+          created_at: string
+          currency: string
+          id: string
+          meter: string | null
+          name: string
+          note: string
+          period: string
+          plan: string
+          reminded_for: string | null
+          renews_on: string | null
+          sort: number
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          currency?: string
+          id?: string
+          meter?: string | null
+          name: string
+          note?: string
+          period?: string
+          plan?: string
+          reminded_for?: string | null
+          renews_on?: string | null
+          sort?: number
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          currency?: string
+          id?: string
+          meter?: string | null
+          name?: string
+          note?: string
+          period?: string
+          plan?: string
+          reminded_for?: string | null
+          renews_on?: string | null
+          sort?: number
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
       }
       product_accessories: {
         Row: {
@@ -2637,6 +2758,63 @@ export interface Database {
         }
         Relationships: []
       }
+      site_health_checks: {
+        Row: {
+          checked_at: string
+          error: string | null
+          id: number
+          ms: number | null
+          ok: boolean
+          status: number | null
+          url: string
+        }
+        Insert: {
+          checked_at?: string
+          error?: string | null
+          id?: never
+          ms?: number | null
+          ok: boolean
+          status?: number | null
+          url: string
+        }
+        Update: {
+          checked_at?: string
+          error?: string | null
+          id?: never
+          ms?: number | null
+          ok?: boolean
+          status?: number | null
+          url?: string
+        }
+        Relationships: []
+      }
+      site_health_incidents: {
+        Row: {
+          alerted_at: string | null
+          ended_at: string | null
+          id: number
+          reason: string
+          recovered_alerted_at: string | null
+          started_at: string
+        }
+        Insert: {
+          alerted_at?: string | null
+          ended_at?: string | null
+          id?: never
+          reason?: string
+          recovered_alerted_at?: string | null
+          started_at?: string
+        }
+        Update: {
+          alerted_at?: string | null
+          ended_at?: string | null
+          id?: never
+          reason?: string
+          recovered_alerted_at?: string | null
+          started_at?: string
+        }
+        Relationships: []
+      }
       slides: {
         Row: {
           alt_text: string | null
@@ -2934,6 +3112,7 @@ export interface Database {
           product_name: string
           quantity: number
           received_quantity: number
+          show_on_receipt: boolean
           sku: string | null
         }
         Insert: {
@@ -2944,6 +3123,7 @@ export interface Database {
           product_name: string
           quantity: number
           received_quantity?: number
+          show_on_receipt?: boolean
           sku?: string | null
         }
         Update: {
@@ -2954,6 +3134,7 @@ export interface Database {
           product_name?: string
           quantity?: number
           received_quantity?: number
+          show_on_receipt?: boolean
           sku?: string | null
         }
         Relationships: [
@@ -2978,9 +3159,11 @@ export interface Database {
           closed_at: string | null
           created_at: string
           created_by: string | null
+          expected_at: string | null
           id: string
           note: string | null
           number: number
+          ordered_at: string | null
           shipped_at: string | null
           status: string
           supplier_id: string
@@ -2990,9 +3173,11 @@ export interface Database {
           closed_at?: string | null
           created_at?: string
           created_by?: string | null
+          expected_at?: string | null
           id?: string
           note?: string | null
           number?: never
+          ordered_at?: string | null
           shipped_at?: string | null
           status?: string
           supplier_id: string
@@ -3002,9 +3187,11 @@ export interface Database {
           closed_at?: string | null
           created_at?: string
           created_by?: string | null
+          expected_at?: string | null
           id?: string
           note?: string | null
           number?: never
+          ordered_at?: string | null
           shipped_at?: string | null
           status?: string
           supplier_id?: string
@@ -3285,6 +3472,15 @@ export interface Database {
         }
         Returns: Json
       }
+      admin_add_to_supplier_draft: {
+        Args: {
+          p_admin_id: string
+          p_product_id: string
+          p_quantity: number
+          p_show_on_receipt: boolean
+        }
+        Returns: Json
+      }
       admin_create_supplier_order: {
         Args: {
           p_admin_id: string
@@ -3292,6 +3488,10 @@ export interface Database {
           p_note?: string
           p_supplier_id: string
         }
+        Returns: Json
+      }
+      admin_edit_supplier_draft: {
+        Args: { p_admin_id: string, p_items: Json, p_order_id: string }
         Returns: Json
       }
       admin_merge_offline_customer: {
@@ -3302,6 +3502,10 @@ export interface Database {
         }
         Returns: Json
       }
+      admin_place_supplier_order: {
+        Args: { p_admin_id: string, p_expected_at: string, p_order_id: string }
+        Returns: Json
+      }
       admin_receive_supplier_order: {
         Args: {
           p_admin_id: string
@@ -3309,6 +3513,10 @@ export interface Database {
           p_items: Json
           p_order_id: string
         }
+        Returns: Json
+      }
+      admin_set_supplier_order_expected: {
+        Args: { p_admin_id: string, p_expected_at: string, p_order_id: string }
         Returns: Json
       }
       admin_set_supplier_order_status: {
@@ -4095,6 +4303,8 @@ export interface Database {
           stock_quantity: number
         }[]
       }
+      site_health_storage: { Args: never, Returns: Json }
+      site_watch_tick: { Args: never, Returns: number }
       submit_review_by_invite: {
         Args: {
           p_author_name?: string
@@ -4123,6 +4333,21 @@ export interface Database {
       validate_promo_code: {
         Args: { p_code: string, p_order_amount: number }
         Returns: Json
+      }
+      vercel_key_delete: { Args: never, Returns: undefined }
+      vercel_key_get: { Args: never, Returns: Json }
+      vercel_key_set: {
+        Args: { p_admin: string, p_team_id: string, p_team_name: string, p_token: string }
+        Returns: undefined
+      }
+      vercel_key_status: {
+        Args: never
+        Returns: {
+          last4: string
+          team_id: string
+          team_name: string
+          updated_at: string
+        }[]
       }
     }
     Enums: {

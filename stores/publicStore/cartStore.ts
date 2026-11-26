@@ -2,6 +2,7 @@ import type { Database, ICheckoutData, ProductWithImages } from '@/types'
 import type { CartLine, ServerSyncMark } from '@/utils/cartSync'
 import { toast } from 'vue-sonner'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { notifyCartChange } from '@/composables/useCartChange'
 import { BUCKET_NAME_PRODUCT, COURIER_DELIVERY_COST, FREE_SHIPPING_THRESHOLD } from '@/constants'
 import { cartSignature, decideCartSync, mergeCartLines } from '@/utils/cartSync'
 import {
@@ -280,6 +281,7 @@ export const useCartStore = defineStore(
       if (existingItem) {
         existingItem.quantity += quantity
         cartAdded(existingItem.product.name, thumbUrl(existingItem.product))
+        notifyCartChange(quantity)
         // 🔥 Открываем корзину при добавлении товара
         isCartOpen.value = true
         // 🔥 Сбрасываем бонусы при изменении корзины
@@ -320,6 +322,7 @@ export const useCartStore = defineStore(
             quantity,
           })
           cartAdded(fullProduct.name, thumbUrl(fullProduct as ProductWithImages))
+          notifyCartChange(quantity)
           // 🔥 Открываем корзину при добавлении нового товара
           isCartOpen.value = true
           // 🔥 Сбрасываем бонусы при изменении корзины
@@ -361,11 +364,10 @@ export const useCartStore = defineStore(
 
       items.value = items.value.filter(i => i.product.id !== productId)
       if (removed) {
-        cartRemoved(
-          removed.product.name,
-          () => restoreItem(removed, index),
-          thumbUrl(removed.product),
-        )
+        const undo = () => restoreItem(removed, index)
+        cartRemoved(removed.product.name, undo, thumbUrl(removed.product))
+        // На телефоне тоста нет — говорит нижняя панель, и «Вернуть» там же.
+        notifyCartChange(-itemQuantity(removed), undo)
       }
       else {
         toast.info('Товар удалён из корзины')
@@ -397,9 +399,12 @@ export const useCartStore = defineStore(
       const item = items.value.find(i => i.product.id === productId)
       if (item) {
         if (quantity > 0) {
+          const delta = quantity - item.quantity
           item.quantity = quantity
           // 🔥 Сбрасываем бонусы при изменении корзины
           bonusesToSpend.value = 0
+          // «+» и «−» в степпере: подсказка у корзины нижней панели на телефоне
+          notifyCartChange(delta)
         }
         else {
           removeItem(productId)

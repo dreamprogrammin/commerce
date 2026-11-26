@@ -21,9 +21,53 @@ export const PURCHASING_PAGES = [
   { to: '/admin/telegram', label: 'Аккаунт Telegram' },
   { to: '/admin/supplier-offers', label: 'Товары поставщиков' },
   { to: '/admin/demand', label: 'Спрос на рынке' },
+  { to: '/admin/kaspi', label: 'Цифры Kaspi' },
   { to: '/admin/ai', label: 'Модели ИИ' },
   { to: '/admin/restock', label: 'К закупке' },
+  { to: '/admin/deliveries', label: 'Поставки' },
 ] as const
+
+/** Дашборд — корень раздела */
+export const PURCHASING_HUB = { to: '/admin/purchasing', label: 'Умный закуп' } as const
+
+/** Кнопка «назад» в шапке админки на страницах закупа */
+export interface PurchasingBack {
+  /** Куда ведёт; при `history` — адрес прежней записи истории */
+  to: string
+  label: string
+  /** Вернуться историей (router.back): прежний экран откроется там, где его оставили */
+  history: boolean
+}
+
+const pathOf = (fullPath: string) => fullPath.split(/[?#]/, 1)[0]!
+
+function purchasingPage(path: string) {
+  return [PURCHASING_HUB, ...PURCHASING_PAGES].find(p => path === p.to || path.startsWith(`${p.to}/`)) ?? null
+}
+
+/**
+ * «Назад» на страницах умного закупа (23 ноября 2026). Владелец: «в раздел
+ * умный закуп нужно сделать удобную кнопку назад, а то непонятно, как
+ * обратно, порой приходится выходить на домашнюю страницу». Сайт ставится на
+ * телефон приложением (site.webmanifest, display: standalone) — кнопки
+ * «назад» у браузера там нет.
+ *
+ * `back` — history.state.back от vue-router: прежний адрес в этой вкладке.
+ * Пришли с экрана закупа — назад на него историей: «‹ Товары поставщиков» на
+ * «Цифрах Kaspi», «‹ Назад» — та же страница с другим адресом. Иначе — вверх:
+ * на дашборд, с вложенной страницы — на её страницу. На дашборде и вне
+ * закупа — null, кнопки нет.
+ */
+export function purchasingBack(current: string, back: string | null | undefined): PurchasingBack | null {
+  const path = pathOf(current)
+  const here = purchasingPage(path)
+  if (!here || path === PURCHASING_HUB.to)
+    return null
+  if (back && back !== current && purchasingPage(pathOf(back)))
+    return { to: back, label: pathOf(back) === path ? 'Назад' : purchasingPage(pathOf(back))!.label, history: true }
+  const up = path === here.to ? PURCHASING_HUB : here
+  return { to: up.to, label: up.label, history: false }
+}
 
 /** Тема в списках дашборда — числа Google (DataForSEO) */
 export interface DemandLine {
@@ -135,6 +179,16 @@ export interface PurchasingStatus {
     /** Заказаны или в пути; null — миграции заказов ещё нет */
     openOrders: number | null
   }
+  /**
+   * «Поставки» (26.11.2026): формирующиеся заказы и сколько в них позиций,
+   * открытые и из них опаздывающие; null — миграции 20261126140000 ещё нет
+   */
+  deliveries: {
+    forming: number
+    formingPositions: number
+    waiting: number
+    late: number
+  } | null
   /** Поставщики по числу товаров на сайте */
   supplierLoad: SupplierLoad[]
   /** Активные товары без поставщика */
@@ -145,7 +199,7 @@ export interface PurchasingStatus {
 export type StepState = 'done' | 'action' | 'running' | 'later'
 
 export interface PurchasingStep {
-  id: 'suppliers' | 'demand' | 'ai' | 'offers' | 'order'
+  id: 'suppliers' | 'demand' | 'ai' | 'offers' | 'order' | 'deliveries'
   title: string
   /** Зачем шаг — одной строкой */
   about: string
@@ -352,7 +406,7 @@ function offersStep(s: PurchasingStatus): PurchasingStep {
   const step = {
     id: 'offers' as const,
     title: 'Товары поставщиков',
-    about: 'Новые товары из каналов поставщиков: фото, подпись и ссылка на пост, у каждого — тема спроса и её цифры. «Есть спрос» оставляет то, что ищут. Разобранное отмечаете — добавил на сайт или не брать.',
+    about: 'Новые товары из каналов поставщиков: фото, подпись и ссылка на пост, у каждого — тема спроса и её цифры. «Высокий спрос» оставляет самое ходовое. Разобранное отмечаете — добавил на сайт или не брать.',
     link: { to: '/admin/supplier-offers', label: 'Товары поставщиков' },
   }
   const o = s.offers
@@ -403,7 +457,42 @@ function orderStep(s: PurchasingStatus): PurchasingStep {
   return { ...step, state: 'done', facts, next: null }
 }
 
-/** Шаги умного закупа по порядку: откуда товар → спрос → чтение постов → товары поставщиков → заказ. */
+/**
+ * «Поставки» (26.11.2026): товары из «На сайт» копятся в заказ поставщику,
+ * «Заказано» — с датой, «Принять» — со сверкой, сколько пришло и сколько нет.
+ */
+function deliveriesStep(s: PurchasingStatus): PurchasingStep {
+  const step = {
+    id: 'deliveries' as const,
+    title: 'Поставки',
+    about: 'Товары из «На сайт» копятся в заказ своему поставщику; отправили — «Заказано» с датой, пришло — «Принять» и сверка.',
+    link: { to: '/admin/deliveries', label: 'Поставки' },
+  }
+  const d = s.deliveries
+  if (!d)
+    return { ...step, state: 'later', facts: ['миграции поставок нет'], next: NO_MIGRATION }
+  const facts: string[] = []
+  if (d.forming)
+    facts.push(`${plural(d.forming, 'формируется', 'формируются', 'формируются')} ${count(d.forming, 'заказ', 'заказа', 'заказов')}: ${count(d.formingPositions, 'позиция', 'позиции', 'позиций')}`)
+  if (d.waiting)
+    facts.push(`ждём ${count(d.waiting, 'поставку', 'поставки', 'поставок')}`)
+  if (d.late)
+    facts.push(`опаздывают: ${d.late}`)
+  if (!facts.length)
+    facts.push('открытых поставок нет')
+
+  const todo = [
+    d.forming && 'Отправьте сформированный заказ поставщику и нажмите «Заказано».',
+    d.late && 'Опаздывающие — уточните у поставщика и поправьте дату.',
+  ].filter(Boolean).join(' ')
+  if (todo)
+    return { ...step, state: 'action', facts, next: todo }
+  if (d.waiting)
+    return { ...step, state: 'running', facts, next: 'Пришло — «Принять» у поставки: остаток прибавится, новый товар появится на сайте.' }
+  return { ...step, state: 'done', facts, next: null }
+}
+
+/** Шаги умного закупа по порядку: откуда товар → спрос → чтение постов → товары поставщиков → заказ → поставки. */
 export function purchasingSteps(s: PurchasingStatus): PurchasingStep[] {
-  return [suppliersStep(s), demandStep(s), aiStep(s), offersStep(s), orderStep(s)]
+  return [suppliersStep(s), demandStep(s), aiStep(s), offersStep(s), orderStep(s), deliveriesStep(s)]
 }

@@ -1,17 +1,21 @@
 /*
  * «Модели ИИ» в админке (31.10.2026) — только на ЛОКАЛЬНОЙ базе и с
- * заглушкой провайдеров (сервер запущен с AI_STUB_URL=http://localhost:8788,
- * заглушка — по образцу в docs/HANDOFF.md). Проверяет:
+ * заглушкой провайдеров: сервер запущен с AI_STUB_URL=http://localhost:8788,
+ * заглушку на этом порту страж поднимает сам (до 6.11.2026 её поднимали
+ * руками, и в репозитории её не было — страж не прогонялся). Проверяет:
  *  1) гость — 401, не-администратор — 403;
  *  2) отклонённый провайдером ключ, мусор и OpenRouter — 400, в Vault не попадают;
  *  3) через страницу: ключ проверяется и сохраняется, на странице и в ответах
  *     сервера его нет — только последние 4 символа; в Vault — он целиком;
  *  4) модель выбирается из живого списка; модель без картинок и чужая — 400;
- *  5) удаление ключа — по второму клику.
+ *  5) «Тексты для сайта» (23.11.2026) — своя карточка: только Claude, даже
+ *     когда есть ключ Gemini; модель без картинок и Gemini — 400;
+ *  6) удаление ключа — по второму клику.
  * Ключи и выбор модели после прогона удаляются.
  *
  *   node check-admin-ai.mjs --base=http://localhost:3141
  */
+import http from 'node:http'
 import process from 'node:process'
 import { createServerClient } from '@supabase/ssr'
 import { chromium } from 'playwright'
@@ -62,13 +66,48 @@ async function api(path, token, init = {}) {
   })() }
 }
 
+/*
+ * Заглушка трёх провайдеров — те же адреса, что у настоящих (server/utils/aiProviders.ts):
+ * Anthropic — /v1/models (SDK, ключ в x-api-key), OpenAI — /openai/v1/models,
+ * Gemini — /gemini/v1beta/models. Принимает только GOOD и GOOD_GEMINI; в отказе —
+ * кусок ключа, как у настоящих провайдеров: сервер не должен его пересказывать.
+ */
+const AI_PORT = 8788
+const stub = http.createServer((req, res) => {
+  const { pathname } = new URL(req.url, `http://127.0.0.1:${AI_PORT}`)
+  const send = (status, body) => {
+    res.writeHead(status, { 'content-type': 'application/json' })
+    res.end(JSON.stringify(body))
+  }
+  const claude = (id, label, image) => ({ type: 'model', id, display_name: label, created_at: '2026-01-01T00:00:00Z', capabilities: { image_input: { supported: image } } })
+  if (pathname === '/v1/models') {
+    const key = req.headers['x-api-key'] ?? ''
+    if (key !== GOOD)
+      return send(401, { type: 'error', error: { type: 'authentication_error', message: `invalid x-api-key ${key}` } })
+    const data = [claude('claude-sonnet-5-5', 'Claude Sonnet 5.5', true), claude('claude-haiku-5-5', 'Claude Haiku 5.5', true), claude('claude-textonly-test', 'Claude Text Only', false)]
+    return send(200, { data, has_more: false, first_id: data[0].id, last_id: data.at(-1).id })
+  }
+  if (pathname === '/openai/v1/models')
+    return send(401, { error: { message: `Incorrect API key provided: ${req.headers.authorization ?? ''}`, code: 'invalid_api_key' } })
+  if (pathname === '/gemini/v1beta/models') {
+    if (req.headers['x-goog-api-key'] !== GOOD_GEMINI)
+      return send(400, { error: { code: 400, message: 'API key not valid', status: 'INVALID_ARGUMENT' } })
+    return send(200, { models: [
+      { name: 'models/gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', supportedGenerationMethods: ['generateContent', 'countTokens'] },
+      { name: 'models/text-embedding-004', displayName: 'Text Embedding 004', supportedGenerationMethods: ['embedContent'] },
+    ] })
+  }
+  send(404, { error: 'нет такого адреса у заглушки' })
+})
+
 async function cleanup() {
   for (const p of ['anthropic', 'openai', 'gemini'])
     await rpc('ai_key_delete', { p_provider: p })
-  await fetch(`${SUPA}/rest/v1/ai_settings?key=eq.supplier_vision_model`, { method: 'DELETE', headers: svc })
+  await fetch(`${SUPA}/rest/v1/ai_settings?key=in.(supplier_vision_model,content_writer_model)`, { method: 'DELETE', headers: svc })
 }
 
 console.log(`стенд ${BASE}`)
+await new Promise((resolve, reject) => stub.once('error', reject).listen(AI_PORT, '127.0.0.1', resolve))
 await cleanup()
 try {
   console.log('\n== доступ')
@@ -120,19 +159,41 @@ try {
     await page.getByRole('button', { name: 'Проверить и сохранить' }).nth(2).click()
     await page.getByText('задан ••••xxxx').waitFor({ timeout: 30000 })
 
-    // Модель: из живого списка, без моделей без картинок
-    const modelSelect = page.getByLabel('Модель')
-    await page.waitForFunction(() => document.querySelector('select[aria-label="Модель"]')?.options.length > 1, null, { timeout: 30000 })
+    // Модель: из живого списка, без моделей без картинок. Задач две (23.11.2026) — всё внутри своей карточки
+    const vision = page.locator('[data-testid=ai-task-supplier_vision_model]')
+    const writer = page.locator('[data-testid=ai-task-content_writer_model]')
+    const modelSelect = vision.getByLabel('Модель')
+    const optionsOf = task => page.waitForFunction(t => document.querySelector(`[data-testid=ai-task-${t}] select[aria-label="Модель"]`)?.options.length > 1, task, { timeout: 30000 })
+    await optionsOf('supplier_vision_model')
     const options = await modelSelect.locator('option').allTextContents()
     check(options.some(o => o.includes('Claude Sonnet 5.5')) && !options.some(o => o.includes('Text Only')), `список моделей живой, без «только текст»: ${options.length - 1}`)
     await modelSelect.selectOption('claude-sonnet-5-5')
-    await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
-    await page.getByText('Сейчас: anthropic/claude-sonnet-5-5').waitFor({ timeout: 30000 })
+    await vision.getByRole('button', { name: 'Сохранить', exact: true }).click()
+    await vision.getByText('Сейчас: anthropic/claude-sonnet-5-5 · выбрана').waitFor({ timeout: 30000 })
     const [setting] = await rest('ai_settings?select=value,updated_by&key=eq.supplier_vision_model')
     check(setting?.value === 'anthropic/claude-sonnet-5-5' && Boolean(setting?.updated_by), `ai_settings: ${setting?.value}, кто выбрал записано`)
-    await page.getByLabel('Провайдер').selectOption('gemini')
-    await page.waitForFunction(() => [...document.querySelector('select[aria-label="Модель"]').options].some(o => o.value === 'gemini-2.5-flash'), null, { timeout: 30000 })
+    await vision.getByLabel('Провайдер').selectOption('gemini')
+    await page.waitForFunction(() => [...document.querySelector('[data-testid=ai-task-supplier_vision_model] select[aria-label="Модель"]').options].some(o => o.value === 'gemini-2.5-flash'), null, { timeout: 30000 })
     check(!(await modelSelect.locator('option').allTextContents()).some(o => o.includes('Embedding')), 'Gemini: только модели для диалога')
+
+    console.log('\n== «Тексты для сайта»')
+    const sp = s => (s ?? '').replace(/\s+/g, ' ').trim()
+    check(sp(await writer.textContent()).includes('Сейчас: anthropic/claude-sonnet-5-5 (по умолчанию)'), 'своя карточка, по умолчанию Claude Sonnet 5.5')
+    const writerProviders = await writer.getByLabel('Провайдер').locator('option').allTextContents()
+    check(writerProviders.length === 1 && writerProviders[0].includes('Anthropic'), `провайдер — только Claude, хотя ключ Gemini задан: ${writerProviders.map(sp).join(' | ')}`)
+    await optionsOf('content_writer_model')
+    const writerOptions = await writer.getByLabel('Модель').locator('option').allTextContents()
+    check(writerOptions.some(o => o.includes('Claude Haiku 5.5')) && !writerOptions.some(o => o.includes('Text Only')), `модели — живой список Claude, без «только текст»: ${writerOptions.length - 1}`)
+    await writer.getByLabel('Модель').selectOption('claude-haiku-5-5')
+    await writer.getByRole('button', { name: 'Сохранить', exact: true }).click()
+    await writer.getByText('Сейчас: anthropic/claude-haiku-5-5 · выбрана').waitFor({ timeout: 30000 })
+    const [writerSetting] = await rest('ai_settings?select=value&key=eq.content_writer_model')
+    const [visionAfter] = await rest('ai_settings?select=value&key=eq.supplier_vision_model')
+    check(writerSetting?.value === 'anthropic/claude-haiku-5-5' && visionAfter?.value === 'anthropic/claude-sonnet-5-5', `выбор своей задачи не трогает чужую: тексты ${writerSetting?.value}, чтение ${visionAfter?.value}`)
+    const putWriter = model => api('/api/admin/ai-settings/model', admin.token, { method: 'PUT', body: JSON.stringify({ task: 'content_writer_model', model }) })
+    const viaGemini = await putWriter('gemini/gemini-2.5-flash')
+    check(viaGemini.status === 400 && viaGemini.body?.message === '«Тексты для сайта» — только Anthropic (Claude)', `Gemini для текстов — 400: «${viaGemini.body?.message}»`)
+    check((await putWriter('anthropic/claude-textonly-test')).status === 400, 'модель без картинок для текстов — 400: ей отдают фото поста')
     if (process.env.SHOT)
       await page.screenshot({ path: `${process.env.SHOT}-ai.png`, fullPage: true })
 
@@ -152,8 +213,10 @@ try {
     await page.getByRole('button', { name: 'Точно удалить?' }).click()
     await page.getByText('задан ••••7Q2z').waitFor({ state: 'detached', timeout: 30000 })
     check(!(await rpc('ai_keys_status')).some(k => k.provider === 'anthropic'), 'второй клик удалил ключ из Vault')
-    await page.getByText('Ключа для этой модели нет').waitFor({ timeout: 10000 })
+    await vision.getByText('Ключа для этой модели нет').waitFor({ timeout: 10000 })
     check(true, 'модель без ключа — предупреждение на странице')
+    const writerNoKey = sp(await writer.textContent())
+    check(writerNoKey.includes('Ключа для этой модели нет — задайте его выше.') && writerNoKey.includes('Чтобы выбрать модель, сначала задайте ключ Anthropic (Claude).') && await writer.getByLabel('Провайдер').count() === 0, 'тексты без ключа Claude — подсказка про ключ Anthropic, а не выбор Gemini')
     check(!errors.length, `страница без ошибок консоли${errors.length ? ` — ${errors[0].slice(0, 160)}` : ''}`)
   }
   finally {
@@ -162,6 +225,7 @@ try {
 }
 finally {
   await cleanup()
+  stub.close()
 }
 
 console.log(fails.length ? `\nКРАСНЫЙ: ${fails.length} провал(ов)` : '\nвсё зелено')

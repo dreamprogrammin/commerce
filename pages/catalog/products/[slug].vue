@@ -11,6 +11,7 @@ import Breadcrumbs from '@/components/global/Breadcrumbs.vue'
 import SEOContentRenderer from '@/components/product/SEOContentRenderer.vue'
 import StockAlertButton from '@/components/product/StockAlertButton.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
+import { useBottomNavReveal } from '@/composables/useBottomNavReveal'
 import { useBreadcrumbSchema } from '@/composables/useBreadcrumbSchema'
 import { useFlipCounter } from '@/composables/useFlipCounter'
 import { useSeoAltText } from '@/composables/useSeoAltText'
@@ -453,6 +454,12 @@ onMounted(() => {
   }
 })
 onUnmounted(() => window.removeEventListener('scroll', handleStickyScroll))
+// Навигация выезжает и без прокрутки — когда товар летит в корзину (с этой же
+// панели или из «Похожих»); панель покупки едет за ней, иначе навигация
+// встанет поверх неё.
+useBottomNavReveal(() => {
+  isNavVisible.value = true
+})
 
 watch(
   () => product.value?.id,
@@ -1435,7 +1442,7 @@ watchEffect(() => {
                     @click="toggleWishlist"
                   >
                     <Icon
-                      :name="isWishlisted ? 'line-md:heart-filled' : 'line-md:heart'"
+                      :name="isWishlisted ? 'uhti:heart-filled' : 'uhti:heart'"
                       class="size-[21px]"
                     />
                     {{ isWishlisted ? 'В избранном' : 'В избранное' }}

@@ -5,11 +5,12 @@
  * Проверяет:
  *  1) /api/admin/purchasing: гость — 401, не-администратор — 403; цифры — как
  *     в базе и как на «К закупке»; ключей в ответе нет ни знаком;
- *  2) плитки и таблица поставщиков — как в базе: поставщики и каналы, товары
- *     от поставщиков и без, к закупке;
+ *  2) четыре плитки и поставщики — как в базе: поставщики и каналы, товары
+ *     от поставщиков и без, к закупке, не разобрано (вид — по макету
+ *     Canvas-2.dc.html, 9.11.2026);
  *  3) спрос по темам на своих цифрах: сумма и рост к прошлому году, «ищут, а
- *     у нас нет» / растёт / скоро сезон, списки тем, график по месяцам с
- *     подсказкой мышью и стрелками, таблица месяцев; фильтр в адресе
+ *     у нас нет» / растёт / скоро сезон, темы по вкладкам, график столбиками
+ *     за 12 месяцев и 2 года с подсказкой мышью и стрелками, таблица месяцев; фильтр в адресе
  *     «Спроса на рынке»; новые запросы на рынке;
  *  4) остаток DataForSEO через заглушку: «хватит на N обновлений», «пора
  *     пополнить», отказ DataForSEO; последнее обновление и его цена, когда
@@ -20,7 +21,11 @@
  *     сами страницы — кнопками на дашборде;
  *  7) телефон 390px: всё влезает без горизонтальной прокрутки, вкладка
  *     «Закупки» и мобильное меню;
- *  8) без миграции каналов — работает; без ошибок консоли.
+ *  8) без миграции каналов — работает; без ошибок консоли;
+ *  9) «назад» в шапке на страницах закупа (23.11.2026): с дашборда —
+ *     «‹ Умный закуп» и назад историей; по прямой ссылке и из других разделов —
+ *     на дашборд; с другой страницы закупа — «‹ её имя»; та же страница с
+ *     другим адресом — «‹ Назад»; на телефоне видна и внизу длинной страницы.
  *
  * Данные заводит сам и в конце убирает. Цифры спроса заводятся, только если
  * на локальной базе своих нет; пробные ключи DataForSEO и ИИ — тоже только
@@ -84,7 +89,7 @@ const OLD_LINKS = [
   '/admin/ai',
 ]
 // Страницы закупа — кнопками на дашборде, в меню их нет
-const PAGES = [['/admin/suppliers', 'Поставщики'], ['/admin/telegram', 'Аккаунт Telegram'], ['/admin/supplier-offers', 'Товары поставщиков'], ['/admin/demand', 'Спрос на рынке'], ['/admin/ai', 'Модели ИИ'], ['/admin/restock', 'К закупке']]
+const PAGES = [['/admin/suppliers', 'Поставщики'], ['/admin/telegram', 'Аккаунт Telegram'], ['/admin/supplier-offers', 'Товары поставщиков'], ['/admin/demand', 'Спрос на рынке'], ['/admin/kaspi', 'Цифры Kaspi'], ['/admin/ai', 'Модели ИИ'], ['/admin/restock', 'К закупке'], ['/admin/deliveries', 'Поставки']]
 const MENU = [...OLD_LINKS.filter(h => !PAGES.some(([p]) => p === h)), '/admin/purchasing']
 
 if (!/localhost|127\.0\.0\.1/.test(BASE))
@@ -93,8 +98,7 @@ if (!/localhost|127\.0\.0\.1/.test(BASE))
 const fails = []
 // Подписи месяцев под графиком не налезают друг на друга
 function monthLabelsApart(p) {
-  return p.locator('[data-testid=demand-chart] svg text').evaluateAll((all) => {
-    const ts = all.filter(t => /^\p{Script=Cyrillic}{3} \d{4}$/u.test(t.textContent.trim()))
+  return p.locator('[data-testid=demand-chart-label]').evaluateAll((ts) => {
     const r = ts.map(t => t.getBoundingClientRect()).sort((a, b) => a.left - b.left)
     return { labels: ts.map(t => t.textContent).join(', '), apart: r.length > 1 && r.every((b, i) => !i || r[i - 1].right + 4 <= b.left) }
   })
@@ -306,11 +310,16 @@ try {
 
   const errors = []
   const failed = []
+  const chunkFails = []
   async function newPage(viewport) {
     const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2 })
     await ctx.addInitScript(() => localStorage.setItem('tg_modal_dismissed_at', String(Date.now())))
+    // Кусок кода не загрузился — Nuxt перезагрузит страницу по адресу перехода (reloadNuxtApp)
+    await ctx.addInitScript(() => addEventListener('vite:preloadError', e => console.warn(`[chunk] ${e.payload?.message ?? e.payload}`)))
     const page = await ctx.newPage()
     page.on('pageerror', e => errors.push(e.message))
+    page.on('console', m => m.text().startsWith('[chunk]') && chunkFails.push(m.text()))
+    page.on('requestfailed', r => r.url().includes('/_nuxt/') && chunkFails.push(`${r.failure()?.errorText} ${r.url().replace(BASE, '')}`))
     page.on('console', m => m.type() === 'error' && !m.text().startsWith('Failed to load resource') && !m.text().includes('[nuxt-gtag]') && errors.push(m.text()))
     page.on('response', (r) => {
       if (r.status() >= 400 && !/\/_payload\.json/.test(r.url()) && !(r.status() === 406 && r.url().includes('/rest/v1/server_carts')))
@@ -318,6 +327,9 @@ try {
     })
     await page.goto(`${BASE}/about`, { waitUntil: 'load', timeout: 120000 })
     await page.waitForFunction(() => document.querySelector('#__nuxt')?.__vue_app__, null, { timeout: 30000 })
+    // После входа магазин грузит профиль (SIGNED_IN). Уйти раньше — запрос оборвётся, и в консоли
+    // останется «Profile loading error: Failed to fetch» (23.11.2026 так покраснел прогон)
+    const profileDone = page.waitForEvent('requestfinished', { predicate: r => r.url().includes('/rest/v1/profiles'), timeout: 15000 }).catch(() => null)
     const loginError = await page.evaluate(async ({ email, password }) => {
       const nuxt = document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$nuxt
       const { error } = await nuxt.$supabase.client.auth.signInWithPassword({ email, password })
@@ -325,8 +337,22 @@ try {
     }, { email: emails.admin, password: PASSWORD })
     if (loginError)
       throw new Error(`вход: ${loginError}`)
+    await profileDone
     await openHub(page)
     return page
+  }
+  // Прокрутка колесом, как у человека. После прыжка scrollTo снимок выходит белым или со сдвигом:
+  // «Спрос на рынке» дорисовывается после загрузки (прыжок к низу — ~5 000 px, потом страница растёт
+  // до 20 000), и кадр ловится посреди перестройки. Замеры при этом верны (23.11.2026)
+  async function wheelDown(page) {
+    await page.evaluate(() => document.querySelector('main').insertAdjacentHTML('beforeend', '<div data-probe-spacer style="height:3000px"></div>'))
+    const { width, height } = page.viewportSize()
+    await page.mouse.move(width / 2, height / 2)
+    for (let i = 0; i < 12; i++) {
+      await page.mouse.wheel(0, 400)
+      await page.waitForTimeout(50)
+    }
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 300)))))
   }
   async function openHub(page) {
     await page.goto(`${BASE}/admin/purchasing`, { waitUntil: 'load', timeout: 120000 })
@@ -345,11 +371,13 @@ try {
   // Плитки: { id: { value, note, delta, warn } }, по порядку
   const tiles = page => page.evaluate(() => [...document.querySelectorAll('[data-testid^=tiles-] > [data-testid]')].map((el) => {
     const text = id => el.querySelector(`[data-testid=${id}]`)?.textContent.replace(/\s+/g, ' ').trim() ?? null
-    return { id: el.dataset.testid.replace(/^tile-/, ''), value: text('tile-value'), note: text('tile-note'), delta: text('tile-delta'), warn: text('tile-warn') }
+    return { id: el.dataset.testid.replace(/^tile-/, ''), value: text('tile-value'), note: text('tile-note'), delta: text('tile-delta') }
   }))
   const tileOf = async (page, id) => (await tiles(page)).find(t => t.id === id) ?? {}
   const text = async (page, testid) => sp(await page.locator(`[data-testid=${testid}]`).first().textContent({ timeout: 5000 }).catch(() => null))
-  const supplierRows = page => page.locator('[data-testid=supplier-row]').evaluateAll(rows => rows.map(r => [...r.querySelectorAll('td')].map(td => td.textContent.replace(/\s+/g, ' ').trim())))
+  // Поставщик: [имя, «N товаров · M к заказу · K каналов, L через аккаунт»]
+  const supplierRows = page => page.locator('[data-testid=supplier-row]').evaluateAll(rows => rows.map(r => ['supplier-name', 'supplier-meta'].map(id => r.querySelector(`[data-testid=${id}]`).textContent.replace(/\s+/g, ' ').trim())))
+  const goods = n => `${n} ${word(n, 'товар', 'товара', 'товаров')}`
   // База поменялась — страницу заново, как владелец по кнопке «Обновить»
   async function refreshHub(page) {
     const done = page.waitForResponse(r => r.url().includes('/api/admin/purchasing'), { timeout: 30000 })
@@ -370,23 +398,29 @@ try {
   const page = await newPage({ width: 1366, height: 900 })
   const pageLinks = await page.locator('[data-testid=purchasing-pages] a').evaluateAll(as => as.map(a => [a.getAttribute('href'), a.textContent.trim()]))
   check(JSON.stringify(pageLinks) === JSON.stringify(PAGES), `кнопки страниц закупа по порядку: ${pageLinks.map(p => p[1]).join(', ')}`)
+  // «Цифры Kaspi» стояли без иконки: в PAGE_ICON не было '/admin/kaspi' (найдено 26.11.2026)
+  const noIcon = await page.locator('[data-testid=purchasing-pages] a').evaluateAll(as => as.filter(a => !a.querySelector('svg')).map(a => a.textContent.trim()))
+  check(noIcon.length === 0, `у каждой кнопки страниц закупа — иконка${noIcon.length ? `; без иконки: ${noIcon.join(', ')}` : ''}`)
   const t0 = await tiles(page)
-  check(t0.map(t => t.id).join() === 'monthly,missing,growing,season,suppliers,products,restock,balance', `восемь плиток в два ряда: ${t0.map(t => t.id).join(', ')}`)
+  check(t0.map(t => t.id).join() === 'monthly,missing,restock,offers', `четыре плитки: ${t0.map(t => t.id).join(', ')}`)
   const tile = id => t0.find(t => t.id === id) ?? {}
-  check(tile('suppliers').value === String(nSuppliers) && (nChannels || tile('suppliers').note === 'каналов в Telegram ещё нет'), `«Поставщики» — ${tile('suppliers').value}: «${tile('suppliers').note}»`)
-  check(tile('products').value === String(nActive - nUnassigned) && tile('products').note === (nUnassigned ? `и ${nUnassigned} без поставщика` : 'у всех товаров есть поставщик'), `«Товаров от поставщиков» — ${tile('products').value}: «${tile('products').note}»`)
+  const summary0 = await text(page, 'supplier-summary')
+  check(summary0.startsWith(`${nSuppliers} ${word(nSuppliers, 'поставщик', 'поставщика', 'поставщиков')} · `) && (nChannels || summary0.endsWith('каналов в Telegram ещё нет')), `«Поставщики» — «${summary0}»`)
+  const offersTile = !j.offers ? ['—', 'после миграции базы'] : !j.offers.collectedAt ? ['—', 'ещё не собирали'] : [String(j.offers.fresh), null]
+  check(tile('offers').value === offersTile[0] && (!offersTile[1] || tile('offers').note === offersTile[1]), `«Не разобрано» — ${tile('offers').value}: «${tile('offers').note}»`)
   const withSupplier = restock.atThreshold - restock.noSupplier
   check(tile('restock').value === String(restock.atThreshold) && (!restock.atThreshold || tile('restock').note.startsWith(word(restock.atThreshold, 'товар', 'товара', 'товаров'))), `«К закупке» — ${tile('restock').value}: «${tile('restock').note}»`)
   check(!restock.noSupplier || !withSupplier || tile('restock').note.endsWith(`, ${restock.noSupplier} без поставщика`), 'без поставщика — отдельно в той же плитке')
   if (!hadNumbers) {
-    check(['monthly', 'missing', 'growing', 'season'].every(id => tile(id).value === '—' && tile(id).note === 'цифр ещё нет') && !tile('monthly').delta, 'цифр спроса нет — прочерки, а не нули')
+    check(['monthly', 'missing'].every(id => tile(id).value === '—' && tile(id).note === 'цифр ещё нет') && !tile('monthly').delta, 'цифр спроса нет — прочерки, а не нули')
+    check(await page.locator('[data-testid=demand-topics]').count() === 0, 'без цифр вкладок тем нет')
     const empty = await text(page, 'demand-empty')
     check(empty.startsWith(`Цифр спроса ещё нет — ${nTopics} ${word(nTopics, 'тема', 'темы', 'тем')} ждут первого обновления.`) && (hadCreds || (empty.includes('Задайте ключ DataForSEO') && empty.includes('$0,18'))), `пустой спрос — что сделать и сколько стоит: «${empty.slice(0, 120)}…»`)
     check(await page.locator('[data-testid=demand-chart]').count() === 0, 'без цифр графика нет')
   }
   if (!hadCreds) {
-    check(tile('balance').value === '—' && tile('balance').note === 'ключ не задан', '«Остаток DataForSEO» — ключ не задан')
-    check(await text(page, 'usage-balance') === 'ключ не задан' && await text(page, 'usage-next') === 'не будет, пока не задан ключ', 'расход: ключа нет — само не обновится')
+    check(await text(page, 'battery-dataforseo') !== null && sp(await page.locator('[data-testid=battery-dataforseo] [data-testid=battery-value]').textContent()) === 'ключа нет', '«Баланс DataForSEO» — ключа нет')
+    check(await page.locator('[data-testid=usage-balance]').count() === 0 && await text(page, 'usage-next') === 'не будет, пока не задан ключ', 'расход: ключа нет — само не обновится')
     check(await page.locator('[data-testid=usage-dataforseo] a[href="/admin/demand"]').count() === 1, 'кнопка «Задать ключ» — на «Спрос на рынке»')
   }
   if (!hadRuns)
@@ -395,13 +429,13 @@ try {
     check(await text(page, 'usage-ai-keys') === 'не заданы' && await page.locator('[data-testid=usage-ai] a[href="/admin/ai"]').count() === 1, 'ключей ИИ нет — кнопка на «Модели ИИ»')
 
   const rows0 = await supplierRows(page)
-  check(rows0.length === j.supplierLoad.length && rows0.every((r, i) => r[0] === j.supplierLoad[i].name && r[1] === String(j.supplierLoad[i].products)), `таблица поставщиков — ${rows0.length} строк, товары как в базе`)
-  check(!nUnassigned || sp(await page.locator('[data-testid=supplier-row-none]').textContent()).startsWith(`Без поставщика ${nUnassigned}`), 'строка «Без поставщика» — с числом товаров')
+  check(rows0.length === j.supplierLoad.length && rows0.every((r, i) => r[0] === j.supplierLoad[i].name && r[1].startsWith(goods(j.supplierLoad[i].products))), `поставщики — ${rows0.length} строк, товары как в базе`)
+  check(!nUnassigned || sp(await page.locator('[data-testid=supplier-row-none] [data-testid=supplier-meta]').textContent()).startsWith(goods(nUnassigned)), 'строка «Без поставщика» — с числом товаров')
 
   const all = await steps(page)
-  check(all.map(s => s.id).join() === 'suppliers,demand,ai,offers,order', `пять шагов по порядку: ${all.map(s => s.id).join(', ')}`)
-  check(all.map(s => s.href).join() === '/admin/suppliers,/admin/demand,/admin/ai,/admin/supplier-offers,/admin/restock', 'ссылки шагов — на их страницы')
-  const [sup, dem, ai, offers, order] = all
+  check(all.map(s => s.id).join() === 'suppliers,demand,ai,offers,order,deliveries', `шесть шагов по порядку: ${all.map(s => s.id).join(', ')}`)
+  check(all.map(s => s.href).join() === '/admin/suppliers,/admin/demand,/admin/ai,/admin/supplier-offers,/admin/restock,/admin/deliveries', 'ссылки шагов — на их страницы')
+  const [sup, dem, ai, offers, order, deliveries] = all
   check(sup.facts.startsWith(`${nSuppliers} ${word(nSuppliers, 'поставщик', 'поставщика', 'поставщиков')}`), `шаг 1 — поставщиков столько же, сколько в базе: «${sup.facts}»`)
   if (!nChannels)
     check(sup.state === 'action' && sup.facts.includes('каналов в Telegram нет') && /«Каналы в Telegram»/.test(sup.next), `шаг 1 без каналов — ждёт владельца, как добавить: «${sup.next}»`)
@@ -415,17 +449,17 @@ try {
   const orderState = (withSupplier || restock.noSupplier) ? 'action' : restock.openOrders ? 'running' : 'done'
   check(order.state === orderState, `шаг 5 — «${order.badge}», как по остаткам: ${withSupplier} у поставщиков, ${restock.noSupplier} без поставщика`)
   check(!withSupplier || order.facts.includes(`к закупке ${withSupplier} `), `шаг 5 — к закупке ${withSupplier}: «${order.facts}»`)
-  const waitingNow = all.flatMap((s, i) => s.state === 'action' ? [i + 1] : [])
+  // Поставки (26.11.2026): формируется или опаздывает — ждёт владельца, ждём — идёт; без миграции — позже
+  const dl = j.deliveries
+  const deliveriesState = !dl ? 'later' : dl.forming || dl.late ? 'action' : dl.waiting ? 'running' : 'done'
+  check(deliveries.state === deliveriesState && (dl || deliveries.next === 'Заработает после миграции базы.'), `шаг 6, поставки — «${deliveries.badge}»: ${JSON.stringify(dl)}`)
+  const doneNow = all.filter(s => s.state === 'done').length
   const waitingLine = sp(await page.locator('[data-testid=purchasing-waiting]').innerText())
-  check(waitingNow.every(n => waitingLine.includes(String(n))) && (waitingNow.length ? /^Сейчас от вас нужно: шаги? [\d, и]+ — что сделать, внизу ↓$/.test(waitingLine) : waitingLine === 'Сейчас от вас ничего не нужно.'), `строка сверху: «${waitingLine}»`)
-  if (waitingNow.length) {
-    await page.locator('[data-testid=purchasing-waiting] a').click()
-    await page.waitForFunction(() => {
-      const r = document.getElementById('steps')?.getBoundingClientRect()
-      return r && r.top >= -2 && r.top < window.innerHeight / 2
-    }, null, { timeout: 5000 }).then(() => check(true, 'номера шагов в строке — ссылка вниз, к шагам'), () => check(false, 'номера шагов в строке — ссылка вниз, к шагам'))
-    await page.evaluate(() => window.scrollTo(0, 0))
-  }
+  check(waitingLine === (doneNow === 6 ? 'Все шаги готовы — от вас ничего не нужно' : `${doneNow} из 6 шагов готово`), `под кольцом шагов: «${waitingLine}»`)
+  // Готовые — строчками внизу, ждущие — карточками сверху, в порядке шагов
+  const shownOrder = await page.locator('[data-testid=purchasing-steps] > li').evaluateAll(li => li.map(el => [el.dataset.testid, el.getBoundingClientRect().top]).sort((a, b) => a[1] - b[1]).map(x => x[0].replace('step-', '')))
+  const expectedOrder = [...all.filter(s => s.state !== 'done'), ...all.filter(s => s.state === 'done')].map(s => s.id)
+  check(shownOrder.join() === expectedOrder.join(), `на экране — сначала что сделать, готовое внизу: ${shownOrder.join(', ')}`)
   if (SHOTS)
     await page.screenshot({ path: `${SHOTS}/purchasing-1366.png`, fullPage: true })
 
@@ -435,18 +469,54 @@ try {
   check(MENU.every(h => navHrefs.includes(h)) && navHrefs.length === MENU.length, `в меню ${navHrefs.length}: прежние пункты, вместо страниц закупа — один «Умный закуп»`)
   check(!PAGES.some(([h]) => navHrefs.includes(h)) && await page.locator('[data-testid=nav-group]').count() === 0, 'страниц закупа в меню нет, подпунктов тоже')
   const item = page.locator('aside nav a[href="/admin/purchasing"]')
-  check(sp(await item.innerText()) === 'Умный закуп' && /\bbg-muted\b/.test(await item.getAttribute('class')), 'на дашборде «Умный закуп» в меню подсвечен')
+  // Горящий пункт — aria-current="page" (меню по макету AdminSidebar, 9.11.2026; прежде — класс bg-muted)
+  check(sp(await item.innerText()) === 'Умный закуп' && await item.getAttribute('aria-current') === 'page', 'на дашборде «Умный закуп» в меню подсвечен')
+  check(await page.locator('[data-testid=admin-back]').count() === 0 && sp(await page.locator('header h1').textContent()) === 'Панель администратора', 'на дашборде кнопки «назад» нет — в шапке «Панель администратора»')
   for (const [href, label] of PAGES) {
     await page.locator(`[data-testid=purchasing-pages] a[href="${href}"]`).click()
     await page.waitForURL(`**${href}`, { timeout: 30000 })
     await page.waitForLoadState('networkidle')
-    const cls = await item.getAttribute('class')
-    check(/\bbg-muted\b/.test(cls) && /\btext-primary\b/.test(cls), `«${label}» — открылась кнопкой, «Умный закуп» в меню горит`)
+    check(await item.getAttribute('aria-current') === 'page', `«${label}» — открылась кнопкой, «Умный закуп» в меню горит`)
+    // «Назад» (23.11.2026): пришли с дашборда — на него же историей, вперёд — эта страница
+    const back = page.locator('[data-testid=admin-back]')
+    const backText = sp(await back.locator('[data-testid=admin-back-label]').textContent())
+    const backSeen = await back.evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+      return !!hit && el.contains(hit)
+    })
+    await back.click()
+    await page.waitForURL('**/admin/purchasing', { timeout: 30000 })
+    const state = await page.evaluate(() => window.history.state)
+    check(backText === 'Умный закуп' && backSeen && state?.forward === href, `«${label}»: в шапке «‹ ${backText}»${backSeen ? '' : ' (закрыта)'} — назад на дашборд историей (вперёд — ${state?.forward})`)
     await openHub(page)
   }
   await page.locator('[data-testid=step-ai] [data-testid=step-link]').click()
   await page.waitForURL('**/admin/ai', { timeout: 30000 })
   check(new URL(page.url()).pathname === '/admin/ai', 'кнопка шага «Модели ИИ» открывает /admin/ai')
+  await openHub(page)
+
+  // Компьютер (23.11.2026): шапка сайта плавала при прокрутке поверх строки админки с «назад» и верха меню
+  await page.goto(`${BASE}/admin/demand`, { waitUntil: 'load', timeout: 120000 })
+  await page.waitForLoadState('networkidle')
+  await wheelDown(page)
+  const deskPinned = await page.evaluate(() => {
+    const seen = (el) => {
+      const r = el.getBoundingClientRect()
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+      return r.top >= 0 && !!hit && el.contains(hit)
+    }
+    return {
+      scrolled: Math.round(window.scrollY),
+      back: seen(document.querySelector('[data-testid=admin-back]')),
+      menu: seen(document.querySelector('aside nav a[href="/admin/purchasing"]')),
+      logo: seen(document.querySelector('[data-testid=admin-sidebar] > a')),
+    }
+  })
+  const seen = ok => ok ? 'видно' : 'не видно'
+  check(deskPinned.scrolled > 2000 && deskPinned.back && deskPinned.menu && deskPinned.logo, `1366 px, внизу страницы: кнопку «назад» ${seen(deskPinned.back)}, пункт «Умный закуп» ${seen(deskPinned.menu)}, верх меню ${seen(deskPinned.logo)} — шапка сайта поверх не плавает`)
+  if (SHOTS)
+    await page.screenshot({ path: `${SHOTS}/back-1366-scrolled.png` })
   await openHub(page)
 
   console.log('\n== шаги и расход вслед за базой')
@@ -464,12 +534,12 @@ INSERT INTO public.supplier_channels (supplier_id, invite_hash, title, chat_type
     check(sup2.state === 'done' && sup2.badge === 'Готово', 'каналы есть — шаг 1 «Готово»')
   if (!nChannels) {
     check(sup2.facts === `${nSup2} ${word(nSup2, 'поставщик', 'поставщика', 'поставщиков')} · 2 канала в Telegram — у 1 из ${nSup2} ${word(nSup2, 'поставщика', 'поставщиков', 'поставщиков')} · через аккаунт: 1`, `сколько каналов, у скольких поставщиков, сколько через аккаунт: «${sup2.facts}»`)
-    const ts = await tileOf(page, 'suppliers')
-    check(ts.value === String(nSup2) && ts.note === `2 канала в Telegram — у 1 из ${nSup2}`, `плитка «Поставщики» — «${ts.value}», «${ts.note}»`)
+    const ts = await text(page, 'supplier-summary')
+    check(ts === `${nSup2} ${word(nSup2, 'поставщик', 'поставщика', 'поставщиков')} · 2 канала в Telegram — у 1 из ${nSup2}`, `«Поставщики» — «${ts}»`)
   }
   check(/через аккаунт Telegram/.test(sup2.next), `про закрытый канал — читать через аккаунт: «${sup2.next}»`)
   const probeRow = (await supplierRows(page)).find(r => r[0] === SUPPLIER)
-  check(probeRow?.join(' | ') === `${SUPPLIER} | 0 | — | 2 1 через аккаунт`, `строка нового поставщика — без товаров, 2 канала, 1 через аккаунт: «${probeRow?.join(' | ')}»`)
+  check(probeRow?.join(' | ') === `${SUPPLIER} | 0 товаров · 2 канала, 1 через аккаунт`, `строка нового поставщика — без товаров, 2 канала, 1 через аккаунт: «${probeRow?.join(' | ')}»`)
 
   runIds.push(psql(`INSERT INTO public.market_demand_runs (kind, status, requested_at) VALUES ('volumes', 'pending', '2026-11-03T05:00:00Z') RETURNING id;`))
   await refreshHub(page)
@@ -493,21 +563,22 @@ INSERT INTO public.supplier_channels (supplier_id, invite_hash, title, chat_type
   if (probeCreds) {
     const asked = stub.log.filter(l => l.url === '/v3/appendix/user_data')
     check(asked.length > 0 && asked.every(l => l.good), asked.length ? 'за балансом — в DataForSEO с ключом из базы' : `стенд не ходит в заглушку — запустите его с DATAFORSEO_STUB_URL=http://localhost:${STUB_PORT}`)
-    const tb = await tileOf(page, 'balance')
-    check(tb.value === '$0,64' && tb.note === 'хватит на 3 обновления' && !tb.warn, `«Остаток DataForSEO» — «${tb.value}», «${tb.note}»`)
-    check(await text(page, 'usage-balance') === '$0,64 — хватит на 3 обновления', 'расход: остаток и на сколько обновлений хватит')
+    const dfsValue = () => page.locator('[data-testid=battery-dataforseo] [data-testid=battery-value]').textContent().then(sp)
+    const tb = await dfsValue()
+    check(tb === '$0,64 из $1,00' && await text(page, 'usage-balance') === 'хватит на 3 обновления', `«Баланс DataForSEO» — «${tb}», «${await text(page, 'usage-balance')}»`)
     check(await text(page, 'usage-next') === `${nextAuto(null)} — каждое 5-е число`, `само обновится ${nextAuto(null)}`)
-    for (const [balance, note, warn] of [[0.25, 'хватит на 1 обновление', 'пора пополнить'], [0.1, 'не хватит ни на одно обновление', 'пополните баланс']]) {
+    for (const [balance, line] of [[0.25, 'хватит на 1 обновление — пора пополнить'], [0.1, 'не хватит ни на одно обновление — пополните баланс']]) {
       stub.balance = balance
       await refreshHub(page)
-      const t = await tileOf(page, 'balance')
-      check(t.value === usd(balance) && t.note === note && t.warn === warn, `остаток ${usd(balance)} — «${t.note}», «${t.warn}»`)
+      const t = await dfsValue()
+      const u = await text(page, 'usage-balance')
+      check(t === `${usd(balance)} из $1,00` && u === line, `остаток ${usd(balance)} — «${t}», «${u}»`)
     }
     stub.reject = true
     await refreshHub(page)
-    const tr = await tileOf(page, 'balance')
-    const usageErr = await text(page, 'usage-balance')
-    check(tr.value === '—' && tr.note === 'не удалось узнать' && usageErr === 'не узнать: DataForSEO не принял логин и пароль API', `DataForSEO отказал — дашборд работает, причина видна: «${usageErr}»`)
+    const tr = await dfsValue()
+    const usageErr = sp(await page.locator('[data-testid=battery-dataforseo] [data-testid=battery-note]').textContent())
+    check(tr === 'не узнать' && usageErr === 'DataForSEO не принял логин и пароль API' && await page.locator('[data-testid=usage-balance]').count() === 0, `DataForSEO отказал — дашборд работает, причина видна: «${usageErr}»`)
     stub.reject = false
     stub.balance = 0.6412
   }
@@ -600,57 +671,77 @@ INSERT INTO public.market_demand_candidates (keyword, search_volume, trend_pct) 
     const tm = await tileOf(page, 'monthly')
     const kind = trend >= 15 ? 'up' : trend <= -15 ? 'down' : 'flat'
     const trendText = trend > 0 ? `+${trend}%` : trend < 0 ? `−${Math.abs(trend)}%` : '0%'
-    check(tm.value === vol(monthly) && tm.note === 'поисков в Google по всем темам' && tm.delta === `${trendText} к прошлому году`, `«Спрос в месяц» — ${tm.value}, «${tm.delta}» (${kind})`)
+    check(tm.value === vol(monthly) && tm.note === 'поисков в Google, в среднем за 3 месяца' && tm.delta === trendText, `«Спрос в месяц» — ${tm.value}, «${tm.delta}» (${kind})`)
+    check(await text(page, 'demand-trend') === `${trendText} за год`, `у графика — «${trendText} за год»`)
     const deltaClass = await page.locator('[data-testid=tile-monthly] [data-testid=tile-delta]').getAttribute('class')
     check(deltaClass.includes({ up: 'text-green-700', down: 'text-red-700', flat: 'text-muted-foreground' }[kind]), `рост покрашен по смыслу: ${kind}`)
     const tOther = await tiles(page)
     const tv = id => tOther.find(t => t.id === id) ?? {}
-    check(tv('missing').value === '1' && tv('missing').note === 'тема без наших товаров' && tv('growing').value === '1' && tv('season').value === '1' && tv('season').note === 'тема с пиком в ближайшие 2 месяца', `«Ищут, а у нас нет» / «Растёт» / «Скоро сезон» — ${tv('missing').value} / ${tv('growing').value} / ${tv('season').value}`)
+    const tabsText = await page.locator('[role=tablist][aria-label=Темы] [role=tab]').evaluateAll(b => b.map(x => x.textContent.replace(/\s+/g, ' ').trim()))
+    check(tv('missing').value === '1' && tv('missing').note === 'тема без наших товаров' && tabsText.join(' | ') === 'Нет у нас · 1 | Растут · 1 | Скоро сезон · 1 | Больше всего ищут', `«Ищут, а у нас нет» — ${tv('missing').value}; вкладки: ${tabsText.join(' | ')}`)
 
     const desc = await text(page, 'demand-card')
-    check(desc.includes(`год назад. Последний месяц — ${monthName(MONTHS.at(-1))}, обновлено 3 ноября.`), 'у спроса по темам — последний месяц и дата обновления')
+    check(desc.includes(`Последний месяц — ${monthName(MONTHS.at(-1))}, обновлено 3 ноября`), 'у спроса в Google — последний месяц и дата обновления')
     const lists = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-testid^=demand-list-]:not([data-testid=demand-list-all])')].map(s => [
       s.dataset.testid.replace('demand-list-', ''),
-      [...s.querySelectorAll('[data-testid=demand-line]')].map(li => [...li.querySelectorAll('p, div > div')].map(e => e.textContent.replace(/\s+/g, ' ').trim())),
+      [...s.querySelectorAll('[data-testid=demand-line]')].map(li => ['line-name', 'line-note', 'line-volume', 'line-trend'].map(id => li.querySelector(`[data-testid=${id}]`).textContent.replace(/\s+/g, ' ').trim())),
     ])))
-    check(Object.keys(lists).join() === 'missing,growing,season,volume', `четыре списка: ${Object.keys(lists).join(', ')}`)
+    check(Object.keys(lists).join() === 'missing,growing,season,volume', `четыре вкладки: ${Object.keys(lists).join(', ')}`)
     check(lists.volume?.map(l => l[0]).join() === byVolume.join(), `«Больше всего ищут» — ${lists.volume?.map(l => l[0]).join(', ')}`)
     const ml = lists.missing?.[0] ?? []
-    check(ml[0] === missingT.name && ml[1] === 'у нас нет' && ml.includes(vol(400)) && ml.includes('+300%'), `«Ищут, а у нас нет» — тема без товаров, спрос и рост: «${ml.join(' | ')}»`)
+    check(ml[0] === missingT.name && ml[1] === 'нет у нас' && ml.includes(vol(400)) && ml.includes('+300%'), `«Ищут, а у нас нет» — тема без товаров, спрос и рост: «${ml.join(' | ')}»`)
     const sl = lists.season?.[0] ?? []
-    check(sl[0] === seasonT.name && sl[1].startsWith(`пик в ${['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'][peakMonth - 1]} · у нас `), `«Скоро сезон» — когда пик и что у нас есть: «${sl[1]}»`)
-    check(await page.locator('[data-testid=demand-list-all]').count() === 0, 'тем в списках не больше пяти — ссылки «все N» нет')
-    check(await text(page, 'demand-new-queries') === `Новых запросов на рынке, ещё не разобранных: ${newQueries} разобрать на «Спросе на рынке» →`, 'новые запросы на рынке — сколько ждут разбора')
+    check(sl[0] === seasonT.name && sl[1] === `${goods(seasonT.our_total)} · пик в ${['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'][peakMonth - 1]}`, `«Скоро сезон» — что у нас есть и когда пик: «${sl[1]}»`)
+    const allLink = page.locator('[data-testid=demand-list-all]')
+    check(await allLink.getAttribute('href') === '/admin/demand?filter=missing' && sp(await allLink.textContent()) === 'Все темы →', 'под темами — «Все темы →» с фильтром открытой вкладки')
+    await page.locator('[data-testid=demand-tab-season]').click()
+    check(await page.locator('[data-testid=demand-list-season]').isVisible() && !(await page.locator('[data-testid=demand-list-missing]').isVisible()) && await allLink.getAttribute('href') === '/admin/demand?filter=season', 'вкладка «Скоро сезон» — свой список и своя ссылка')
+    await page.locator('[data-testid=demand-tab-missing]').click()
+    check(await text(page, 'demand-new-queries') === `Новых запросов на рынке, ещё не разобранных: ${newQueries} — разобрать`, 'новые запросы на рынке — сколько ждут разбора')
 
-    // График: конец подписан, подсказка — мышью и стрелками, таблица — те же числа
+    // График: горит последний месяц с подсказкой; мышь и стрелки — другой месяц; 12 месяцев и 2 года
     const chartBox = page.locator('[data-testid=demand-chart]')
     await chartBox.scrollIntoViewIfNeeded()
-    check(await text(page, 'demand-chart-end') === vol(series.at(-1)), `последний месяц подписан на графике: ${vol(series.at(-1))}`)
+    const tipNow = async () => [await text(page, 'demand-chart-tip-month'), await text(page, 'demand-chart-tip-value'), await text(page, 'demand-chart-tip-yoy')]
+    const yoyOf = i => `${(p => p > 0 ? `+${p}%` : p < 0 ? `−${Math.abs(p)}%` : '0%')(Math.round((series[i] / series[i - 12] - 1) * 100))} за год`
+    const bars = page.locator('[data-testid=demand-chart-bar]')
+    // Мышь осталась там, где была вкладка, и после прокрутки могла встать на столбик — убираем
+    await page.mouse.move(5, 5)
+    check(await bars.count() === 12, `сначала — 12 месяцев: ${await bars.count()} столбиков`)
+    const t23 = await tipNow()
+    check(t23.join(' | ') === `${monthName(MONTHS[23])} | ${vol(series[23])} | ${yoyOf(23)}`, `горит последний месяц: «${t23.join(' | ')}»`)
     const wideLabels = await monthLabelsApart(page)
     check(wideLabels.apart, `подписи месяцев не налезают друг на друга: ${wideLabels.labels}`)
-    const plot = await page.locator('[data-testid=demand-chart] svg rect').boundingBox()
-    const tip = () => text(page, 'demand-chart-tip')
-    await page.mouse.move(plot.x + 1, plot.y + plot.height / 2)
-    check(await tip() === `${monthName(MONTHS[0])} · ${vol(series[0])} ${word(series[0], 'поиск', 'поиска', 'поисков')}`, `мышь у левого края — первый месяц: «${await tip()}»`)
-    await page.mouse.move(plot.x + plot.width - 1, plot.y + plot.height / 2)
-    check(await tip() === `${monthName(MONTHS[23])} · ${vol(series[23])} ${word(series[23], 'поиск', 'поиска', 'поисков')}`, `у правого — последний: «${await tip()}»`)
+    await bars.first().hover()
+    check((await tipNow()).join(' | ') === `${monthName(MONTHS[12])} | ${vol(series[12])} | ${yoyOf(12)}`, `мышь на первом столбике — ${monthName(MONTHS[12])}: «${(await tipNow()).join(' | ')}»`)
     await page.mouse.move(5, 5)
-    check(await page.locator('[data-testid=demand-chart-tip]').count() === 0 && await page.locator('[data-testid=demand-chart-end]').count() === 1, 'мышь ушла — подсказки нет, подпись конца вернулась')
+    check((await tipNow())[0] === monthName(MONTHS[23]), 'мышь ушла — снова горит последний месяц')
     await chartBox.focus()
-    check(await tip() === `${monthName(MONTHS[23])} · ${vol(series[23])} ${word(series[23], 'поиск', 'поиска', 'поисков')}`, 'фокус с клавиатуры — последний месяц')
     await page.keyboard.press('ArrowLeft')
-    check((await tip()).startsWith(monthName(MONTHS[22])), `← — месяц назад: «${await tip()}»`)
+    check((await tipNow())[0] === monthName(MONTHS[22]), `← — месяц назад: «${(await tipNow())[0]}»`)
     await page.keyboard.press('Home')
-    check((await tip()).startsWith(monthName(MONTHS[0])), 'Home — первый месяц')
+    check((await tipNow())[0] === monthName(MONTHS[12]), 'Home — первый из 12 месяцев')
     await chartBox.blur()
+    await page.locator('[data-testid=demand-range] [role=tab]', { hasText: '2 года' }).click()
+    check(await bars.count() === 24, `«2 года» — 24 столбика: ${await bars.count()}`)
+    await chartBox.focus()
+    await page.keyboard.press('Home')
+    const t0tip = await tipNow()
+    check(t0tip[0] === monthName(MONTHS[0]) && t0tip[1] === vol(series[0]) && t0tip[2] === '', `Home за 2 года — первый месяц, без «за год»: «${t0tip.join(' | ')}»`)
+    await chartBox.blur()
+    const twoLabels = await monthLabelsApart(page)
+    check(twoLabels.apart, `за 2 года подписи не налезают: ${twoLabels.labels}`)
+    if (SHOTS)
+      await page.locator('[data-testid=demand-card]').screenshot({ path: `${SHOTS}/purchasing-chart-2y.png` })
+    await page.locator('[data-testid=demand-range] [role=tab]', { hasText: '12 месяцев' }).click()
     const tableRows = await page.locator('[data-testid=demand-chart-table] tbody tr').evaluateAll(rs => rs.map(r => [...r.cells].map(td => td.textContent.replace(/\s+/g, ' ').trim()).join(' | ')))
     check(tableRows.length === 24 && tableRows[0] === `${monthName(MONTHS[0])} | ${vol(series[0])}` && tableRows[23] === `${monthName(MONTHS[23])} | ${vol(series[23])}`, `таблица под графиком — 24 месяца с теми же числами: ${tableRows.length}, «${tableRows[0]}» … «${tableRows.at(-1)}»`)
     if (SHOTS) {
       await page.evaluate(() => window.scrollTo(0, 0))
       await page.screenshot({ path: `${SHOTS}/purchasing-1366-numbers.png`, fullPage: true })
       await chartBox.scrollIntoViewIfNeeded()
-      await page.mouse.move(plot.x + plot.width * 0.62, plot.y + plot.height / 2)
-      await chartBox.screenshot({ path: `${SHOTS}/purchasing-chart-hover.png` })
+      await bars.nth(7).hover()
+      await page.locator('[data-testid=demand-card]').screenshot({ path: `${SHOTS}/purchasing-chart-hover.png` })
       await page.mouse.move(5, 5)
     }
 
@@ -691,20 +782,20 @@ INSERT INTO public.market_demand_candidates (keyword, search_volume, trend_pct) 
   const fit = await mobile.evaluate(() => {
     const w = window.innerWidth
     const tiles = [...document.querySelectorAll('[data-testid^=tiles-] > [data-testid]')].map(el => el.getBoundingClientRect())
-    const table = document.querySelector('[data-testid=supplier-load]')
-    const wrap = table?.parentElement
-    const chart = document.querySelector('[data-testid=demand-chart] svg')?.getBoundingClientRect()
+    const table = document.querySelector('[data-testid=supplier-load]')?.getBoundingClientRect()
+    const chart = document.querySelector('[data-testid=demand-chart]')?.getBoundingClientRect()
+    const lines = [...document.querySelectorAll('[data-testid=demand-line]')].filter(el => el.offsetParent).map(el => el.getBoundingClientRect())
     return {
       tiles: tiles.every(r => r.left >= 0 && r.right <= w),
-      pairs: tiles.length === 8 && tiles[0].top === tiles[1].top && tiles[1].top < tiles[2].top,
-      table: !table || wrap.scrollWidth <= wrap.clientWidth,
-      chart: !chart || chart.right <= w,
+      pairs: tiles.length === 4 && tiles.every((r, i) => !i || r.top > tiles[i - 1].top),
+      table: !table || table.right <= w,
+      chart: (!chart || chart.right <= w) && lines.every(r => r.right <= w),
       steps: [...document.querySelectorAll('[data-testid=purchasing-steps] > li')].every(li => li.getBoundingClientRect().right <= w),
     }
   })
-  check(fit.tiles && fit.pairs, `плитки — по две в ряд, в край не упираются${fit.tiles && fit.pairs ? '' : ` (в край: ${fit.tiles}, по две: ${fit.pairs})`}`)
-  check(fit.table, 'таблица поставщиков влезает без своей прокрутки')
-  check(fit.chart && fit.steps, `график и шаги не вылезают за край${fit.chart && fit.steps ? '' : ` (график: ${fit.chart}, шаги: ${fit.steps})`}`)
+  check(fit.tiles && fit.pairs, `четыре плитки — одна под другой, в край не упираются${fit.tiles && fit.pairs ? '' : ` (в край: ${fit.tiles}, столбиком: ${fit.pairs})`}`)
+  check(fit.table, 'поставщики влезают')
+  check(fit.chart && fit.steps, `график, темы и шаги не вылезают за край${fit.chart && fit.steps ? '' : ` (график и темы: ${fit.chart}, шаги: ${fit.steps})`}`)
   const narrowLabels = await monthLabelsApart(mobile)
   check(narrowLabels.apart, `и на телефоне подписи месяцев не налезают: ${narrowLabels.labels}`)
   if (SHOTS)
@@ -722,8 +813,105 @@ INSERT INTO public.market_demand_candidates (keyword, search_volume, trend_pct) 
   check(/\btext-primary\b/.test(await tab.getAttribute('class')), 'на «Поставщиках» вкладка «Закупки» горит')
   await mobile.getByRole('button', { name: 'Меню' }).click()
   await sheet.waitFor()
-  check(/\bbg-muted\b/.test(await sheet.locator('nav a[href="/admin/purchasing"]').getAttribute('class')), 'и в мобильном меню горит «Умный закуп»')
+  check(await sheet.locator('nav a[href="/admin/purchasing"]').getAttribute('aria-current') === 'page', 'и в мобильном меню горит «Умный закуп»')
+  await mobile.keyboard.press('Escape')
+  await sheet.waitFor({ state: 'hidden' })
+
+  // «Назад» в шапке (23.11.2026). В приложении на телефоне кнопки браузера нет
+  console.log('\n== «назад» на страницах закупа')
+  const mBack = mobile.locator('[data-testid=admin-back]')
+  const mLabel = async () => sp(await mBack.locator('[data-testid=admin-back-label]').textContent())
+  const loads = []
+  mobile.on('load', () => loads.push(mobile.url().replace(BASE, '')))
+  const push = async (to) => {
+    try {
+      await mobile.evaluate(async (to) => {
+        await document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$router.push(to)
+      }, to)
+    }
+    catch (e) {
+      // 23.11.2026 перезагрузка здесь случалась в трёх прогонах из четырёх — пусть краснеет с подробностями.
+      // Метку nuxt:reload оставляет reloadNuxtApp: так Nuxt перезагружает при сбое куска кода
+      await mobile.waitForLoadState('load')
+      const mark = await mobile.evaluate(() => sessionStorage.getItem('nuxt:reload')).catch(() => null)
+      check(false, `переход на ${to} — без перезагрузки страницы: ${e.message.split('\n')[0]}; метка Nuxt: ${mark ?? 'нет'}; куски кода: ${chunkFails.slice(-6).join(' | ') || 'сбоев нет'}; загрузки: ${loads.join(', ')}; ошибки: ${errors.slice(-4).join(' | ').slice(0, 600)}; ответы: ${failed.slice(-4).join(' | ')}`)
+    }
+  }
+  // Переход закончен, когда новую страницу показал макет. После «назад» строка браузера меняется сразу,
+  // а роутер и макет догоняют позже: 23.11.2026 страж читал подпись раньше и краснел через раз
+  const settle = async (path) => {
+    await mobile.waitForFunction((p) => {
+      const app = document.querySelector('#__nuxt')?.__vue_app__?.config.globalProperties
+      return location.pathname + location.search === p && app?.$router.currentRoute.value.fullPath === p && app.$nuxt._route.fullPath === p
+    }, path, { timeout: 30000 })
+    await mobile.evaluate(() => new Promise(r => requestAnimationFrame(() => r())))
+    await mobile.waitForLoadState('networkidle')
+  }
+  await mobile.goto(`${BASE}/admin/demand`, { waitUntil: 'load', timeout: 120000 })
+  await mobile.waitForLoadState('networkidle')
+  check(await mLabel() === 'Умный закуп' && await mobile.locator('header h1').count() === 0, 'телефон, «Спрос на рынке» по прямой ссылке: в шапке «‹ Умный закуп» вместо «Панель администратора»')
+  if (SHOTS)
+    await mobile.screenshot({ path: `${SHOTS}/back-390-top.png` })
+  // Далеко внизу длинной страницы кнопка там же: шапка прилипает. Длину даёт распорка — цифр на базе может не быть
+  await wheelDown(mobile)
+  const pinned = await mobile.evaluate(() => {
+    const el = document.querySelector('[data-testid=admin-back]')
+    const r = el.getBoundingClientRect()
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+    return { scrolled: Math.round(window.scrollY), top: Math.round(r.top), height: Math.round(r.height), right: Math.round(r.right), hit: !!hit && el.contains(hit) }
+  })
+  check(pinned.scrolled > 2000 && pinned.hit && pinned.top >= 0 && pinned.top + pinned.height <= 56 && pinned.height >= 40, `внизу страницы кнопка на месте и не мелкая: прокрутка ${pinned.scrolled}, кнопка ${pinned.top}…${pinned.top + pinned.height} px, высота ${pinned.height}`)
+  if (SHOTS)
+    await mobile.screenshot({ path: `${SHOTS}/back-390-scrolled.png` })
+  await mBack.click()
+  await settle('/admin/purchasing')
+  check((await mobile.evaluate(() => window.history.state?.back)) === '/admin/demand', 'по прямой ссылке назад некуда — кнопка открыла дашборд новым шагом (назад браузером — снова «Спрос на рынке»)')
+
+  await push('/admin/demand')
+  await settle('/admin/demand')
+  await push('/admin/kaspi')
+  await settle('/admin/kaspi')
+  const fromDemand = await mLabel()
+  await mBack.click()
+  await settle('/admin/demand')
+  const afterKaspi = await mobile.evaluate(() => window.history.state?.forward)
+  check(fromDemand === 'Спрос на рынке' && afterKaspi === '/admin/kaspi', `со «Спроса на рынке» на «Цифры Kaspi»: в шапке «‹ ${fromDemand}», назад — на «Спрос на рынке» историей`)
+  check(await mLabel() === 'Умный закуп', 'а оттуда — «‹ Умный закуп»: до него пришли с дашборда')
+
+  // Не «Модели ИИ»: там к этому шагу лежит пробный ключ, и страница спросила бы список моделей у провайдера
+  await push('/admin/suppliers')
+  await settle('/admin/suppliers')
+  await push('/admin/suppliers?probe=1')
+  await settle('/admin/suppliers?probe=1')
+  const samePage = await mLabel()
+  await mBack.click()
+  await settle('/admin/suppliers')
+  check(samePage === 'Назад', `та же страница с другим адресом — «‹ ${samePage}», назад на прежний адрес`)
+
+  await push('/admin')
+  await settle('/admin')
+  check(await mBack.count() === 0, 'вне закупа кнопки нет')
+  await push('/admin/restock')
+  await settle('/admin/restock')
+  const fromOutside = await mLabel()
+  await mBack.click()
+  await settle('/admin/purchasing')
+  check(fromOutside === 'Умный закуп' && (await mobile.evaluate(() => window.history.state?.back)) === '/admin/restock', `пришли из другого раздела — «‹ ${fromOutside}», кнопка открыла дашборд, а не прежний раздел`)
   await mobile.context().close()
+
+  // Планшет: рядом боковое меню и «Очистить кеш» / «Полный сброс» — имя не влезало («Умный з…»), там «‹ Назад»
+  const tablet = await newPage({ width: 820, height: 900 })
+  await tablet.goto(`${BASE}/admin/supplier-offers`, { waitUntil: 'load', timeout: 120000 })
+  await tablet.waitForLoadState('networkidle')
+  const tb = await tablet.evaluate(() => {
+    const el = document.querySelector('[data-testid=admin-back]')
+    const shown = [...el.querySelectorAll('span')].filter(s => s.offsetParent).map(s => ({ text: s.textContent.trim(), cut: s.scrollWidth > s.clientWidth }))
+    const r = el.getBoundingClientRect()
+    const firstTool = el.closest('header').querySelector('.ml-auto').getBoundingClientRect()
+    return { shown, apart: r.right <= firstTool.left }
+  })
+  check(tb.shown.length === 1 && tb.shown[0].text === 'Назад' && !tb.shown[0].cut && tb.apart, `планшет 820 px: в шапке «‹ ${tb.shown.map(s => s.text).join(' / ')}», не обрезано, с кнопками справа не сходится`)
+  await tablet.context().close()
 
   console.log('\n== без миграции каналов')
   psql(`ALTER TABLE public.supplier_channels RENAME TO supplier_channels_check_off; NOTIFY pgrst, 'reload schema';`)
@@ -734,7 +922,7 @@ INSERT INTO public.market_demand_candidates (keyword, search_volume, trend_pct) 
   await refreshHub(page)
   const sup3 = await stepOf(page, 'suppliers')
   check(sup3.state === 'later' && sup3.next === 'Заработает после миграции базы.', 'шаг 1 — «В разработке», после миграции')
-  check((await tileOf(page, 'suppliers')).note === 'каналы — после миграции базы' && (await supplierRows(page)).every(r => r[3] === '—'), 'плитка и таблица — каналы «после миграции», прочерки')
+  check((await text(page, 'supplier-summary')).endsWith('каналы — после миграции базы') && (await supplierRows(page)).every(r => !r[1].includes('канал')), 'поставщики — каналы «после миграции», в строках каналов нет')
   psql(`ALTER TABLE public.supplier_channels_check_off RENAME TO supplier_channels; NOTIFY pgrst, 'reload schema';`)
   renamed = false
   await page.context().close()

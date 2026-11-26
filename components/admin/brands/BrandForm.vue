@@ -28,9 +28,11 @@ const supabase = useSupabaseClient<Database>()
 // Парсим page_layout из initialData
 const initialLayout = (props.initialData as any)?.page_layout as BrandPageLayout | null
 
+const startName = props.initialName || props.initialData?.name || ''
 const formData = ref<Partial<BrandInsert | BrandUpdate>>({
-  name: props.initialName || props.initialData?.name || '',
-  slug: props.initialData?.slug || '',
+  name: startName,
+  // Название из формы товара — и слаг по нему сразу: наблюдатель ниже ловит только правку названия
+  slug: props.initialData?.slug || slugify(startName),
   description: props.initialData?.description || null,
   logo_url: props.initialData?.logo_url || null,
   is_custom_page: (props.initialData as any)?.is_custom_page || false,
@@ -408,7 +410,9 @@ onBeforeUnmount(() => {
 
     <!-- 🔍 SEO секция -->
     <div class="space-y-4 pt-6 border-t">
-      <div class="flex items-center justify-between gap-3">
+      <!-- С переносом: на телефоне кнопки уходят на вторую строку. Без него «Сгенерировать» на странице бренда
+           уезжала за правый край, а в окне формы товара строка распирала окно шире экрана (24.11.2026) -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <h3 class="font-semibold flex items-center gap-2">
           <Icon name="lucide:search" class="w-4 h-4" />
           SEO оптимизация

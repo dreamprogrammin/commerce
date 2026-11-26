@@ -14,6 +14,7 @@ import type {
   ProductUpdate,
   ProductWithImages,
 } from '@/types'
+import type { AiProductFill } from '@/utils/aiWriter'
 import type { AgeUnit } from '@/utils/productAge'
 import type { ProductDraft } from '@/utils/supplierOfferList'
 import { debounce } from 'lodash-es'
@@ -64,6 +65,8 @@ const props = defineProps<{
   initialData?: FullProduct | null
   /** Новый товар из поста поставщика — что подставить в пустую форму */
   draft?: (ProductDraft & { photoUrl: string | null }) | null
+  /** «Тексты для сайта» — что написал ИИ; ложится в поля, которых не трогали */
+  aiFill?: AiProductFill | null
 }>()
 
 const emit = defineEmits<{
@@ -85,6 +88,10 @@ const emit = defineEmits<{
       attributeValues: AttributeValuePayload[]
     },
   ): void
+  /** Какие поля получили ответ ИИ — подписями для человека */
+  (e: 'aiFilled', fields: string[]): void
+  /** Бренд создан в окне формы и выбран в ней */
+  (e: 'brandCreated', brand: { id: string, name: string }): void
 }>()
 
 // --- 2. ИНИЦИАЛИЗАЦИЯ СТОРОВ И COMPOSABLES ---
@@ -168,8 +175,24 @@ const linkedAccessories = ref<(ProductWithImages | ProductSearchResult)[]>([])
 const accessorySearchQuery = ref('')
 const accessorySearchResults = ref<ProductSearchResult[]>([])
 const isSearchingAccessories = ref(false)
+/*
+ * Что набрано в поиске бренда и линейки — этим «➕ Создать…» подписывает
+ * новое (24.11.2026). Раньше эти ref стояли в v-model самого Command, а там
+ * выбранный пункт, не поиск: окно получало прошлый выбранный бренд, а список
+ * после выбора сужался до него одного. Список по поиску фильтрует сам Command.
+ */
 const brandSearchQuery = ref('')
+/*
+ * Открыт ли список брендов и линеек (24.11.2026). Раньше у Popover не было
+ * v-model:open: выбранный пункт оставлял список открытым до клика мимо, а
+ * «➕ Создать…» — висеть под окном. Теперь выбор и «Создать…» его закрывают.
+ */
+const isBrandListOpen = ref(false)
+const isProductLineListOpen = ref(false)
 const productLineSearchQuery = ref('')
+/** С каким названием открыто окно «Создать новый бренд» / «…линейку» */
+const brandDialogName = ref('')
+const productLineDialogName = ref('')
 const brandProductLines = ref<ProductLine[]>([])
 const isProductLineDialogOpen = ref(false)
 const isLoadingProductLines = ref(false)
@@ -345,29 +368,71 @@ watch(
   { immediate: true },
 )
 
+/*
+ * «Тексты для сайта» (23 ноября 2026): ответ ИИ ложится в поле, пока его не
+ * трогали — оно пустое, в нём прочитанное с фото или прошлый ответ ИИ.
+ * Поправленное человеком не затирается, в том числе при «Написать заново».
+ */
+type AiField = 'name' | 'description' | 'seo_description' | 'category_id' | 'brand_id'
+const aiApplied: Partial<Record<AiField, string>> = {}
+watch(
+  () => props.aiFill,
+  (fill) => {
+    if (!fill || props.initialData?.id)
+      return
+    const filled: string[] = []
+    const put = (field: AiField, label: string, value: string | null, alsoUntouched?: string | null) => {
+      const current = formData.value[field] ?? null
+      const untouched = !current?.trim() || current === alsoUntouched || current === aiApplied[field]
+      if (!value || !untouched)
+        return
+      formData.value[field] = value
+      aiApplied[field] = value
+      filled.push(label)
+    }
+    put('name', 'название', fill.name, props.draft?.name)
+    put('description', 'описание', fill.description)
+    put('seo_description', 'SEO-описание', fill.seoDescription)
+    put('category_id', 'раздел', fill.categoryId)
+    put('brand_id', 'бренд', fill.brandId)
+    emit('aiFilled', filled)
+  },
+)
+
 // --- 5. ВЫЧИСЛЯЕМЫЕ ЗНАЧЕНИЯ ---
 
-const filteredBrands = computed(() => {
-  if (!brandSearchQuery.value) {
-    return brands.value
-  }
-  return brands.value.filter(brand =>
-    brand.name.toLowerCase().includes(brandSearchQuery.value.toLowerCase()),
-  )
-})
-
-const filteredProductLines = computed(() => {
-  if (!productLineSearchQuery.value) {
-    return brandProductLines.value
-  }
-  return brandProductLines.value.filter(line =>
-    line.name
-      .toLowerCase()
-      .includes(productLineSearchQuery.value.toLowerCase()),
-  )
-})
-
 // --- 6. ОБРАБОТЧИКИ СОБЫТИЙ ---
+
+function openBrandDialog(name: string) {
+  brandDialogName.value = name.trim()
+  isBrandListOpen.value = false
+  isBrandDialogOpen.value = true
+}
+
+function openProductLineDialog(name: string) {
+  productLineDialogName.value = name.trim()
+  isProductLineListOpen.value = false
+  isProductLineDialogOpen.value = true
+}
+
+/** Выбор в списке брендов — в форму, список закрывается */
+function pickBrand(id: string | null) {
+  formData.value.brand_id = id
+  isBrandListOpen.value = false
+}
+
+/** Выбор в списке линеек — в форму, список закрывается */
+function pickProductLine(id: string | null) {
+  formData.value.product_line_id = id
+  isProductLineListOpen.value = false
+}
+
+/*
+ * «Тексты для сайта» (24.11.2026): бренда, которого на сайте нет, ИИ не ищет —
+ * карточка над формой открывает это окно с названием от ИИ, человек
+ * заполняет бренд сам (кнопка «Промпт для нейросети» в окне).
+ */
+defineExpose({ openBrandDialog })
 
 async function handleBrandCreate(payload: {
   data: BrandInsert | BrandUpdate
@@ -384,6 +449,7 @@ async function handleBrandCreate(payload: {
     await nextTick()
     formData.value.brand_id = newBrand.id
     brandSearchQuery.value = ''
+    emit('brandCreated', { id: newBrand.id, name: newBrand.name })
   }
 }
 
@@ -1809,7 +1875,7 @@ const seoKeywordsString = computed({
 
           <div>
             <Label>Бренд (опционально)</Label>
-            <Popover>
+            <Popover v-model:open="isBrandListOpen">
               <PopoverTrigger as-child>
                 <Button
                   variant="outline"
@@ -1825,17 +1891,13 @@ const seoKeywordsString = computed({
                 </Button>
               </PopoverTrigger>
               <PopoverContent class="w-[--radix-popover-trigger-width] p-0">
-                <Command v-model:model-value="brandSearchQuery">
-                  <CommandInput placeholder="Поиск или создание бренда..." />
+                <Command>
+                  <CommandInput placeholder="Поиск или создание бренда..." @update:model-value="brandSearchQuery = String($event ?? '')" />
                   <CommandList>
                     <CommandEmpty>
                       <div
                         class="relative cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
-                        @click="
-                          () => {
-                            isBrandDialogOpen = true;
-                          }
-                        "
+                        @click="openBrandDialog(brandSearchQuery)"
                       >
                         ➕ Создать новый бренд
                       </div>
@@ -1843,23 +1905,15 @@ const seoKeywordsString = computed({
                     <CommandGroup>
                       <CommandItem
                         value=""
-                        @select="
-                          () => {
-                            formData.brand_id = null;
-                          }
-                        "
+                        @select="pickBrand(null)"
                       >
                         Без бренда
                       </CommandItem>
                       <CommandItem
-                        v-for="brand in filteredBrands"
+                        v-for="brand in brands"
                         :key="brand.id"
                         :value="brand.name"
-                        @select="
-                          () => {
-                            formData.brand_id = brand.id;
-                          }
-                        "
+                        @select="pickBrand(brand.id)"
                       >
                         <Check
                           :class="
@@ -1878,12 +1932,14 @@ const seoKeywordsString = computed({
             </Popover>
 
             <Dialog v-model:open="isBrandDialogOpen">
-              <DialogContent class="sm:max-w-[625px]">
+              <!-- Форма бренда выше экрана: без прокрутки «Сохранить бренд» уходила за край. Колонка сетки — по ширине
+                   окна (grid-cols-1): иначе её распирает неразрывная строка формы, на телефоне окно шире экрана (24.11.2026) -->
+              <DialogContent class="grid-cols-1 max-h-[90dvh] overflow-y-auto sm:max-w-[625px]">
                 <DialogHeader>
                   <DialogTitle>Создать новый бренд</DialogTitle>
                 </DialogHeader>
                 <BrandForm
-                  :initial-name="brandSearchQuery"
+                  :initial-name="brandDialogName"
                   @submit="handleBrandCreate"
                 />
               </DialogContent>
@@ -1896,7 +1952,7 @@ const seoKeywordsString = computed({
             <p class="text-xs text-muted-foreground mb-2">
               Например: Barbie, Hot Wheels для Mattel
             </p>
-            <Popover>
+            <Popover v-model:open="isProductLineListOpen">
               <PopoverTrigger as-child>
                 <Button
                   variant="outline"
@@ -1923,17 +1979,13 @@ const seoKeywordsString = computed({
                 </Button>
               </PopoverTrigger>
               <PopoverContent class="w-[--radix-popover-trigger-width] p-0">
-                <Command v-model:model-value="productLineSearchQuery">
-                  <CommandInput placeholder="Поиск или создание линейки..." />
+                <Command>
+                  <CommandInput placeholder="Поиск или создание линейки..." @update:model-value="productLineSearchQuery = String($event ?? '')" />
                   <CommandList>
                     <CommandEmpty>
                       <div
                         class="relative cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
-                        @click="
-                          () => {
-                            isProductLineDialogOpen = true;
-                          }
-                        "
+                        @click="openProductLineDialog(productLineSearchQuery)"
                       >
                         ➕ Создать новую линейку
                       </div>
@@ -1941,23 +1993,15 @@ const seoKeywordsString = computed({
                     <CommandGroup>
                       <CommandItem
                         value=""
-                        @select="
-                          () => {
-                            formData.product_line_id = null;
-                          }
-                        "
+                        @select="pickProductLine(null)"
                       >
                         Без линейки
                       </CommandItem>
                       <CommandItem
-                        v-for="line in filteredProductLines"
+                        v-for="line in brandProductLines"
                         :key="line.id"
                         :value="line.name"
-                        @select="
-                          () => {
-                            formData.product_line_id = line.id;
-                          }
-                        "
+                        @select="pickProductLine(line.id)"
                       >
                         <Check
                           :class="
@@ -1976,7 +2020,7 @@ const seoKeywordsString = computed({
             </Popover>
 
             <Dialog v-model:open="isProductLineDialogOpen">
-              <DialogContent class="sm:max-w-[525px]">
+              <DialogContent class="grid-cols-1 max-h-[90dvh] overflow-y-auto sm:max-w-[525px]">
                 <DialogHeader>
                   <DialogTitle>Создать новую линейку</DialogTitle>
                   <DialogDescription>
@@ -1986,7 +2030,7 @@ const seoKeywordsString = computed({
                 </DialogHeader>
                 <ProductLineForm
                   :brand-id="formData.brand_id!"
-                  :initial-name="productLineSearchQuery"
+                  :initial-name="productLineDialogName"
                   @submit="handleProductLineCreate"
                 />
               </DialogContent>

@@ -1,16 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { WriterBudget } from '~/utils/aiCost'
 import type { VisionModelSpend } from '~/utils/supplierOfferList'
 import type { AiBudget, AiLimitsReading, UsageMeters } from '~/utils/usageBatteries'
+import { visionCost } from '~/utils/supplierOfferList'
 import { budgetPeriod } from '~/utils/usageBatteries'
+import { pgrstTableNotFound } from './pgrstErrors'
 
 /**
  * Показания «батареек» дашборда «Умный закуп» (6 ноября 2026); подписи и
  * уровни — utils/usageBatteries.ts. Таблицы — миграция 20261106120000.
  */
 
-/** Миграции «батареек» нет: таблицы или функции нет в базе */
-export function meterNotInstalled(error: { code?: string } | null | undefined): boolean {
-  return ['PGRST202', 'PGRST205', '42P01', '42883'].includes(error?.code ?? '')
+/** Миграции «батареек» нет: таблицы или функции нет в базе. Запись на PostgREST 12 — пустая ошибка (pgrstErrors.ts) */
+export function meterNotInstalled(error: { code?: string, message?: string } | null | undefined): boolean {
+  return ['PGRST202', 'PGRST205', '42P01', '42883'].includes(error?.code ?? '') || pgrstTableNotFound(error)
 }
 
 export function isAiBudget(v: unknown): v is AiBudget {
@@ -32,6 +35,59 @@ export async function recordTelegramFlood(db: SupabaseClient, seconds: number, c
 
 type Dataforseo = UsageMeters['dataforseo']
 
+const almatyDay = (d: Date) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Almaty' }).format(d)
+
+/** С какого дня считать расход: с начала периода бюджета, без бюджета — за 30 дней */
+function spendFrom(aiBudget: AiBudget | null, now: Date): string {
+  return aiBudget ? budgetPeriod(aiBudget, now).start : almatyDay(new Date(now.getTime() - 29 * 86_400_000))
+}
+
+/** Расход моделей по журналу с дня `from` (по Алматы, YYYY-MM-DD) — по модели одной строкой */
+async function aiSpendSince(db: SupabaseClient, from: string): Promise<{ spend: VisionModelSpend[], error: { code?: string, message: string } | null }> {
+  const { data, error } = await db.from('ai_usage_daily').select('model, input_tokens, output_tokens, posts').gte('day', from)
+  if (error)
+    return { spend: [], error }
+  const byModel = new Map<string, VisionModelSpend>()
+  for (const r of data ?? []) {
+    const m = byModel.get(r.model) ?? { model: r.model, posts: 0, inputTokens: 0, outputTokens: 0 }
+    m.posts += r.posts
+    m.inputTokens += Number(r.input_tokens)
+    m.outputTokens += Number(r.output_tokens)
+    byModel.set(r.model, m)
+  }
+  return { spend: [...byModel.values()], error: null }
+}
+
+/**
+ * Бюджет ИИ для карточки «Тексты от ИИ» (24.11.2026) — тем же счётом, что
+ * батарейка «Бюджет ИИ». Владелец: «нужно показывать сколько было использовано
+ * токенов и сколько осталось в эквиваленте можно сгенерировать описаний».
+ * Читать после записи расхода запроса — он уже в журнале. Не бросает: без
+ * журнала или при сбое базы — null, карточка просто без этих строк.
+ */
+export async function writerBudget(db: SupabaseClient, spec: string, now = new Date()): Promise<WriterBudget | null> {
+  const failed = (error: { code?: string, message?: string }) => {
+    if (!meterNotInstalled(error))
+      console.error('[usage] бюджет для «Текстов от ИИ» не прочитан:', error.message)
+    return null
+  }
+  const row = await db.from('ai_settings').select('value').eq('key', 'ai_budget').maybeSingle()
+  if (row.error)
+    return failed(row.error)
+  const aiBudget = isAiBudget(row.data?.value) ? row.data.value : null
+  const since = spendFrom(aiBudget, now)
+  const { spend, error } = await aiSpendSince(db, since)
+  if (error)
+    return failed(error)
+  const mine = spend.find(s => s.model === spec)
+  return {
+    budgetUsd: aiBudget?.usd ?? null,
+    since,
+    spentUsd: visionCost(spend),
+    writer: { input: mine?.inputTokens ?? 0, output: mine?.outputTokens ?? 0 },
+  }
+}
+
 /** Всё для «батареек»; DataForSEO — уже спрошенный дашбордом (null — ключа нет) */
 export async function readUsageMeters(db: SupabaseClient, dataforseo: Dataforseo, now = new Date()): Promise<UsageMeters> {
   const almatyToday = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Almaty' }).format(now)
@@ -51,21 +107,10 @@ export async function readUsageMeters(db: SupabaseClient, dataforseo: Dataforseo
   // Расход — с начала периода бюджета; без бюджета — за 30 дней
   let aiSpend: VisionModelSpend[] = []
   if (installed) {
-    const from = aiBudget
-      ? budgetPeriod(aiBudget, now).start
-      : new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Almaty' }).format(new Date(now.getTime() - 29 * 86_400_000))
-    const { data, error } = await db.from('ai_usage_daily').select('model, input_tokens, output_tokens, posts').gte('day', from)
+    const { spend, error } = await aiSpendSince(db, spendFrom(aiBudget, now))
     if (error)
       throw createError({ statusCode: 500, message: error.message })
-    const byModel = new Map<string, VisionModelSpend>()
-    for (const r of data ?? []) {
-      const m = byModel.get(r.model) ?? { model: r.model, posts: 0, inputTokens: 0, outputTokens: 0 }
-      m.posts += r.posts
-      m.inputTokens += Number(r.input_tokens)
-      m.outputTokens += Number(r.output_tokens)
-      byModel.set(r.model, m)
-    }
-    aiSpend = [...byModel.values()]
+    aiSpend = spend
   }
 
   // Лимиты — провайдера выбранной модели, свежие

@@ -1,6 +1,7 @@
 import { Icon } from '#components'
 import { h } from 'vue'
 import { toast } from 'vue-sonner'
+import { isBottomNavShown } from '@/composables/useCartChange'
 
 /**
  * Уведомления по макету «Тосты.dc.html».
@@ -34,15 +35,21 @@ interface RichToast {
   thumbUrl?: string | null
   /** Класс задаёт акцент там, где типа тоста не хватает (бонусы, избранное). */
   accentClass?: string
+  /**
+   * Описание — название товара: на телефоне оно в одну строку (тост там
+   * плотнее, см. toast.css). Остальным описаниям — ошибкам, бонусам — строки
+   * не урезаются: в них смысл, а не подпись.
+   */
+  product?: boolean
   type?: 'success' | 'info' | 'error'
   action?: { label: string, onClick: () => void }
 }
 
-function show({ title, description, icon, thumbUrl, accentClass, type, action }: RichToast) {
+function show({ title, description, icon, thumbUrl, accentClass, product, type, action }: RichToast) {
   const options = {
     description: description || undefined,
     icon: figure(icon, thumbUrl),
-    class: ['uh-toast--rich', accentClass].filter(Boolean).join(' '),
+    class: ['uh-toast--rich', product && 'uh-toast--product', accentClass].filter(Boolean).join(' '),
     action,
   }
 
@@ -55,13 +62,23 @@ function show({ title, description, icon, thumbUrl, accentClass, type, action }:
 
 export function useToasts() {
   return {
-    /** Товар положили в корзину. */
+    /**
+     * Товар положили в корзину.
+     *
+     * Только там, где нет нижней панели (десктоп, админка): на телефоне и
+     * планшете о добавлении говорит она сама — подсказкой над корзиной и
+     * кольцом пути до бесплатной доставки (макет MobileNav.dc.html, см.
+     * `composables/useCartChange.ts`).
+     */
     cartAdded(name: string, thumbUrl?: string | null) {
+      if (isBottomNavShown())
+        return
       show({
         title: 'Добавили в корзину',
         description: name,
         icon: 'solar:cart-3-bold',
         thumbUrl,
+        product: true,
         action: {
           label: 'Перейти в корзину',
           onClick: () => {
@@ -71,13 +88,22 @@ export function useToasts() {
       })
     },
 
-    /** Товар убрали из корзины — с возвратом, пока тост на экране. */
+    /**
+     * Товар убрали из корзины — с возвратом, пока тост на экране.
+     *
+     * Тоже только без нижней панели: на телефоне об удалении говорит она —
+     * красным «−1» над корзиной и с «Вернуть» (владелец 25.11.2026: тост при
+     * удалении убрать, сделать как при добавлении).
+     */
     cartRemoved(name: string, undo: () => void, thumbUrl?: string | null) {
+      if (isBottomNavShown())
+        return
       show({
         title: 'Товар убрали из корзины',
         description: name,
         icon: 'lucide:trash-2',
         thumbUrl,
+        product: true,
         type: 'info',
         action: { label: 'Вернуть', onClick: undo },
       })
@@ -100,6 +126,7 @@ export function useToasts() {
         description: name,
         icon: 'line-md:heart-filled',
         accentClass: 'uh-toast--wish',
+        product: true,
         action: {
           label: 'Смотреть избранное',
           onClick: () => {
@@ -115,6 +142,7 @@ export function useToasts() {
         description: name,
         icon: 'line-md:heart',
         accentClass: 'uh-toast--wish',
+        product: true,
         type: 'info',
       })
     },

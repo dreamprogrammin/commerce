@@ -1,3 +1,5 @@
+import type { SavedOfferProduct } from './aiWriter'
+import type { OfferGuess } from './offerGuess'
 import type { OrderSheetLine } from './orderSheet'
 
 /**
@@ -61,6 +63,16 @@ export interface Offer {
   items: OfferItem[] | null
   /** Почему не прочёлся */
   readError: string | null
+  /**
+   * Запросы покупателя по товарам поста (18.11.2026), порядок — как в items;
+   * null — не подбирали или нет миграции 20261118120000
+   */
+  queries: string[][] | null
+  /**
+   * Разбор ИИ по товарам поста (22.11.2026): как такую вещь ищут и тема по
+   * смыслу; null — не разбирали или нет миграции 20261122120000
+   */
+  guess: (OfferGuess | null)[] | null
 }
 
 /** Чтение ИИ на странице «Товары поставщиков» */
@@ -171,6 +183,11 @@ export interface OfferDraftSource {
   supplierId: string | null
   supplierName: string | null
   items: OfferItem[] | null
+  /**
+   * Тексты, уже написанные ИИ, по номерам товаров поста (26.11.2026): форма
+   * берёт их, а не пишет заново. Нет поля — сервер старой сборки.
+   */
+  written?: Record<string, SavedOfferProduct>
 }
 
 /** Что форма нового товара берёт из поста; чего нет — остаётся пустым */

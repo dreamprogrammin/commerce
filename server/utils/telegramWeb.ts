@@ -3,6 +3,7 @@ import type { ChannelCheck, ChannelLink } from '~/utils/telegramChannel'
 import process from 'node:process'
 import { parseChannelLink } from '~/utils/telegramChannel'
 import { decodeEntities, isPreviewPage } from '~/utils/telegramPreview'
+import { pgrstTableNotFound } from './pgrstErrors'
 
 /**
  * Проверка канала поставщика у Telegram (3 ноября 2026) — для поля «Каналы в
@@ -160,11 +161,11 @@ export function readChannelLink(body: unknown): ChannelRef {
 
 /*
  * Миграции каналов (20261103120000_supplier_channels) ещё нет: превью с `dev`
- * смотрит в боевую базу до её применения. PostgREST отвечает PGRST205,
- * Postgres — 42P01.
+ * смотрит в боевую базу до её применения. Чтение — 42P01 от Postgres, запись —
+ * пустая ошибка PostgREST 12 (pgrstErrors.ts); PGRST205 — у PostgREST 13.
  */
-export function channelsNotInstalled(error: { code?: string } | null | undefined): boolean {
-  return error?.code === 'PGRST205' || error?.code === '42P01'
+export function channelsNotInstalled(error: { code?: string, message?: string } | null | undefined): boolean {
+  return error?.code === 'PGRST205' || error?.code === '42P01' || pgrstTableNotFound(error)
 }
 
 /** За каким поставщиком канал уже записан; null — ни за каким (или миграции ещё нет). */

@@ -32,7 +32,8 @@
  *     читаются; без ключа ИИ — подсказка и кнопка «Модели ИИ»;
  *  5) повторный сбор — ничего нового; новые посты — только они;
  *  6) старше 30 дней — удалены вместе с фото; фото удалённого канала — тоже;
- *  7) группировка: по поставщикам, по дням, списком; запоминается;
+ *  7) группировка: по поставщикам, по дням, списком; запоминается; вид
+ *     «Плитка / Список» запоминается; группа сворачивается; «Разобрано N из M»;
  *  8) разбор: «Не брать» и «Отменить», «Добавил», «Вернуть в новые»;
  *     счётчики; в базе — кто и когда;
  *  9) без ключа ИИ товары собираются без чтения; «Прочитать» берёт фото из
@@ -46,12 +47,43 @@
  *     страница и дашборд говорят про миграцию; без миграции товаров — тоже
  *     про миграцию, не 500;
  * 13) телефон 390px — без горизонтальной прокрутки, цена с ₸ одной строкой;
- *     без ошибок консоли.
+ *     без ошибок консоли;
+ * 14) примерный спрос (22.11.2026): после сбора ИИ сам разбирает товары —
+ *     текстом, со списком тем; «как такое ищут» уходит в «Узнать спрос»
+ *     первым; тема по смыслу даёт уровень товару без темы; по названию не
+ *     ищут — уровень по примерному запросу, а не «спроса нет»; без миграции
+ *     20261122120000 — страница как прежде, разбор — off: 'migration';
+ * 15) «Тексты для сайта» (23.11.2026): по «Сгенерировать» (26.11.2026) модель задачи «Тексты
+ *     для сайта» (по умолчанию Sonnet 5.5; заглушка) пишет название, описание
+ *     и SEO-описание и выбирает раздел и бренд номерами из списков сайта — в
+ *     запросе правила кнопки «Скопировать промпт» без строк «Имя поля:», ответ
+ *     по схеме, низкий уровень рассуждений, фото поста, подпись без цены;
+ *     поле, которое правили, пока модель писала, не затирается; бренда на
+ *     сайте нет — карточка называет его, «Создать бренд» открывает окно формы
+ *     с этим названием и слагом, созданный бренд выбран в форме и уходит в
+ *     товар; в интернете бренд не ищется (24.11.2026): маршрута поиска нет,
+ *     запросов поиска и страницы бренда заглушка не получает; отказ модели —
+ *     «Повторить»; расход — в журнал своей строкой, вход вместе с кешем, и
+ *     бюджет считает его тоже;
+ * 16) форма товара (24.11.2026): выбор в списке бренда и линейки закрывает
+ *     список, открытый заново список брендов не сужен до выбранного;
+ *     «➕ Создать новый бренд» и «…новую линейку» — список закрывается, окно
+ *     с набранным в поиске названием и слагом по нему, курсор в окне; окно выше экрана прокручивается, и
+ *     «Сохранить» в нём можно нажать; на телефоне 390 px оба окна в ширину
+ *     экрана, а на странице правки бренда кнопки строки «SEO оптимизация»
+ *     не уезжают за край.
+ * 17) тексты по кнопке и сохраняются (26.11.2026): «На сайт» к модели не
+ *     ходит — над формой «Сгенерировать»; ответ лежит у товара поставщика
+ *     (без остатка бюджета), после перезагрузки он в форме без нового
+ *     запроса, расход — «тогда»; бренд, созданный кнопкой «Создать бренд»,
+ *     после перезагрузки уже не «новый» и уходит в товар; без миграции
+ *     20261126120000 «Сгенерировать» работает, просто ответ не сохраняется.
  *
  * Данные заводит сам — администратор, покупатель, два поставщика с каналами,
- * вход подделки Telegram, ключ ИИ для заглушки — и в конце всё убирает, фото
- * в бакете тоже. Если на локальной базе уже есть секреты Telegram, ключи ИИ
- * или выбрана другая модель чтения, страж останавливается, не тронув их.
+ * вход подделки Telegram, ключ ИИ для заглушки, раздел и бренд для «Текстов
+ * для сайта» — и в конце всё убирает, фото в бакете тоже. Если на локальной
+ * базе уже есть секреты Telegram, ключи ИИ или выбрана другая модель чтения
+ * или текстов, страж останавливается, не тронув их.
  *
  *   sg docker -c "node check-admin-supplier-offers.mjs --base=http://localhost:3141"
  *
@@ -62,6 +94,7 @@
  */
 import { Buffer } from 'node:buffer'
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import http from 'node:http'
 import process from 'node:process'
 import ExcelJS from 'exceljs'
@@ -72,6 +105,12 @@ const WEB_PORT = 3199
 const WEB = `http://127.0.0.1:${WEB_PORT}`
 const AI_PORT = 8788
 const AI_WEB = `http://127.0.0.1:${AI_PORT}`
+// Заглушка DataForSEO — база зовёт её из контейнера через pg_net (как в check-admin-demand.mjs)
+const DFS_PORT = 8790
+const DFS_LOGIN = 'offers_stub_login'
+const DFS_PASSWORD = 'offers-stub-PassWord9'
+const REST_CONTAINER = 'supabase_rest_gvsdevsvzgcivpphcuai'
+const sleep = ms => new Promise(r => setTimeout(r, ms))
 const SUPA = 'http://127.0.0.1:54321'
 const DB_CONTAINER = 'supabase_db_gvsdevsvzgcivpphcuai'
 // Стандартные демо-ключи локального Supabase — публичные
@@ -92,6 +131,21 @@ const SHOTS = process.env.SHOTS
 const HOUR = 3_600_000
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mPo33EDAAP5AiCMelXAAAAAAElFTkSuQmCC', 'base64')
 const PNG_B64 = PNG.toString('base64')
+// «Тексты для сайта» (23.11.2026): модель по умолчанию; раздел (с родителем — путь «A › B») и бренд заводит страж
+const WRITER = 'claude-sonnet-5-5'
+const CATEGORY_TOP = 'Проверка текстов ИИ'
+const CATEGORY_CHILD = 'Машинки — проверка текстов'
+const CATEGORY_PATH = `${CATEGORY_TOP} › ${CATEGORY_CHILD}`
+const PROBE_BRAND = 'Probe Brand Offers'
+// Бренд с коробки PO-1013: на сайте его нет — страж создаёт его в окне формы, как человек
+const NEW_BRAND = 'Probetoys'
+// «Бренд» PO-1024 — тоже нет на сайте; его не создают
+const FACTORY_BRAND = 'Фабрика Пробная'
+// Набирается в поиске бренда и линейки формы товара — окна «Создать…» закрываются без сохранения
+const TYPED_BRAND = 'Probe Typed Brand'
+const TYPED_LINE = 'Probe Typed Line'
+// SEO-описание PO-1014, которое человек пишет сам, пока ИИ отвечает
+const OWN_SEO = 'Своё SEO-описание — написано руками, пока ИИ отвечал'
 
 if (!/localhost|127\.0\.0\.1/.test(BASE))
   throw new Error('Только локальный стенд: страж заводит пользователей, поставщиков и секреты Telegram')
@@ -133,7 +187,7 @@ async function api(path, token, body, method = body ? 'POST' : 'GET') {
   })
   const text = await res.text()
   bodies.push(text)
-  if (path.startsWith('/api/admin/supplier-offers'))
+  if (/^\/api\/admin\/(?:supplier-offers|content-writer)/.test(path))
     offerBodies.push(text)
   let json = null
   try {
@@ -210,7 +264,54 @@ await new Promise(r => server.listen(WEB_PORT, '127.0.0.1', r))
  * провайдер отвечает 429, 'down' — рвёт соединение. Фото в журнал не пишется —
  * только тип и совпало ли с отданным заглушкой t.me и подделкой Telegram.
  */
-const ai = { mode: 'ok', requests: [], retrieved: 0, tries: new Map() }
+const ai = { mode: 'ok', requests: [], queries: [], guesses: [], retrieved: 0, tries: new Map(), writes: [], searches: [], writerRetrieved: 0, textSpent: { in: 0, out: 0 }, rates: 0, hold: null, release: null }
+
+/*
+ * «Тексты для сайта» (23.11.2026) — ответы по артикулу из ДАННЫХ. Раздел и
+ * бренд модель отдаёт номерами из списков системного промпта; заглушка ищет
+ * в них свои строки, как модель, — номер сверяется по дороге в форму.
+ * PO-1024: первая попытка — отказ модели.
+ */
+const TEXTS = {
+  'PO-1013': {
+    name: 'Машинка на пульте Probetoys PO-1013 — 1:24, 2,4 ГГц',
+    description: '<h2>Машинка на пульте</h2><p>Едет вперёд и назад, поворачивает; пульт на 2,4 ГГц.</p><ul><li>Масштаб 1:24</li><li>Для детей от 3 лет</li></ul>',
+    seo_description: 'Машинка на пульте Probetoys PO-1013: масштаб 1:24, пульт 2,4 ГГц, для детей от 3 лет. Купить в Ухтышке с доставкой по Алматы и Казахстану.',
+    category: CATEGORY_PATH,
+    brand: null,
+    new_brand: NEW_BRAND,
+  },
+  'PO-1014': {
+    name: 'Набор игрушек Probe Brand Offers PO-1014 — 5 предметов',
+    description: '<p>Набор из пяти предметов в коробке.</p>',
+    seo_description: 'Набор игрушек Probe Brand Offers PO-1014 из пяти предметов для детей от 3 лет. Купить в Ухтышке с доставкой по Алматы и Казахстану.',
+    category: CATEGORY_PATH,
+    brand: PROBE_BRAND,
+    new_brand: '',
+  },
+  'PO-1024': {
+    name: 'Игрушка PO-1024 от фабрики — для игры дома',
+    description: '<p>Игрушка для игры дома и на прогулке.</p>',
+    seo_description: 'Игрушка PO-1024 для игры дома и на прогулке, для детей от 3 лет. Купить в Ухтышке с доставкой по Алматы и по всему Казахстану.',
+    category: null,
+    brand: null,
+    new_brand: FACTORY_BRAND,
+  },
+}
+// Номер строки «N. label» в списке промпта, как его выбрала бы модель; нет такой — 0
+function numberIn(system, heading, label) {
+  if (!label)
+    return 0
+  const block = system.split('\n\n').find(b => b.startsWith(heading)) ?? ''
+  const line = block.split('\n').find(l => /^\d+\. /.test(l) && l.slice(l.indexOf('. ') + 2) === label)
+  return line ? Number.parseInt(line, 10) : 0
+}
+// Расход «Текстов для сайта» так, как его считает сервер: вход — вместе с записью в кеш и чтением из него
+function textSpend(usage) {
+  ai.textSpent.in += usage.input_tokens + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0)
+  ai.textSpent.out += usage.output_tokens
+  return usage
+}
 function aiAnswer(article, caption) {
   const price = Number(/Цена (\d+)/.exec(caption)?.[1]) || null
   const item = patch => ({ name: `Игрушка ${article}`, article, brand: null, price_text: price, price_image: null, price_note: null, age: '3+', confidence: 'high', doubt: null, ...patch })
@@ -240,6 +341,13 @@ const aiServer = http.createServer((req, res) => {
   const chunks = []
   req.on('data', c => chunks.push(c))
   req.on('end', () => {
+    // Курс Нацбанка для строки «Расход» (24.11.2026): сервер стенда берёт его здесь, а не на nationalbank.kz.
+    // Курс и дата — не те, что зашиты в код (455,12 на 24.11.2026): строка в карточке покажет, откуда курс
+    if (req.method === 'GET' && pathname === '/nbk/rates_all.xml') {
+      ai.rates++
+      res.writeHead(200, { 'content-type': 'text/xml; charset=utf-8' })
+      return res.end('<?xml version="1.0" encoding="utf-8"?><rss version="2.0"><channel><item><title>EUR</title><pubDate>23.11.2026</pubDate><description>520.00</description><quant>1</quant></item><item><title>USD</title><pubDate>23.11.2026</pubDate><description>450.00</description><quant>1</quant></item></channel></rss>')
+    }
     if (req.headers['x-api-key'] !== AI_KEY)
       return send(401, { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } })
     const model = { type: 'model', id: VISION, display_name: 'Claude Haiku 5.5', created_at: '2026-01-01T00:00:00Z' }
@@ -250,9 +358,69 @@ const aiServer = http.createServer((req, res) => {
       ai.retrieved++
       return send(200, { ...model, capabilities: { image_input: { supported: true }, effort: { low: { supported: true }, medium: { supported: true }, high: { supported: true } } } })
     }
+    // «Тексты для сайта» — своя модель; справку о ней сервер спрашивает раз
+    if (req.method === 'GET' && pathname === `/v1/models/${WRITER}`) {
+      ai.writerRetrieved++
+      return send(200, { type: 'model', id: WRITER, display_name: 'Claude Sonnet 5.5', created_at: '2026-01-01T00:00:00Z', capabilities: { image_input: { supported: true }, effort: { low: { supported: true }, medium: { supported: true }, high: { supported: true } } } })
+    }
     if (req.method !== 'POST' || pathname !== '/v1/messages')
       return send(404, { type: 'error', error: { type: 'not_found_error', message: pathname } })
     const body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+    // Подбор запросов покупателя (18.11.2026) — текстом, без фото; режимы сбоев его не касаются
+    if (typeof body.system === 'string' && body.system.startsWith('Ты помогаешь закупщику')) {
+      const text = typeof body.messages?.[0]?.content === 'string' ? body.messages[0].content : ''
+      const list = JSON.parse(text.slice(text.indexOf('[')))
+      ai.queries.push({ model: body.model, format: body.output_config?.format?.type, items: list.length, images: JSON.stringify(body.messages).includes('"image"') })
+      const items = list.map(it => ({ id: it.id, queries: [`${it.name} точно`, `${it.name} купить`, 'кукла'] }))
+      return send(200, { id: `msg_q_${ai.queries.length}`, type: 'message', role: 'assistant', model: body.model, content: [{ type: 'text', text: JSON.stringify({ items }) }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 800, output_tokens: 400 } })
+    }
+    // Разбор товаров (22.11.2026): «как такое ищут» — «Похожие игрушки <номер>»; тема по смыслу —
+    // «Проверка спроса средний» у PO-1020, если она есть в списке, иначе 0
+    if (typeof body.system === 'string' && body.system.startsWith('Ты разбираешь товары')) {
+      const text = typeof body.messages?.[0]?.content === 'string' ? body.messages[0].content : ''
+      const topicLines = text.slice(0, text.indexOf('\n\nТовары:')).split('\n').slice(1)
+      const list = JSON.parse(text.slice(text.indexOf('Товары:\n') + 'Товары:\n'.length))
+      const middle = topicLines.findIndex(l => /^\d+\. Проверка спроса средний(?: —|$)/.test(l)) + 1
+      ai.guesses.push({ model: body.model, format: body.output_config?.format?.type, items: list.length, topics: topicLines.length, images: JSON.stringify(body.messages).includes('"image"') })
+      const items = list.map(it => ({ id: it.id, query: `Похожие игрушки ${/(\d+)\s*$/.exec(it.name)?.[1] ?? '0'}`, topic: it.name.endsWith('PO-1020') ? middle : 0 }))
+      return send(200, { id: `msg_g_${ai.guesses.length}`, type: 'message', role: 'assistant', model: body.model, content: [{ type: 'text', text: JSON.stringify({ items }) }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 600, output_tokens: 200 } })
+    }
+    // «Тексты для сайта» (23.11.2026): системный промпт карточки товара — блоком с кешем
+    const systemText = Array.isArray(body.system) ? body.system.map(b => b.text ?? '').join('\n') : typeof body.system === 'string' ? body.system : ''
+    if (systemText.includes('ЗАДАНИЕ: тексты для карточки товара')) {
+      const parts = Array.isArray(body.messages?.[0]?.content) ? body.messages[0].content : []
+      const data = parts.find(b => b.type === 'text')?.text ?? ''
+      const article = /Код модели \(артикул с коробки\): (\S+)/.exec(data)?.[1] ?? null
+      const tries = (ai.tries.get(`текст ${article}`) ?? 0) + 1
+      ai.tries.set(`текст ${article}`, tries)
+      ai.writes.push({
+        article,
+        model: body.model,
+        effort: body.output_config?.effort,
+        format: body.output_config?.format?.type,
+        fields: Object.keys(body.output_config?.format?.schema?.properties ?? {}).join(','),
+        cache: Array.isArray(body.system) ? body.system.at(-1)?.cache_control?.type ?? null : null,
+        rules: systemText.startsWith('Ты пишешь тексты'),
+        clipboardAnswer: systemText.includes('Отвечай строго по полям из задания'),
+        listed: numberIn(systemText, 'РАЗДЕЛЫ КАТАЛОГА', CATEGORY_PATH) > 0 && numberIn(systemText, 'БРЕНДЫ НА САЙТЕ', PROBE_BRAND) > 0,
+        images: parts.filter(b => b.type === 'image').map(b => `${b.source?.type} ${b.source?.media_type}${b.source?.data === PNG_B64 ? ' как отдано' : ''}`),
+        data,
+      })
+      const t = TEXTS[article]
+      const refused = !t || (article === 'PO-1024' && tries === 1)
+      const usage = textSpend({ input_tokens: 1000, cache_creation_input_tokens: 4000, cache_read_input_tokens: 500, output_tokens: refused ? 2 : 600 })
+      const answer = refused
+        ? []
+        : [{ type: 'text', text: JSON.stringify({ name: t.name, description: t.description, seo_description: t.seo_description, category: numberIn(systemText, 'РАЗДЕЛЫ КАТАЛОГА', t.category), brand: numberIn(systemText, 'БРЕНДЫ НА САЙТЕ', t.brand), new_brand: t.new_brand }) }]
+      const reply = () => send(200, { id: `msg_t_${ai.writes.length}`, type: 'message', role: 'assistant', model: body.model, content: answer, stop_reason: refused ? 'refusal' : 'end_turn', stop_sequence: null, usage })
+      // PO-1014 придержан, пока страж не правит поле сам (ai.release)
+      return article === 'PO-1014' && ai.hold ? ai.hold.then(reply) : reply()
+    }
+    // Поиска бренда больше нет (24.11.2026): запрос с инструментами или страница бренда — провал стража
+    if (Array.isArray(body.tools) || systemText.includes('ЗАДАНИЕ: тексты для страницы бренда')) {
+      ai.searches.push({ model: body.model, tools: (body.tools ?? []).map(x => x.type).join(','), page: systemText.includes('ЗАДАНИЕ: тексты для страницы бренда') })
+      return send(400, { type: 'error', error: { type: 'invalid_request_error', message: 'probe: brand search is gone' } })
+    }
     const content = body.messages?.[0]?.content ?? []
     const caption = content.find(b => b.type === 'text')?.text ?? ''
     const article = /(?:PO|ЗК)-\d+/.exec(caption)?.[0] ?? null
@@ -292,6 +460,50 @@ const aiServer = http.createServer((req, res) => {
 })
 await new Promise(r => aiServer.listen(AI_PORT, '127.0.0.1', r))
 
+// ---------- заглушка DataForSEO ----------
+
+/*
+ * Спрос по номеру из фразы: «игрушка po 1016 точно» — 5 000 (верхняя треть),
+ * po 1013 — 30, po 1018 — «данных нет» (null), остальные — номер × 10.
+ * Примерные «похожие игрушки N» (22.11.2026): 1018 — 40 (нижняя треть своих),
+ * 1020 — «данных нет», от 1000 — (N − 1000) × 30, прочие — 100.
+ */
+const dfs = { requests: [] }
+function dfsVolume(keyword) {
+  const like = /^похожие игрушки (\d+)$/.exec(keyword)
+  if (like) {
+    const n = Number(like[1])
+    return n === 1018 ? 40 : n === 1020 ? null : n >= 1000 ? (n - 1000) * 30 : 100
+  }
+  const n = Number(/po (\d+)/.exec(keyword)?.[1])
+  if (n === 1016)
+    return 5000
+  if (n === 1013)
+    return 30
+  if (n === 1018)
+    return null
+  return n ? (n - 1000) * 10 : 70
+}
+const dfsServer = http.createServer((req, res) => {
+  let raw = ''
+  req.on('data', c => raw += c)
+  req.on('end', () => {
+    res.setHeader('Content-Type', 'application/json')
+    if (req.url === '/ping')
+      return res.end('{"pong":true}')
+    const good = req.headers.authorization === `Basic ${Buffer.from(`${DFS_LOGIN}:${DFS_PASSWORD}`).toString('base64')}`
+    const task = raw ? JSON.parse(raw)?.[0] ?? {} : {}
+    dfs.requests.push({ url: req.url, good, task })
+    if (!good) {
+      res.statusCode = 401
+      return res.end(JSON.stringify({ status_code: 40100, status_message: 'You are not authorized.', cost: 0, tasks: [] }))
+    }
+    const result = (task.keywords ?? []).map(keyword => ({ keyword, search_volume: dfsVolume(keyword), monthly_searches: dfsVolume(keyword) == null ? null : [{ year: 2026, month: 10, search_volume: dfsVolume(keyword) }] }))
+    res.end(JSON.stringify({ version: '0.1', status_code: 20000, status_message: 'Ok.', cost: 0.09, tasks_count: 1, tasks_error: 0, tasks: [{ id: 'stub', status_code: 20000, status_message: 'Ok.', cost: 0.09, result_count: result.length, result }] }))
+  })
+})
+await new Promise(r => dfsServer.listen(DFS_PORT, '0.0.0.0', r))
+
 // ---------- данные ----------
 
 const stamp = Date.now()
@@ -315,7 +527,7 @@ COMMIT;
 }
 
 // Товары сайта, созданные «На сайт», и их фото в product-images
-const PROBE_PRODUCTS = `sku IN ('PO-1013', 'PO-1014') AND name IN ('Игрушка PO-1013', 'Проверка дубля')`
+const PROBE_PRODUCTS = `sku IN ('PO-1013', 'PO-1014') AND name IN ('Игрушка PO-1013', 'Проверка дубля', '${TEXTS['PO-1013'].name}')`
 async function removeProbeProducts() {
   const ids = psql(`SELECT coalesce(string_agg(id::text, ','), '') FROM public.products WHERE ${PROBE_PRODUCTS};`).split(',').filter(Boolean)
   for (const id of ids) {
@@ -329,11 +541,19 @@ async function removeProbeProducts() {
 
 async function cleanup() {
   await removeProbeProducts()
-  psql(`DELETE FROM public.market_demand_topics WHERE name LIKE 'Проверка спроса%'; DELETE FROM public.market_demand_keywords WHERE keyword = 'проверка спроса po-1016';`)
+  // Раздел и бренды «Текстов для сайта» — после товаров: товары держат бренд
+  psql(`DELETE FROM public.product_lines WHERE name = :'l'; DELETE FROM public.brands WHERE name IN (:'b1', :'b2', :'b3'); DELETE FROM public.categories WHERE slug LIKE 'probe-ai-texts-%';`, { b1: PROBE_BRAND, b2: NEW_BRAND, b3: TYPED_BRAND, l: TYPED_LINE })
+  psql(`DELETE FROM public.market_demand_topics WHERE name LIKE 'Проверка спроса%'; DELETE FROM public.market_demand_keywords WHERE keyword IN ('проверка спроса po-1016', 'проверка спроса po-1013', 'проверка спроса po-1014');`)
   const ids = psql(`SELECT coalesce(string_agg(c.id::text, ','), '') FROM public.supplier_channels c JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
   for (const id of new Set([...channelIds, ...ids.split(',').filter(Boolean), ORPHAN]))
     await removeFiles(await bucketFiles(id))
-  psql(`DELETE FROM public.suppliers WHERE name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
+  // Заказы поставщикам держат поставщика (ON DELETE RESTRICT): «На сайт» кладёт товар в формирующийся (26.11.2026)
+  psql(`DELETE FROM public.supplier_orders WHERE supplier_id IN (SELECT id FROM public.suppliers WHERE name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}'));
+DELETE FROM public.suppliers WHERE name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
+  // Фразы стража — «игрушка po 1016 точно», «игрушка зк 10 купить», «набор b 2 точно»
+  psql(`DELETE FROM public.market_demand_monthly WHERE keyword ~ '^(игрушка|набор) .+ (точно|купить)$' OR keyword ~ '^похожие игрушки [0-9]+$'; DELETE FROM public.market_demand_keywords WHERE keyword ~ '^(игрушка|набор) .+ (точно|купить)$' OR keyword ~ '^похожие игрушки [0-9]+$';`)
+  if (started && psql(`SELECT to_regproc('public.market_demand_request_offers') IS NOT NULL;`) === 't')
+    psql(`DELETE FROM public.market_demand_runs WHERE kind = 'offers'; DELETE FROM vault.secrets WHERE name = 'dataforseo_credentials';`)
   if (started)
     psql(`DELETE FROM public.ai_usage_daily; DELETE FROM public.service_meters; DELETE FROM public.ai_settings WHERE key = 'ai_budget';`)
   if (started)
@@ -351,20 +571,88 @@ COMMIT;
 NOTIFY pgrst, 'reload schema';`)
 }
 
+// База «до 20261126120000»: колонки сохранённых текстов нет; функций на ней нет — достаточно имени
+function renameTexts(back) {
+  const [from, to] = back ? ['_check_off', ''] : ['', '_check_off']
+  psql(`ALTER TABLE public.supplier_offers RENAME COLUMN written_texts${from} TO written_texts${to};
+NOTIFY pgrst, 'reload schema';`)
+}
+
+function psqlSuper(sql) {
+  return execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=postgres', DB_CONTAINER, 'psql', '-w', '-h', '127.0.0.1', '-U', 'supabase_admin', '-d', 'postgres', '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1'], { input: sql, encoding: 'utf8' }).trim()
+}
+
+/*
+ * База «до 20261122120000», как бой до разбора ИИ: тела supplier_offer_phrases
+ * и supplier_offer_demand — из миграции 20261118120000, колонок разбора нет
+ * (переименованы). Обратно — колонки и тела, снятые перед этим.
+ */
+let guessDefs = ''
+function guessOff(off) {
+  const [from, to] = off ? ['', '_check_off'] : ['_check_off', '']
+  const rename = ['demand_guess', 'guessed_at'].map(c => `ALTER TABLE public.supplier_offers RENAME COLUMN ${c}${from} TO ${c}${to};`).join('\n')
+  // Тело SQL-функции проверяется при создании: новые — только при колонках на месте, прежние — до переименования
+  if (off) {
+    guessDefs = psqlSuper(`SELECT string_agg(pg_get_functiondef(p.oid), E';\n') || ';' FROM pg_proc p WHERE p.proname IN ('supplier_offer_phrases', 'supplier_offer_demand') AND p.pronamespace = 'public'::regnamespace;`)
+    const src = readFileSync('supabase/migrations/20261118120000_supplier_offer_queries.sql', 'utf8')
+    const before = ['supplier_offer_phrases', 'supplier_offer_demand']
+      .map(n => new RegExp(`CREATE FUNCTION public\\.${n}\\([\\s\\S]*?\\n\\$\\$;`).exec(src)[0].replace('CREATE FUNCTION', 'CREATE OR REPLACE FUNCTION'))
+      .join('\n')
+    psqlSuper(`BEGIN;\n${before}\n${rename}\nCOMMIT;\nNOTIFY pgrst, 'reload schema';`)
+  }
+  else {
+    psqlSuper(`BEGIN;\n${rename}\n${guessDefs}\nCOMMIT;\nNOTIFY pgrst, 'reload schema';`)
+  }
+}
+async function restartRest() {
+  execFileSync('docker', ['restart', REST_CONTAINER], { encoding: 'utf8' })
+  for (let i = 0; i < 60; i++) {
+    if (await fetch(`${SUPA}/rest/v1/suppliers?select=id&limit=1`, { headers: serviceHeaders }).then(r => r.ok).catch(() => false))
+      return
+    await sleep(1000)
+  }
+  throw new Error('PostgREST не поднялся после перезапуска')
+}
+async function dfsPing() {
+  for (let t = 0; t < 10; t++) {
+    const id = psql(`SELECT net.http_get('http://host.docker.internal:${DFS_PORT}/ping')`)
+    for (let i = 0; i < 10; i++) {
+      await sleep(500)
+      const row = psql(`SELECT coalesce(status_code, 0) FROM net._http_response WHERE id = ${id}`)
+      if (row === '200')
+        return true
+      if (row)
+        break
+    }
+  }
+  return false
+}
+
 const browser = await chromium.launch()
+let gucSet = false
 let renamed = false
 let readRenamed = false
+let guessRenamed = false
+let textsRenamed = false
 try {
   if (psql(`SELECT to_regclass('public.supplier_offers') IS NOT NULL;`) !== 't')
     throw new Error('На локальной базе нет миграции 20261104160000_supplier_offers')
   if (vaultNames())
     throw new Error(`На локальной базе уже есть секреты Telegram (${vaultNames()}) — страж их не трогает`)
+  if (psql(`SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'supplier_offers' AND column_name = 'demand_guess';`) !== '1')
+    throw new Error('На локальной базе нет миграции 20261122120000_supplier_offer_guess')
   if (psql(`SELECT to_regclass('public.service_meters') IS NOT NULL;`) !== 't')
     throw new Error('На локальной базе нет миграции 20261106120000_usage_meters')
   if (psql(`SELECT (SELECT count(*) FROM public.ai_usage_daily) + (SELECT count(*) FROM public.service_meters) + (SELECT count(*) FROM public.ai_settings WHERE key = 'ai_budget');`) !== '0')
     throw new Error('На локальной базе уже есть расход ИИ, показания или бюджет — страж их не трогает')
   if (aiKeyNames())
     throw new Error(`На локальной базе уже есть ключи ИИ (${aiKeyNames()}) — страж их не трогает`)
+  if (psql(`SELECT count(*) FROM public.ai_settings WHERE key = 'content_writer_model';`) !== '0')
+    throw new Error('На локальной базе выбрана модель «Текстов для сайта» — страж ждёт модель по умолчанию и чужой выбор не трогает')
+  if (psql(`SELECT count(*) FROM vault.secrets WHERE name = 'dataforseo_credentials';`) !== '0')
+    throw new Error('На локальной базе уже есть ключ DataForSEO — страж его не трогает')
+  if (psql(`SELECT to_regproc('public.market_demand_request_offers') IS NOT NULL;`) === 't' && psql(`SELECT count(*) FROM public.market_demand_runs WHERE kind = 'offers';`) !== '0')
+    throw new Error('На локальной базе уже есть проверки фраз товаров — страж их не трогает')
   started = true
   await cleanup()
   const adminId = await createUser(emails.admin)
@@ -388,6 +676,11 @@ try {
   const memberId = psql(`INSERT INTO public.supplier_channels (supplier_id, invite_hash, title, chat_type, created_at) VALUES (:'s', 'MemberProbe_offers', 'Проверка — закрытый канал', 'channel', now() - interval '2 minutes') RETURNING id;`, { s: closedSupplier })
   const expiredId = psql(`INSERT INTO public.supplier_channels (supplier_id, invite_hash, title, chat_type, created_at) VALUES (:'s', 'ExpiredProbe_offers', 'Проверка — устаревшее приглашение', 'channel', now() - interval '1 minute') RETURNING id;`, { s: closedSupplier })
   channelIds.push(openId, memberId, expiredId)
+  // «Тексты для сайта»: свои раздел с родителем и бренд — заглушка ИИ выбирает их номерами из списков сайта
+  const categoryTopId = psql(`INSERT INTO public.categories (name, slug, href) VALUES (:'n', :'s', :'h') RETURNING id;`, { n: CATEGORY_TOP, s: `probe-ai-texts-${stamp}`, h: `/catalog/probe-ai-texts-${stamp}` }).split('\n')[0]
+  const categoryId = psql(`INSERT INTO public.categories (name, slug, href, parent_id) VALUES (:'n', :'s', :'h', :'p') RETURNING id;`, { n: CATEGORY_CHILD, s: `probe-ai-texts-cars-${stamp}`, h: `/catalog/probe-ai-texts-${stamp}/probe-ai-texts-cars-${stamp}`, p: categoryTopId }).split('\n')[0]
+  // Свой бренд «Товаров поставщиков» — ИИ выбирает его из списка сайта; его же страница правки проверяется на телефоне
+  const probeBrandId = psql(`INSERT INTO public.brands (name, slug) VALUES (:'n', :'s') RETURNING id;`, { n: PROBE_BRAND, s: `probe-brand-offers-${stamp}` }).split('\n')[0]
 
   console.log('\n== маршруты')
   const routes = [
@@ -395,34 +688,51 @@ try {
     ['POST', '/api/admin/supplier-offers/collect', { channelId: openId }],
     ['POST', '/api/admin/supplier-offers/status', { ids: [openId], status: 'skipped' }],
     ['POST', '/api/admin/supplier-offers/read', { before: new Date().toISOString() }],
+    ['POST', '/api/admin/supplier-offers/queries', {}],
+    ['POST', '/api/admin/supplier-offers/demand', {}],
+    ['POST', '/api/admin/content-writer/product', { id: openId, item: 0 }],
   ]
   for (const [method, path, body] of routes) {
     const guest = await api(path, null, body, method)
     const buyer = await api(path, buyerToken, body, method)
     check(guest.status === 401 && buyer.status === 403, `${method} ${path}: гость — ${guest.status}, не-администратор — ${buyer.status}`)
   }
-  check(!stub.requests.length && !ai.requests.length && offersOf(openId) === 0, 'отказанные запросы в t.me и к модели не ходили и ничего не записали')
+  check(!stub.requests.length && !ai.requests.length && !ai.writes.length && !ai.searches.length && offersOf(openId) === 0, 'отказанные запросы в t.me и к модели не ходили и ничего не записали')
   const bad = [
     await api('/api/admin/supplier-offers?status=all', adminToken),
     await api('/api/admin/supplier-offers/collect', adminToken, { channelId: 'x' }),
     await api('/api/admin/supplier-offers/status', adminToken, { ids: ['x'], status: 'skipped' }),
     await api('/api/admin/supplier-offers/status', adminToken, { ids: [openId], status: 'ordered' }),
     await api('/api/admin/supplier-offers/read', adminToken, { before: 'вчера' }),
+    await api('/api/admin/content-writer/product', adminToken, { id: 'x', item: 0 }),
+    await api('/api/admin/content-writer/product', adminToken, { id: openId, item: -1 }),
   ]
-  check(bad.every(r => r.status === 400), `негодный статус, канал, товары, начало прохода — 400: ${bad.map(r => `${r.status} «${r.json?.message}»`).join(', ')}`)
+  check(bad.every(r => r.status === 400) && !ai.writes.length && !ai.searches.length, `негодный статус, канал, товары, начало прохода и товар для текстов — 400: ${bad.map(r => `${r.status} «${r.json?.message}»`).join(', ')}`)
+  // Поиск бренда в интернете убран 24.11.2026 — маршрута нет и у администратора
+  const goneBrand = await api('/api/admin/content-writer/brand', adminToken, { name: NEW_BRAND, product: 'Машинка' })
+  check(goneBrand.status === 404 && !ai.searches.length, `поиска бренда в интернете нет — маршрут отвечает 404: ${goneBrand.status}`)
   const missing = await api('/api/admin/supplier-offers/collect', adminToken, { channelId: '00000000-0000-4000-8000-000000000000' })
   check(missing.status === 404, `несуществующий канал — 404 «${missing.json?.message}»`)
 
   const errors = []
   const failedResponses = []
-  async function newPage(viewport, path = '/admin/supplier-offers') {
+  // idle: false — не ждать тишины в сети: придержанный ответ ИИ держит запрос открытым
+  async function newPage(viewport, path = '/admin/supplier-offers', idle = true) {
     const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2 })
     await ctx.addInitScript(() => localStorage.setItem('tg_modal_dismissed_at', String(Date.now())))
+    // «Показать ещё N» в группе (макет) — раскрывать сразу: проверки ниже считают все карточки.
+    // Саму кнопку проверяет отдельный блок, выключая это флагом manualMore в sessionStorage
+    await ctx.addInitScript(() => {
+      if (sessionStorage.getItem('manualMore'))
+        return
+      new MutationObserver(() => document.querySelectorAll('[data-testid=offers-group-more]').forEach(b => b.click()))
+        .observe(document, { childList: true, subtree: true })
+    })
     const page = await ctx.newPage()
     page.on('pageerror', e => errors.push(e.message))
     page.on('console', m => m.type() === 'error' && !m.text().startsWith('Failed to load resource') && !m.text().includes('[nuxt-gtag]') && errors.push(m.text()))
     page.on('response', async (r) => {
-      if (r.url().includes('/api/admin/supplier-offers')) {
+      if (/\/api\/admin\/(?:supplier-offers|content-writer)/.test(r.url())) {
         const text = await r.text().catch(() => '')
         bodies.push(text)
         offerBodies.push(text)
@@ -443,14 +753,31 @@ try {
     if (loginError)
       throw new Error(`вход: ${loginError}`)
     await page.goto(`${BASE}${path}`, { waitUntil: 'load', timeout: 120000 })
-    await page.waitForLoadState('networkidle')
+    if (idle)
+      await page.waitForLoadState('networkidle')
     return page
   }
   const toastWith = (page, text) => page.locator('[data-sonner-toast]', { hasText: text })
   const sp = s => (s ?? '').replace(/\s+/g, ' ').trim()
   const cards = page => page.locator('[data-testid=offer-card]')
   const statusCount = async (page, id) => Number((await page.locator(`[data-testid=offers-status-${id}] span`).textContent()).trim())
-  const groupTitles = page => page.locator('[data-testid=offers-group] h2').evaluateAll(hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()))
+  // Заголовок группы — «Поставщик · 12»: название и счётчик (макет 18.11 — счётчик пилюлей рядом)
+  const groupTitles = page => page.locator('[data-testid=offers-group-title]').evaluateAll(hs => hs.map(h => `${h.textContent.trim()} · ${h.parentElement.querySelector('[data-testid=offers-group-count]').textContent.trim()}`))
+  // Соседние фразы строки «Точный спрос» не слипаются («62 товара.Не проверено»): между ними — зазор
+  const narrowGaps = page => page.locator('[data-testid=offers-narrow] p > span').evaluate((box) => {
+    const spans = [...box.querySelectorAll(':scope > span')]
+    const out = []
+    for (let i = 1; i < spans.length; i++) {
+      const a = spans[i - 1].getClientRects()
+      const b = spans[i].getClientRects()
+      if (!a.length || !b.length)
+        continue
+      const end = a[a.length - 1]
+      if (Math.abs(end.top - b[0].top) < 2)
+        out.push(Math.round(b[0].left - end.right))
+    }
+    return out
+  })
   const noScroll = page => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
   // Список перечитывается после сбора, смены отбора и перезагрузки — ждать сам ответ:
   // networkidle на этой странице уже наступал, и waitForLoadState вернётся сразу
@@ -512,7 +839,7 @@ try {
   check(channelRows.length === 3 && channelRows.every(r => r.endsWith('ещё не собирали')), `каналы — «ещё не собирали»: ${channelRows.join(' | ')}`)
   check(await page.locator('[data-testid=offers-channel] [aria-label="Закрытый канал"]').count() === 2, 'у закрытых каналов — замок')
   check(await page.locator('[data-testid=offers-no-account] a[href="/admin/telegram"]').count() === 1, 'закрытые каналы без аккаунта — подсказка и кнопка «Аккаунт Telegram»')
-  check(sp(await page.locator('[data-testid=offers-empty]').textContent()).startsWith('Нажмите «Собрать новые»'), 'пусто — что нажать')
+  check(sp(await page.locator('[data-testid=offers-empty]').innerText()).includes('Нажмите «Собрать новые»'), 'пусто — что нажать')
   const keyless = await readLine(page)
   check(keyless.includes('задайте ключ для Claude Haiku 5.5') && await page.locator('[data-testid=offers-reading] a[href="/admin/ai"]').count() === 1 && await page.locator('[data-testid=offers-reread]').count() === 0, `без ключа ИИ — «${keyless}», кнопка «Модели ИИ»`)
 
@@ -539,6 +866,36 @@ try {
   check(errorsUnder.length === 1 && /Приглашение в канал устарело/.test(errorsUnder[0]), `причина — у канала: «${errorsUnder[0]}»`)
   const total = openPosts.length + closedCount
   check(await statusCount(page, 'new') === total && await cards(page).count() === total, `«Новые» — ${total}, карточек столько же`)
+
+  // В группе сначала 12 товаров, остальные — «Показать ещё N» (макет «Товары поставщиков»)
+  await page.evaluate(() => sessionStorage.setItem('manualMore', '1'))
+  await page.reload({ waitUntil: 'networkidle' })
+  await cards(page).first().waitFor()
+  const bigIdx = await page.locator('[data-testid=offers-group]').evaluateAll(gs => gs.findIndex(g => g.querySelector('[data-testid=offers-group-more]')))
+  const big = page.locator('[data-testid=offers-group]').nth(bigIdx)
+  const bigTotal = Number(sp(await big.locator('[data-testid=offers-group-count]').textContent()))
+  const moreText = bigIdx >= 0 ? sp(await big.locator('[data-testid=offers-group-more]').textContent()) : ''
+  check(bigIdx >= 0 && await big.locator('[data-testid=offer-card]').count() === 12 && moreText === `Показать ещё ${bigTotal - 12}`, `большая группа — 12 карточек и «${moreText}» (всего ${bigTotal})`)
+  if (SHOTS && bigIdx >= 0) {
+    await page.locator('[data-testid=offers-status-new]').scrollIntoViewIfNeeded()
+    await page.mouse.move(5, 5)
+    await page.screenshot({ path: `${SHOTS}/offers-tabs-1366.png` })
+    await big.locator('[data-testid=offers-group-more]').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: `${SHOTS}/offers-more-1366.png` })
+  }
+  if (bigIdx >= 0) {
+    await big.locator('[data-testid=offers-group-more]').click()
+    check(await big.locator('[data-testid=offer-card]').count() === bigTotal && await big.locator('[data-testid=offers-group-more]').count() === 0, `«Показать ещё» — все ${bigTotal}, кнопки больше нет`)
+    await page.locator('[data-testid=offers-view-list]').click()
+    check(await big.locator('[data-testid=offer-row]').count() === bigTotal, 'в «Списке» группа тоже раскрыта')
+    await page.locator('[data-testid=offers-view-grid]').click()
+  }
+  const gaps = await narrowGaps(page)
+  check(gaps.length > 0 && gaps.every(g => g >= 3), `«Точный спрос» — фразы не слипаются, зазоры ${JSON.stringify(gaps)} px`)
+  await page.evaluate(() => sessionStorage.removeItem('manualMore'))
+  await page.reload({ waitUntil: 'networkidle' })
+  await cards(page).first().waitFor()
+  check(await cards(page).count() === total, `дальше — все ${total} карточек раскрыты`)
   const pages = stub.requests.filter(r => r.startsWith('/s/'))
   check(pages.some(r => r.includes('before=')) && pages.some(r => r.includes('after=')), `открытый канал — назад до 3 дней (?before=), дальше от прочитанного (?after=): ${pages.join(' ')}`)
 
@@ -567,8 +924,10 @@ try {
   await shown.scrollIntoViewIfNeeded()
   check(await shown.evaluate(img => img.decode().then(() => img.naturalWidth > 0, () => false)), 'фото на карточке загрузилось')
   check(await page.locator('[data-testid=offer-card]', { hasText: 'PO-1020' }).locator('text=2 фото').count() === 1, 'на карточке альбома — «2 фото»')
-  if (SHOTS)
+  if (SHOTS) {
+    await page.evaluate(() => window.scrollTo(0, 0))
     await page.screenshot({ path: `${SHOTS}/offers-1366.png` })
+  }
 
   console.log('\n== чтение ИИ при сборе')
   const read = JSON.parse(psql(`SELECT json_agg(json_build_object('m', message_id, 'items', read_items, 'error', read_error, 'model', read_model, 'at', read_at, 'in', read_input_tokens, 'out', read_output_tokens, 'path', photo_path, 'caption', caption)) FROM public.supplier_offers WHERE channel_id IN ('${openId}', '${memberId}');`))
@@ -586,11 +945,11 @@ try {
   check(ai.retrieved <= 1, `справка о модели — не больше одной на сервер: ${ai.retrieved}`)
 
   const c13 = await cardOf(page, 'PO-1013')
-  check(c13.names[0] === 'Игрушка PO-1013' && c13.articles[0] === 'Арт. PO-1013' && c13.prices[0] === '1 013 ₸' && c13.from[0] === 'в подписи', `карточка: название, артикул без второй «Арт.», цена из подписи — ${c13.names[0]} · ${c13.articles[0]} · ${c13.prices[0]} ${c13.from[0]}`)
+  check(c13.names[0] === 'Игрушка PO-1013' && c13.articles[0] === 'Арт. PO-1013' && c13.prices[0] === '1 013 ₸' && c13.from[0] === 'цена из подписи', `карточка: название, артикул без второй «Арт.», цена из подписи — ${c13.names[0]} · ${c13.articles[0]} · ${c13.prices[0]} ${c13.from[0]}`)
   const c14 = await cardOf(page, 'PO-1014')
-  check(c14.prices[0] === '2 500 ₸' && c14.from[0] === 'на фото', `в подписи цены нет — с фото: ${c14.prices[0]} ${c14.from[0]}`)
+  check(c14.prices[0] === '2 500 ₸' && c14.from[0] === 'цена с фото', `в подписи цены нет — с фото: ${c14.prices[0]} ${c14.from[0]}`)
   const c16 = await cardOf(page, 'PO-1016')
-  check(c16.prices[0] === '1 016 ₸' && c16.from[0] === 'в подписи' && c16.conflict[0] === 'На фото другая: 1 200 ₸', `цены расходятся — главная из подписи, с фото рядом: ${c16.prices[0]} · ${c16.conflict[0]}`)
+  check(c16.prices[0] === '1 016 ₸' && c16.from[0] === 'цена из подписи' && c16.conflict[0] === 'На фото другая: 1 200 ₸', `цены расходятся — главная из подписи, с фото рядом: ${c16.prices[0]} · ${c16.conflict[0]}`)
   const c18 = await cardOf(page, 'PO-1018')
   check(c18.doubt[0] === 'ИИ не уверен: последняя цифра артикула не читается', `сомнение модели — на карточке: ${c18.doubt[0]}`)
   const c19 = await cardOf(page, 'PO-1019')
@@ -606,7 +965,7 @@ try {
   const c30 = await cardOf(page, 'PO-1030')
   check(!c30.items && !c30.none.length && !c30.error.length, 'товар без фото — без чтения и без ошибки')
   const line = await readLine(page)
-  check(line.startsWith('Артикул и цену с фото читает Claude Haiku 5.5 — при «Собрать новые».') && line.includes('Не прочлось: 2 — причина на карточке.') && await page.locator('[data-testid=offers-reread]').isVisible(), `строка чтения — модель и непрочитанное: «${line}»`)
+  check(line.startsWith('Артикул и цену с фото читает Claude Haiku 5.5 при «Собрать новые».') && line.includes('Не прочлось: 2 — причина на карточке.') && await page.locator('[data-testid=offers-reread]').isVisible(), `строка чтения — модель и непрочитанное: «${line}»`)
   if (SHOTS) {
     await page.locator('[data-testid=offer-card]', { hasText: 'PO-1016' }).scrollIntoViewIfNeeded()
     await page.screenshot({ path: `${SHOTS}/offers-1366-items.png` })
@@ -643,16 +1002,35 @@ try {
   check(await page.locator('[data-testid=offers-group-none]').getAttribute('aria-pressed') === 'true', 'выбор группировки — запомнен')
   await page.locator('[data-testid=offers-group-supplier]').click()
 
+  console.log('\n== вид, свёрнутые группы, «Разобрано» (макет 18.11.2026)')
+  const gridCount = await cards(page).count()
+  await page.locator('[data-testid=offers-view-list]').click()
+  check(await page.locator('[data-testid=offer-row]').count() === gridCount && await cards(page).count() === 0, `«Список» — те же ${gridCount} товаров строками`)
+  if (SHOTS)
+    await page.screenshot({ path: `${SHOTS}/offers-1366-list.png` })
+  await reload(page)
+  check(await page.locator('[data-testid=offers-view-list]').getAttribute('aria-pressed') === 'true', 'вид — запомнен')
+  await page.locator('[data-testid=offers-view-grid]').click()
+  const firstGroup = page.locator('[data-testid=offers-group]').first()
+  const inFirst = await firstGroup.locator('[data-testid=offer-card]').count()
+  await firstGroup.locator('[data-testid=offers-group-toggle]').click()
+  check(inFirst > 0 && await firstGroup.locator('[data-testid=offer-card]').count() === 0 && await cards(page).count() === gridCount - inFirst && sp(await firstGroup.locator('[data-testid=offers-group-toggle]').textContent()) === 'Показать', 'свернуть группу — её карточки скрыты, остальные на месте')
+  await firstGroup.locator('[data-testid=offers-group-toggle]').click()
+  check(await cards(page).count() === gridCount, '«Показать» — группа снова развёрнута')
+  const [nNew, nAdded, nSkipped] = [await statusCount(page, 'new'), await statusCount(page, 'added'), await statusCount(page, 'skipped')]
+  const progress = sp(await page.locator('[data-testid=offers-progress]').innerText())
+  check(progress.includes(`${nAdded + nSkipped} из ${nNew + nAdded + nSkipped}`) && progress.endsWith(`Осталось ${nNew}`), `«Разобрано»: ${progress}`)
+
   console.log('\n== разбор')
   const newTotal = total + 2
   const firstCard = cards(page).first()
-  const firstCaption = sp(await firstCard.locator('[data-testid=offer-caption]').textContent())
+  const firstId = await firstCard.getAttribute('data-offer-id')
   await firstCard.locator('[data-testid=offer-skipped]').click()
   await toastWith(page, 'Отмечено: не брать').waitFor({ timeout: 15000 })
   check(await statusCount(page, 'new') === newTotal - 1 && await statusCount(page, 'skipped') === 1 && await cards(page).count() === newTotal - 1, '«Не брать» — карточка ушла, счётчики сдвинулись')
   await toastWith(page, 'Отмечено: не брать').getByRole('button', { name: 'Отменить' }).click()
   await page.waitForFunction(n => document.querySelectorAll('[data-testid=offer-card]').length === n, newTotal, { timeout: 15000 })
-  check(await statusCount(page, 'skipped') === 0 && sp(await cards(page).first().locator('[data-testid=offer-caption]').textContent()) === firstCaption, '«Отменить» — карточка вернулась на место')
+  check(await statusCount(page, 'skipped') === 0 && await cards(page).first().getAttribute('data-offer-id') === firstId, '«Отменить» — карточка вернулась на место')
   await cards(page).first().locator('[data-testid=offer-added]').click()
   await toastWith(page, 'Отмечено: добавил на сайт').waitFor({ timeout: 15000 })
   const marked = JSON.parse(psql(`SELECT json_agg(json_build_object('status', status, 'by', status_by, 'at', status_at)) FROM public.supplier_offers WHERE status <> 'new' AND channel_id IN ('${openId}', '${memberId}');`))
@@ -719,11 +1097,11 @@ try {
 INSERT INTO public.market_demand_keywords (keyword, search_volume) VALUES ('проверка спроса po-1016', 2400);
 INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 'проверка спроса po-1016', m::date, 2400 FROM generate_series('2026-08-01'::date, '2026-10-01', interval '1 month') m;`)
   await reload(page)
-  const demandOf = article => page.locator('[data-testid=offer-card]', { hasText: article }).locator('[data-testid=offer-demand]').textContent().then(sp)
+  const demandOf = article => page.locator('[data-testid=offer-card]', { hasText: article }).locator('[data-testid=offer-demand]').innerText().then(sp)
   const d16 = await demandOf('PO-1016')
-  check(d16.startsWith('Спрос: Проверка спроса · 2 400/мес') && d16.includes('на сайте такого нет'), `тема нашла товар по прочитанному ИИ: «${d16}»`)
+  check(d16.startsWith('Проверка спроса 2 400 поисков в месяц') && d16.includes('На сайте такого нет'), `тема нашла товар по прочитанному ИИ: «${d16}»`)
   const d18 = await demandOf('PO-1018')
-  check(d18.startsWith('Спрос: Проверка спроса без цифр · цифр ещё нет'), `тема без цифр — так и сказано: «${d18}»`)
+  check(d18.startsWith('Проверка спроса без цифр цифр спроса ещё нет'), `тема без цифр — так и сказано: «${d18}»`)
   if (SHOTS) {
     await page.locator('[data-testid=offer-card]', { hasText: 'PO-1016' }).screenshot({ path: `${SHOTS}/offer-demand.png` })
     await page.locator('[data-testid=offer-card]', { hasText: 'PO-1020' }).screenshot({ path: `${SHOTS}/offer-no-demand.png` })
@@ -737,11 +1115,22 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   check(l18.level === 'unknown' && l20.level === 'unknown' && l20.text === 'Спрос: нет данных', `уровень без цифр и без темы — «нет данных»: ${l18.level}, ${JSON.stringify(l20)}`)
   check(await page.locator('[data-testid=offer-card]').count() === await page.locator('[data-testid=offer-demand-level]').count(), 'уровень — на каждой карточке')
   const d20 = await demandOf('PO-1020')
-  check(d20 === 'Темы спроса нет · Добавить тему', `темы нет — предложение добавить: «${d20}»`)
-  await page.locator('[data-testid=offers-demand-demand]').click()
+  // 22.11.2026: под темой — как такое ищут (разбор ИИ), пока DataForSEO не ответил
+  check(d20 === 'Темы спроса нет · Добавить тему Такое ищут как «похожие игрушки 1020» спрос ещё не проверен', `темы нет — предложение добавить, под ним — как такое ищут: «${d20}»`)
+  // «Высокий спрос» (18.11.2026) — уровень «высокий», как метка на фото. Тема с цифрами пока одна —
+  // делить на трети не на что, высокого нет ни у кого
+  await page.locator('[data-testid=offers-demand-high]').click()
   await painted(page)
-  const withDemand = await cards(page).locator('[data-testid=offer-name]').first().textContent().then(sp)
-  check(await cards(page).count() === 1 && withDemand === 'Игрушка PO-1016', `«Есть спрос» — только товары темы с цифрами: ${await cards(page).count()} — ${withDemand}`)
+  check(await cards(page).count() === 0 && sp(await page.locator('[data-testid=offers-empty]').innerText()).includes('Высокого спроса нет ни у одного товара'), '«Высокий спрос» при одной теме с цифрами — пусто, так и сказано')
+  // Ещё две темы с меньшим спросом: 2 400 у PO-1016 — верхняя треть
+  psql(`INSERT INTO public.market_demand_topics (name, kind, keywords, match_terms) VALUES ('Проверка спроса низкий', 'type', '{"проверка спроса po-1013"}', '{"po-1013"}'), ('Проверка спроса средний', 'type', '{"проверка спроса po-1014"}', '{"po-1014"}');
+INSERT INTO public.market_demand_keywords (keyword, search_volume) VALUES ('проверка спроса po-1013', 100), ('проверка спроса po-1014', 900);
+INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT k, m::date, v FROM (VALUES ('проверка спроса po-1013', 100), ('проверка спроса po-1014', 900)) x(k, v), generate_series('2026-08-01'::date, '2026-10-01', interval '1 month') m;`)
+  await reload(page)
+  check(await page.locator('[data-testid=offers-demand-high]').getAttribute('aria-pressed') === 'true', '«Высокий спрос» — запомнен')
+  const highNames = await cards(page).locator('[data-testid=offer-name]').evaluateAll(ns => ns.map(n => n.textContent.trim()))
+  const highLevels = await cards(page).locator('[data-testid=offer-demand-level]').evaluateAll(ls => ls.map(l => l.dataset.level))
+  check(highNames.length >= 1 && highNames[0] === 'Игрушка PO-1016' && highLevels.every(l => l === 'high') && !highNames.some(n => /PO-101[34]$/.test(n)), `«Высокий спрос» — только с меткой «высокий»: ${highNames.join(', ')}`)
   await page.locator('[data-testid=offers-demand-none]').click()
   await painted(page)
   const noneCount = await cards(page).count()
@@ -758,23 +1147,246 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   await page.goto(`${BASE}/admin/supplier-offers`, { waitUntil: 'networkidle', timeout: 120000 })
   await painted(page)
 
+  console.log('\n== примерный спрос: тема по смыслу')
+  // Разбор после сбора шёл без тем стража — у PO-1020 темы нет. Разобрать заново: ИИ видит «Проверка спроса средний»
+  const offer20 = psql(`SELECT id FROM public.supplier_offers WHERE channel_id = :'c' AND post_url LIKE '%/1020';`, { c: openId })
+  psql(`UPDATE public.supplier_offers SET demand_guess = NULL, guessed_at = NULL WHERE id = :'o';`, { o: offer20 })
+  await reload(page)
+  const guessLeft = sp(await page.locator('[data-testid=offers-guess-state]').textContent())
+  check(guessLeft === 'Не разобрано ИИ: 1 товар.' && await page.locator('[data-testid=offers-queries]').count() === 1 && sp(await page.locator('[data-testid=offers-guess-about]').textContent()).startsWith('По названию не ищут — примерный'), `разбора нет у одного товара — «${guessLeft}», кнопка «Подобрать запросы»`)
+  const guessedBefore = ai.guesses.length
+  await noToasts(page)
+  const reguessed = listed(page)
+  await page.locator('[data-testid=offers-queries]').click()
+  const guessToast = toastWith(page, 'ИИ разобрал').last()
+  await guessToast.waitFor({ timeout: 60000 })
+  await reguessed
+  await painted(page)
+  const lastGuess = ai.guesses.at(-1)
+  check(sp(await guessToast.textContent()) === 'ИИ разобрал: 1 товар' && ai.guesses.length === guessedBefore + 1 && lastGuess.items === 1 && lastGuess.topics >= 4 && !lastGuess.images, `разбор кнопкой — один запрос к модели, со списком тем, без фото: «${sp(await guessToast.textContent())}», тем ${lastGuess?.topics}`)
+  const meaningOf = article => page.locator('[data-testid=offer-card]', { hasText: article }).evaluate((el) => {
+    const t = s => el.querySelector(`[data-testid=${s}]`)?.textContent.replace(/\s+/g, ' ').trim()
+    return {
+      level: el.querySelector('[data-testid=offer-demand-level]')?.dataset.level,
+      source: el.querySelector('[data-testid=offer-demand-level]')?.dataset.source,
+      meaning: el.querySelector('[data-testid=offer-topic]')?.dataset.meaning,
+      topic: t('offer-topic-name'),
+      topicVolume: t('offer-demand-volume'),
+      guess: t('offer-guess-phrase'),
+      guessVolume: t('offer-guess-volume'),
+    }
+  })
+  const m20 = await meaningOf('PO-1020')
+  // Темы с цифрами 100, 900, 2 400 — 900 средний
+  check(m20.meaning === 'true' && m20.topic === 'Проверка спроса средний (подобрал ИИ)' && m20.topicVolume === '900 поисков в месяц' && m20.level === 'mid' && m20.source === 'meaning', `PO-1020 без признаков темы — тема по смыслу, уровень по ней: ${JSON.stringify(m20)}`)
+  check(m20.guess === '«похожие игрушки 1020»' && m20.guessVolume === 'спрос ещё не проверен', `и как такое ищут: ${m20.guess} — ${m20.guessVolume}`)
+  const m16 = await meaningOf('PO-1016')
+  check(!m16.meaning && m16.source === 'topic' && m16.topic === 'Проверка спроса' && m16.topicVolume === '2 400 поисков в месяц', `тема по признакам — как была, без «подобрал ИИ»: ${JSON.stringify(m16)}`)
+  await page.locator('[data-testid=offers-demand-none]').click()
+  await painted(page)
+  const noneNames = await cards(page).locator('[data-testid=offer-name]').evaluateAll(ns => ns.map(n => n.textContent.trim()))
+  check(noneNames.length > 0 && !noneNames.includes('Игрушка PO-1020'), `«Темы нет» — без товара с темой по смыслу: ${noneNames.length} карточек`)
+  await page.locator('[data-testid=offers-demand-all]').click()
+  await painted(page)
+  if (SHOTS)
+    await page.locator('[data-testid=offer-card]', { hasText: 'PO-1020' }).screenshot({ path: `${SHOTS}/offer-meaning.png` })
+
+  console.log('\n== точный спрос: запросы покупателя и DataForSEO')
+  // Запросы подобраны сами после сбора и «Прочитать»: текстом, без фото, пачками
+  const ownQueries = () => JSON.parse(psql(`SELECT json_build_object('with', count(*) FILTER (WHERE o.search_queries IS NOT NULL), 'read', count(*) FILTER (WHERE jsonb_typeof(o.read_items) = 'array' AND jsonb_array_length(o.read_items) > 0), 'sample', (SELECT o2.search_queries FROM public.supplier_offers o2 WHERE o2.post_url LIKE '%/1023' AND o2.channel_id = :'c' LIMIT 1)) FROM public.supplier_offers o JOIN public.supplier_channels c ON c.id = o.channel_id JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}') AND o.status = 'new';`, { c: openId }))
+  const q0 = ownQueries()
+  check(q0.with > 0 && q0.with >= q0.read && ai.queries.length > 0 && ai.queries.every(r => r.model === VISION && r.format === 'json_schema' && !r.images && r.items <= 40), `запросы подобраны у прочитанных: ${q0.with} из ${q0.read}, запросов к модели ${ai.queries.length}, без фото, по схеме`)
+  check(JSON.stringify(q0.sample) === JSON.stringify([['игрушка po 1023 точно', 'игрушка po 1023 купить'], ['набор b 2 точно', 'набор b 2 купить'], ['набор b 3 точно', 'набор b 3 купить'], ['набор b 4 точно', 'набор b 4 купить']]), `фразы по товарам поста, в их порядке, «кукла» одним словом — мимо: ${JSON.stringify(q0.sample)}`)
+  // Разбор ИИ (22.11.2026) — тоже сам после сбора: текстом, со списком тем, пачками
+  const ownGuess = () => JSON.parse(psql(`SELECT json_build_object('with', count(*) FILTER (WHERE o.demand_guess IS NOT NULL), 'read', count(*) FILTER (WHERE jsonb_typeof(o.read_items) = 'array' AND jsonb_array_length(o.read_items) > 0), 'sample', (SELECT o2.demand_guess FROM public.supplier_offers o2 WHERE o2.post_url LIKE '%/1023' AND o2.channel_id = :'c' LIMIT 1)) FROM public.supplier_offers o JOIN public.supplier_channels c ON c.id = o.channel_id JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}') AND o.status = 'new';`, { c: openId }))
+  const g0 = ownGuess()
+  check(g0.read > 0 && g0.with >= g0.read && ai.guesses.length > 0 && ai.guesses.every(r => r.model === VISION && r.format === 'json_schema' && !r.images && r.items <= 40 && r.topics > 0), `разбор ИИ у прочитанных: ${g0.with} из ${g0.read}, запросов к модели ${ai.guesses.length}, без фото, по схеме, со списком тем`)
+  check(JSON.stringify(g0.sample) === JSON.stringify(['1023', '2', '3', '4'].map(n => ({ query: `похожие игрушки ${n}`, topic: null }))), `разбор по товарам поста, в их порядке, строчными: ${JSON.stringify(g0.sample)}`)
+  const narrowLine = async () => sp(await page.locator('[data-testid=offers-narrow]').innerText())
+  const before = await narrowLine()
+  check(/Не проверено: \d+ запрос/.test(before) && await page.locator('[data-testid=offers-check-demand]').count() === 1 && sp(await page.locator('[data-testid=offers-check-demand]').innerText()).startsWith('Узнать спрос · ≈ $'), `до проверки — «${before}», кнопка «Узнать спрос» с ценой`)
+  check(await page.locator('[data-testid=offer-narrow]').count() === 0 && await page.locator('[data-testid=offer-topic]').count() > 0, 'пока DataForSEO не ответил — спрос по темам, как прежде')
+  // 21.11.2026, как на бою: цифра есть у одной фразы одного товара (пришла с «Новыми запросами»).
+  // Было: у всех остальных — «Спрос: нет данных», «Высокий спрос» пуст. Остальные — по своей теме
+  psql(`INSERT INTO public.market_demand_keywords (keyword, search_volume) VALUES ('игрушка po 1023 купить', 40);`)
+  await reload(page)
+  const partialLevel = article => page.locator('[data-testid=offer-card]', { hasText: article }).locator('[data-testid=offer-demand-level]').evaluate(e => e.dataset.level)
+  const p16 = await partialLevel('PO-1016')
+  const p13 = await partialLevel('PO-1013')
+  const p23 = await partialLevel('PO-1023')
+  check(p16 === 'high' && p13 === 'low' && p23 === 'mid', `одна проверенная фраза: у остальных — уровень темы (PO-1016 ${p16}, PO-1013 ${p13}), у товара с цифрой — по фразе (PO-1023 ${p23})`)
+  const partialCards = await page.locator('[data-testid=offer-card]').evaluateAll(els => els.map(el => ({
+    topicVolume: !!el.querySelector('[data-testid=offer-demand-volume]'),
+    level: el.querySelector('[data-testid=offer-demand-level]')?.dataset.level,
+  })))
+  const withTopic = partialCards.filter(c => c.topicVolume)
+  check(withTopic.length > 0 && withTopic.every(c => c.level !== 'unknown'), `у товаров с цифрами темы нет «нет данных»: ${withTopic.length} с темой, «нет данных» у ${withTopic.filter(c => c.level === 'unknown').length}`)
+  await page.locator('[data-testid=offers-demand-high]').click()
+  await painted(page)
+  const partialHigh = await cards(page).locator('[data-testid=offer-name]').evaluateAll(ns => ns.map(n => n.textContent.trim()))
+  check(partialHigh[0] === 'Игрушка PO-1016', `«Высокий спрос» не пуст — высокий по теме: ${partialHigh.join(', ')}`)
+  await page.locator('[data-testid=offers-demand-all]').click()
+  await painted(page)
+  psql(`DELETE FROM public.market_demand_keywords WHERE keyword = 'игрушка po 1023 купить';`)
+  await reload(page)
+  // Без ключа DataForSEO — отказ базы текстом
+  await noToasts(page)
+  await page.locator('[data-testid=offers-check-demand]').click()
+  await toastWith(page, 'Ключ DataForSEO не задан').waitFor({ timeout: 30000 })
+  check(!dfs.requests.length, 'без ключа — в DataForSEO не ходили, «Ключ DataForSEO не задан»')
+
+  psqlSuper(`ALTER ROLE authenticator IN DATABASE postgres SET app.market_demand_api = 'http://host.docker.internal:${DFS_PORT}';`)
+  gucSet = true
+  await restartRest()
+  if (!(await dfsPing()))
+    throw new Error('база не достучалась до заглушки DataForSEO через host.docker.internal')
+  psql(`SELECT vault.create_secret(:'s', 'dataforseo_credentials');`, { s: JSON.stringify({ login: DFS_LOGIN, password: DFS_PASSWORD }) })
+  const phrases = psql(`SELECT cardinality(public.supplier_offer_phrases(1000));`)
+  await noToasts(page)
+  const relisted = listed(page)
+  await page.locator('[data-testid=offers-check-demand]').click()
+  const doneToast = toastWith(page, 'DataForSEO ответил').last()
+  await doneToast.waitFor({ timeout: 200000 })
+  await relisted
+  await painted(page)
+  const sent = dfs.requests.filter(r => r.url === '/v3/keywords_data/google_ads/search_volume/live')
+  check(sent.length === 1 && sent[0].good && sent[0].task.location_code === 2398 && sent[0].task.language_code === 'ru' && sent[0].task.keywords.length === Number(phrases) && !sent[0].task.keywords.includes('кукла'), `одна задача search_volume по Казахстану: ${sent[0]?.task.keywords.length} фраз из ${phrases}, «кукла» не ушла`)
+  const sentWords = sent[0]?.task.keywords ?? []
+  const likeSent = sentWords.filter(k => k.startsWith('похожие игрушки ')).length
+  check(likeSent > 0 && sentWords.slice(0, likeSent).every(k => k.startsWith('похожие игрушки ')), `примерные запросы — в той же задаче, первыми: ${likeSent} из ${sentWords.length}`)
+  check(sp(await doneToast.textContent()) === `DataForSEO ответил: ${phrases} ${Number(phrases) % 10 === 1 && Number(phrases) % 100 !== 11 ? 'запрос' : [2, 3, 4].includes(Number(phrases) % 10) && ![12, 13, 14].includes(Number(phrases) % 100) ? 'запроса' : 'запросов'}`, `уведомление: «${sp(await doneToast.textContent())}»`)
+  const after = await narrowLine()
+  check(after.includes('Все запросы проверены') && await page.locator('[data-testid=offers-check-demand]').count() === 0, `после ответа — «${after}», кнопки нет`)
+  const narrowOf = article => page.locator('[data-testid=offer-card]', { hasText: article }).evaluate(el => ({
+    level: el.querySelector('[data-testid=offer-demand-level]')?.dataset.level,
+    phrase: el.querySelector('[data-testid=offer-narrow-phrase]')?.textContent.trim(),
+    volume: el.querySelector('[data-testid=offer-narrow-volume]')?.textContent.replace(/\s+/g, ' ').trim(),
+    topic: el.querySelector('[data-testid=offer-topic]')?.textContent.replace(/\s+/g, ' ').trim(),
+    more: el.querySelector('[data-testid=offer-narrow-more]')?.textContent.replace(/\s+/g, ' ').trim(),
+    items: [...el.querySelectorAll('[data-testid=offer-item-narrow]')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
+    source: el.querySelector('[data-testid=offer-demand-level]')?.dataset.source,
+    guess: ['offer-guess-phrase', 'offer-guess-volume'].map(s => el.querySelector(`[data-testid=${s}]`)?.textContent.replace(/\s+/g, ' ').trim()).join(' — '),
+  }))
+  const n16 = await narrowOf('PO-1016')
+  const n13 = await narrowOf('PO-1013')
+  const n18 = await narrowOf('PO-1018')
+  check(n16.level === 'high' && n16.phrase === '«игрушка po 1016 точно»' && n16.volume === '5 000 поисков в месяц' && n16.topic.startsWith('Тема «Проверка спроса»'), `PO-1016 — высокий по своей фразе, тема фоном: ${JSON.stringify(n16)}`)
+  const n23 = await narrowOf('PO-1023')
+  check(n16.more === 'ещё: «игрушка po 1016 купить» 5 000', `у товара — и другие фразы с цифрами: «${n16.more}»`)
+  check(JSON.stringify(n23.items) === JSON.stringify(['Ищут «набор b 2 точно» — 70 в месяц', 'Ищут «набор b 3 точно» — 70 в месяц']), `второй и третий товар поста — свой спрос: ${JSON.stringify(n23.items)}`)
+  check(n13.level === 'low' && n13.volume === '30 поисков в месяц', `PO-1013 — тема «средняя», а фраза — низкий: ${JSON.stringify(n13)}`)
+  // 22.11.2026: по названию не ищут (было — «спроса нет») — уровень по примерному запросу, 40 — нижняя треть своих
+  check(n18.level === 'low' && n18.source === 'type' && n18.volume === 'ищут слишком редко — цифр нет' && n18.guess === '«похожие игрушки 1018» — 40 поисков в месяц', `PO-1018 — по названию не ищут, уровень по примерному запросу: ${JSON.stringify(n18)}`)
+  check(n16.source === 'narrow' && n16.guess === '«похожие игрушки 1016» — 480 поисков в месяц', `у PO-1016 уровень по своей фразе, примерный — рядом: ${n16.guess}`)
+  if (SHOTS)
+    await page.locator('[data-testid=offer-card]', { hasText: 'PO-1018' }).screenshot({ path: `${SHOTS}/offer-type.png` })
+  await page.locator('[data-testid=offers-demand-high]').click()
+  await painted(page)
+  const hiNames = await cards(page).locator('[data-testid=offer-name]').evaluateAll(ns => ns.map(n => n.textContent.trim()))
+  const hiLevels = await cards(page).locator('[data-testid=offer-demand-level]').evaluateAll(ls => ls.map(l => l.dataset.level))
+  check(hiNames[0] === 'Игрушка PO-1016' && hiLevels.length > 0 && hiLevels.every(l => l === 'high') && !hiNames.some(n => /PO-101[38]$/.test(n)), `«Высокий спрос» — по фразам товара: ${hiNames.join(', ')}`)
+  if (SHOTS)
+    await page.screenshot({ path: `${SHOTS}/narrow-high-1366.png`, fullPage: true })
+  await page.locator('[data-testid=offers-demand-all]').click()
+  await painted(page)
+  if (SHOTS)
+    await page.screenshot({ path: `${SHOTS}/narrow-all-1366.png`, fullPage: true })
+  await noToasts(page)
+  const resend = await api('/api/admin/supplier-offers/demand', adminToken, {})
+  // Отказ «ключ не задан» выше — ожидаемый, не сбой страницы; ключ DataForSEO дальше не нужен («батарейки» ждут «ключа нет»)
+  failedResponses.splice(0, failedResponses.length, ...failedResponses.filter(r => r !== '400 /api/admin/supplier-offers/demand'))
+  psql(`DELETE FROM vault.secrets WHERE name = 'dataforseo_credentials';`)
+  check(resend.status === 400 && resend.json?.message?.startsWith('Проверять нечего') && sent.length === dfs.requests.filter(r => r.url.endsWith('/live')).length, `повторно — «проверять нечего», в DataForSEO не ходили: ${resend.status}`)
+
   console.log('\n== «На сайт»')
   const offerIdOf = m => psql(`SELECT id FROM public.supplier_offers WHERE channel_id = :'c' AND message_id = ${m};`, { c: openId })
+  // Не дождались — false, а не обрыв стража: на сборке без «Текстов для сайта» видно, какие проверки не прошли
+  const appeared = (locator, timeout = 30000) => locator.waitFor({ timeout }).then(() => true, () => false)
+  const textOf = async locator => (await locator.count()) ? sp(await locator.first().textContent()) : ''
+  const clickIf = async locator => (await locator.count()) > 0 && await locator.first().click().then(() => true)
   check(await page.locator('[data-testid=offer-card]', { hasText: 'PO-1023' }).locator('[data-testid=offer-to-site]').count() === 3, 'несколько товаров в посте — «На сайт» у каждого из показанных')
+  const unreadText = await api('/api/admin/content-writer/product', adminToken, { id: offerIdOf(1019), item: 0 })
+  check(unreadText.status === 409 && unreadText.json?.message?.startsWith('ИИ ещё не прочитал этот товар') && !ai.writes.length, `тексты для товара, которого ИИ в посте не нашёл, — 409, к модели не ходили: ${unreadText.status} «${unreadText.json?.message}»`)
+
   const dupId = psql(`INSERT INTO public.products (name, slug, price, sku) VALUES ('Проверка дубля', :'s', 100, 'PO-1014') RETURNING id;`, { s: `probe-offer-dup-${stamp}` }).split('\n')[0]
-  const form = await newPage({ width: 1366, height: 900 }, `/admin/products/new?offer=${offerIdOf(1014)}`)
+  // Ответ ИИ про PO-1014 придержан: пока модель пишет, SEO-описание правят руками — подстановка его не трогает
+  ai.hold = new Promise(r => ai.release = r)
+  const form = await newPage({ width: 1366, height: 900 }, `/admin/products/new?offer=${offerIdOf(1014)}`, false)
   await form.locator('[data-testid=draft-duplicate]').waitFor({ timeout: 30000 })
   check(sp(await form.locator('[data-testid=draft-duplicate]').textContent()).startsWith('Артикул PO-1014 уже есть на сайте: «Проверка дубля».') && await form.locator(`[data-testid=draft-duplicate] a[href="/admin/products/${dupId}"]`).count() === 1, 'артикул уже на сайте — предупреждение и ссылка на товар')
   check(await form.locator('#cost_price').inputValue() === '2500', `цена с фото — тоже в закупочную: ${await form.locator('#cost_price').inputValue()}`)
+  // ИИ — только по кнопке (26.11.2026): «будут ситуации, когда я не захочу добавлять такой товар, а токены были уже потрачены»
+  const start14 = form.locator('[data-testid=ai-writer-start]')
+  const idle14 = await appeared(start14)
+  await sleep(1500)
+  check(idle14 && await textOf(start14) === 'Сгенерировать' && (await textOf(form.locator('[data-testid=ai-writer]'))).includes('Токены тратятся, только когда нажмёте «Сгенерировать»') && !ai.writes.some(w => w.article === 'PO-1014'), `форма открылась — к модели не ходили, над формой «Сгенерировать»: запросов текстов ${ai.writes.filter(w => w.article === 'PO-1014').length}`)
+  if (SHOTS)
+    await form.locator('[data-testid=ai-writer]').screenshot({ path: `${SHOTS}/ai-writer-idle-1366.png` })
+  await clickIf(start14)
+  const writing = await appeared(form.locator('[data-testid=ai-writer-status]'))
+  check(writing && (await textOf(form.locator('[data-testid=ai-writer]'))).includes('ИИ пишет название и описание, подбирает раздел и бренд'), '«Сгенерировать» — ИИ пишет тексты, «Пишу…» над формой')
+  await form.locator('#seo_description').fill(OWN_SEO)
+  ai.release()
+  ai.hold = null
+  const t14 = TEXTS['PO-1014']
+  const wrote14 = await appeared(form.locator('[data-testid=ai-writer-filled]'))
+  const f14 = await form.evaluate(() => ({ name: document.querySelector('#name')?.value, description: document.querySelector('#description')?.value, seo: document.querySelector('#seo_description')?.value }))
+  const filled14 = await textOf(form.locator('[data-testid=ai-writer-filled]'))
+  check(wrote14 && filled14 === 'Подставлено в форму: название, описание, раздел, бренд.' && f14.name === t14.name && f14.description === t14.description && f14.seo === OWN_SEO, `SEO-описание, написанное, пока ИИ отвечал, — не затёрто, остальное подставлено: «${filled14}»`)
+  check(await textOf(form.locator('[data-testid=ai-writer-brand]')) === `Бренд: ${PROBE_BRAND}` && await form.getByRole('combobox').filter({ hasText: PROBE_BRAND }).count() === 1 && await form.locator('[data-testid=ai-brand]').count() === 0 && !ai.searches.length, 'бренд из списка сайта — выбран в форме, «Создать бренд» нет')
+  // Расход (24.11.2026): заглушка отвечает 1000 токенов мимо кеша, 4000 в кеш, 500 из кеша и 600 ответа —
+  // по ценам Sonnet 5.5 это $0,01805, по курсу заглушки 450 ₸ — 8,1 ₸
+  // Строки — блоками, без пробела между ними: textContent всей строки их склеивает, сверять по одной
+  const usageLines = async root => (await root.locator('[data-testid=ai-writer-usage] > span').allTextContents()).map(sp)
+  const SPENT_LINE = 'Расход: 6 100 токенов (запрос 5 500, ответ 600) ≈ 8,1 ₸ · $0,018'
+  const RATE_LINE = 'Курс Нацбанка на 23.11.2026: 450,00 ₸ за $'
+  // «Описания …: N токенов» — журнал модели описаний, вход вместе с кешем; денег в строке нет — они в остатке бюджета
+  const writerLineOk = (line, period) => {
+    const m = new RegExp(`^Описания \\(Claude Sonnet 5\\.5\\) ${period}: ([\\d ]+) токен[а-я]*$`).exec(line ?? '')
+    return !!m && Number(m[1].replace(/ /g, '')) === ai.textSpent.in + ai.textSpent.out
+  }
+  const lines14 = await usageLines(form)
+  check(lines14[0] === SPENT_LINE && lines14.at(-1) === RATE_LINE, `под ответом — расход в токенах, тенге и долларах и курс с датой — курс заглушки, не nationalbank.kz и не из кода: ${JSON.stringify([lines14[0], lines14.at(-1)])}`)
+  check(lines14.length === 4 && writerLineOk(lines14[1], 'за 30 дней') && lines14[2] === 'Бюджет ИИ не задан — задайте сумму на счёте Anthropic в «Умном закупе», карточка «Бюджет ИИ»: здесь будет видно, на сколько описаний хватит', `бюджета нет — всё на описания за 30 дней по журналу (${ai.textSpent.in}/${ai.textSpent.out}) и подсказка, где задать бюджет: ${JSON.stringify(lines14.slice(1, 3))}`)
+  // Ответ — у товара поставщика (26.11.2026): «контент, который был сгенерирован, должен сохраняться даже после перезагрузки»
+  const saved14 = await textOf(form.locator('[data-testid=ai-writer-saved]'))
+  const stored14 = JSON.parse(psql(`SELECT coalesce(written_texts->'0', 'null') FROM public.supplier_offers WHERE id = :'o';`, { o: offerIdOf(1014) }))
+  check(saved14 === 'Ответ сохранён — после перезагрузки страницы он вернётся без новых трат.' && stored14?.name === t14.name && stored14.description === t14.description && stored14.usage?.output === 600 && !('budget' in stored14) && !Number.isNaN(Date.parse(stored14.writtenAt)), `ответ сохранён у товара поставщика — тексты и расход, без остатка бюджета: «${saved14}» · ${stored14 ? Object.keys(stored14).join(',') : 'в базе пусто'}`)
+  const writes14 = ai.writes.filter(w => w.article === 'PO-1014').length
+  await form.reload({ waitUntil: 'networkidle' })
+  const back14 = await appeared(form.locator('[data-testid=ai-writer-filled]'))
+  await sleep(1000)
+  const r14 = await form.evaluate(() => ({ name: document.querySelector('#name')?.value, description: document.querySelector('#description')?.value, seo: document.querySelector('#seo_description')?.value }))
+  const savedBack = await textOf(form.locator('[data-testid=ai-writer-saved]'))
+  check(back14 && r14.name === t14.name && r14.description === t14.description && r14.seo === t14.seo_description && /^Написано \d\d\.\d\d в \d\d:\d\d — взято сохранённое, токены не потрачены\.$/.test(savedBack) && ai.writes.filter(w => w.article === 'PO-1014').length === writes14, `после перезагрузки — сохранённые тексты в форме, к модели не ходили: «${savedBack}», запросов текстов +${ai.writes.filter(w => w.article === 'PO-1014').length - writes14}`)
+  const back14Lines = await usageLines(form)
+  await form.setViewportSize({ width: 390, height: 844 })
+  const restoredPhone = await form.locator('[data-testid=ai-writer]').evaluate(el => el.scrollWidth <= el.clientWidth + 1 && el.getBoundingClientRect().right <= window.innerWidth + 0.5 && document.documentElement.scrollWidth <= window.innerWidth).catch(() => false)
+  check(restoredPhone, 'сохранённый ответ на телефоне 390 px — карточка в ширину экрана, без горизонтальной прокрутки')
+  if (SHOTS)
+    await form.locator('[data-testid=ai-writer]').screenshot({ path: `${SHOTS}/ai-writer-restored-390.png` })
+  await form.setViewportSize({ width: 1366, height: 900 })
+  check(await textOf(form.locator('[data-testid=ai-writer-filled]')) === 'Подставлено в форму: название, описание, SEO-описание, раздел, бренд.' && back14Lines.length === 2 && back14Lines[0] === SPENT_LINE.replace('Расход:', 'Расход тогда:') && back14Lines[1] === RATE_LINE && await textOf(form.locator('[data-testid=ai-writer-retry]')) === 'Написать заново' && await form.locator('[data-testid=ai-writer-start]').count() === 0, `у сохранённого — расход того раза без остатка бюджета, «Написать заново»: ${JSON.stringify(back14Lines)}`)
   await form.context().close()
+
+  // Бюджет ИИ на время второго описания (24.11.2026) — строка «осталось»; батарейке ниже нужен «не задан», после проверки убрать
+  const almatyToday = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Almaty' }).format(new Date())
+  const todayWords = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Almaty', day: 'numeric', month: 'long' }).format(new Date())
+  psql(`INSERT INTO public.ai_settings (key, value) VALUES ('ai_budget', '{"usd": 1, "since": "${almatyToday}", "resetDay": null}');`)
 
   // Клик со страницы, а не переход по адресу: ссылка ведёт куда надо
   await page.route('**/api/seo/notify-indexing', r => r.fulfill({ json: { success: true, indexnow: { submitted: false, urls_count: 0 }, yandex_ping: { submitted: false }, bing_ping: { submitted: false } } }))
   await page.locator('[data-testid=offer-card]', { hasText: 'PO-1013' }).locator('[data-testid=offer-to-site]').click()
   await page.waitForURL(u => u.pathname === '/admin/products/new' && u.searchParams.get('offer') === offerIdOf(1013), { timeout: 30000 })
-  await page.waitForFunction(() => document.querySelector('#name')?.value === 'Игрушка PO-1013', null, { timeout: 30000 })
+  const t13 = TEXTS['PO-1013']
+  await appeared(page.locator('[data-testid=ai-writer-start]'))
+  await clickIf(page.locator('[data-testid=ai-writer-start]'))
+  const wrote13 = await appeared(page.locator('[data-testid=ai-writer-filled]'))
   await page.locator('img[src^="blob:"]').first().waitFor({ timeout: 30000 })
   const filled = await page.evaluate(() => ({
+    name: document.querySelector('#name')?.value,
+    description: document.querySelector('#description')?.value,
+    seo: document.querySelector('#seo_description')?.value,
     sku: document.querySelector('#sku')?.value,
     slug: document.querySelector('#slug')?.value,
     cost: document.querySelector('#cost_price')?.value,
@@ -782,17 +1394,207 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
     photos: document.querySelectorAll('img[src^="blob:"]').length,
   }))
   const supplierShown = await page.getByRole('combobox').filter({ hasText: SUPPLIER_OPEN }).count()
-  check(filled.sku === 'PO-1013' && filled.slug && filled.cost === '1013' && supplierShown === 1, `форма — название, артикул, закупочная цена, поставщик: ${filled.sku} · ${filled.cost} · поставщик ${supplierShown ? 'выбран' : 'нет'} · слаг ${filled.slug}`)
+  check(wrote13 && filled.name === t13.name && filled.description === t13.description && filled.seo === t13.seo_description, `ИИ — название, описание и SEO-описание в форме: «${filled.name}»`)
+  const category13 = await textOf(page.locator('[data-testid=ai-writer-category]'))
+  check(await textOf(page.locator('[data-testid=ai-writer-filled]')) === 'Подставлено в форму: название, описание, SEO-описание, раздел.' && category13 === `Раздел: ${CATEGORY_PATH}` && await page.getByRole('combobox').filter({ hasText: CATEGORY_CHILD }).count() === 1, `раздел — по номеру из списка сайта, выбран в форме: «${category13}»`)
+  check(filled.sku === 'PO-1013' && filled.slug && filled.cost === '1013' && supplierShown === 1, `форма — артикул, закупочная цена, поставщик: ${filled.sku} · ${filled.cost} · поставщик ${supplierShown ? 'выбран' : 'нет'} · слаг ${filled.slug}`)
   check(filled.photos >= 1 && filled.price === '0', `фото поста — в галерее (${filled.photos}), розничная цена не подставлена: ${filled.price}`)
   check(sp(await page.locator('[data-testid=draft-source]').textContent()).startsWith(`Из поста поставщика — ${SUPPLIER_OPEN}`) && await page.locator('[data-testid=draft-duplicate]').count() === 0, 'над формой — откуда товар; дубля нет')
+  const w13 = ai.writes.find(w => w.article === 'PO-1013')
+  check(w13?.model === WRITER && w13.effort === 'low' && w13.format === 'json_schema' && w13.fields === 'name,description,seo_description,category,brand,new_brand' && w13.cache === 'ephemeral', `запрос — ${WRITER}, низкий уровень рассуждений, ответ по схеме, правила в кеше: ${JSON.stringify(w13 && { model: w13.model, effort: w13.effort, format: w13.format, cache: w13.cache })}`)
+  check(w13?.rules && !w13.clipboardAnswer && w13.listed, 'в промпте — правила и задание кнопки «Скопировать промпт», без строк «Имя поля:», со списками разделов и брендов сайта')
+  check(JSON.stringify(w13?.images) === '["base64 image/png как отдано"]' && w13.data.includes('- Код модели (артикул с коробки): PO-1013') && !/₸|Цена \d/.test(w13.data), `модели — фото поста из бакета и подпись без цены: ${JSON.stringify(w13?.images)}`)
+  check(ai.writerRetrieved <= 1, `справка о модели текстов — не больше одной на сервер: ${ai.writerRetrieved}`)
+  const lines13 = await usageLines(page)
+  check(ai.rates <= 1 && lines13[0] === SPENT_LINE && lines13.at(-1) === RATE_LINE, `курс — не больше одного запроса за день на сервер (${ai.rates}), расход второго описания — той же строкой`)
+  // Ждём: $1 минус весь журнал с сегодняшнего дня по ценам Haiku 5.5 и Sonnet 5.5. Описаний — по цене после перерыва:
+  // 4 500 токенов начала запроса пишутся в кеш заново — $0,01925; подряд они читаются из кеша — $0,00845
+  const AFTER_PAUSE = 0.01925
+  const IN_ROW = 0.00845
+  const CACHE_LINE = 'Описание после перерыва больше 5 минут ≈ 8,7 ₸, а подряд ≈ 3,8 ₸ — ИИ ещё помнит правила, разделы и бренды сайта'
+  const PRICES = { 'anthropic/claude-haiku-5-5': [0.1, 0.5], 'anthropic/claude-sonnet-5-5': [2, 10] }
+  const journal = JSON.parse(psql(`SELECT coalesce(json_agg(json_build_object('m', model, 'i', input_tokens, 'o', output_tokens)), '[]') FROM public.ai_usage_daily WHERE day >= '${almatyToday}';`))
+  const rest = 1 - journal.reduce((sum, r) => sum + (r.i * (PRICES[r.m]?.[0] ?? Number.NaN) + r.o * (PRICES[r.m]?.[1] ?? Number.NaN)) / 1e6, 0)
+  const left13 = /^Бюджет ИИ: осталось ≈ ([\d ]+) ₸ \(\$0,(\d{3}) из \$1,00\) — примерно на (\d+) (?:такое описание|таких описани[йя]), подряд — на ([\d ]+)$/.exec(lines13[2] ?? '')
+  check(lines13.length === 5 && writerLineOk(lines13[1], `с ${todayWords}`) && left13 && Math.abs(Number(left13[1].replace(/ /g, '')) - rest * 450) <= 0.6 && Math.abs(Number(`0.${left13[2]}`) - rest) < 0.0006 && Number(left13[3]) === Math.floor(rest / AFTER_PAUSE) && Number(left13[4].replace(/ /g, '')) === Math.floor(rest / IN_ROW) && lines13[3] === CACHE_LINE, `бюджет $1 — на описания с сегодняшнего дня, осталось ≈ $${rest.toFixed(3)} по журналу (${journal.map(r => r.m.split('/')[1]).join(', ')}): ${Math.floor(rest / AFTER_PAUSE)} описаний после перерыва, ${Math.floor(rest / IN_ROW)} подряд и строка цен: ${JSON.stringify(lines13.slice(1, 4))}`)
+  psql(`DELETE FROM public.ai_settings WHERE key = 'ai_budget';`)
+
+  console.log('\n== бренда на сайте нет — заполняется вручную')
+  const brandLine = await textOf(page.locator('[data-testid=ai-writer-brand]'))
+  const brandBox = await textOf(page.locator('[data-testid=ai-brand]'))
+  const createBrand = page.locator('[data-testid=ai-brand-create]')
+  check(brandLine === `Бренд: «${NEW_BRAND}» — такого на сайте нет` && brandBox.includes('ИИ бренды в интернете не ищет') && await textOf(createBrand) === `Создать бренд «${NEW_BRAND}»`, `бренд с коробки, которого на сайте нет, — назван, рядом «Создать бренд»: «${brandLine}» · «${brandBox.slice(0, 120)}»`)
+  // Дать карточке время: прежняя сборка сама шла искать бренд
+  await sleep(1500)
+  check(!ai.searches.length && ai.writes.filter(w => w.article === 'PO-1013').length === 1, `в интернете бренд не ищется — запросов поиска и страницы бренда: ${ai.searches.length}, текстов: ${ai.writes.filter(w => w.article === 'PO-1013').length}`)
+  if (SHOTS)
+    await page.locator('[data-testid=ai-writer]').screenshot({ path: `${SHOTS}/ai-writer-1366.png` })
+  // Телефон: карточка с кнопкой «Создать бренд» — в ширину экрана
+  await page.setViewportSize({ width: 390, height: 844 })
+  const phoneCard = await page.locator('[data-testid=ai-writer]').evaluate((el) => {
+    const button = el.querySelector('[data-testid=ai-brand-create]')?.getBoundingClientRect()
+    return { fits: el.scrollWidth <= el.clientWidth + 1 && el.getBoundingClientRect().right <= window.innerWidth + 0.5, page: document.documentElement.scrollWidth <= window.innerWidth, button: Boolean(button) && button.right <= el.getBoundingClientRect().right + 0.5 }
+  }).catch(() => ({}))
+  check(phoneCard.fits && phoneCard.page && phoneCard.button, `«Тексты от ИИ» на телефоне 390 px — карточка и «Создать бренд» в ширину экрана, страница без горизонтальной прокрутки: ${JSON.stringify(phoneCard)}`)
+  if (SHOTS)
+    await page.locator('[data-testid=ai-writer]').screenshot({ path: `${SHOTS}/ai-writer-390.png` })
+  await page.setViewportSize({ width: 1366, height: 900 })
+  // «Создать бренд» — окно формы с названием от ИИ и слагом; страницу бренда человек пишет сам — «Промпт для нейросети» в окне
+  await clickIf(createBrand)
+  const brandDialog = page.getByRole('dialog')
+  const prefilled = await appeared(brandDialog.locator('#brand-slug'), 10000)
+    ? { name: await brandDialog.locator('#brand-name').inputValue(), slug: await brandDialog.locator('#brand-slug').inputValue(), prompt: await brandDialog.getByRole('button', { name: 'Промпт для нейросети' }).count() }
+    : null
+  check(prefilled?.name === NEW_BRAND && prefilled.slug === 'probetoys' && prefilled.prompt === 1, `«Создать бренд» — окно бренда с названием от ИИ и слагом, «Промпт для нейросети» в нём: ${JSON.stringify(prefilled)}`)
+  await brandDialog.getByRole('button', { name: 'Сохранить бренд' }).click({ timeout: 10000 }).catch(() => {})
+  const brandMade = await appeared(page.locator('[data-testid=ai-brand]', { hasText: 'создан и выбран в форме' }))
+  // Окно уходит с анимацией — ждать, пока его не станет
+  await page.getByRole('dialog').first().waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+  const madeState = { card: await textOf(page.locator('[data-testid=ai-brand]')), picked: await page.locator('button[role=combobox]').filter({ hasText: NEW_BRAND }).count(), dialogs: await page.getByRole('dialog').count(), left: (await textOf(page.getByRole('dialog'))).slice(0, 80) }
+  check(brandMade && madeState.card === `Бренд «${NEW_BRAND}» создан и выбран в форме.` && madeState.picked === 1 && !madeState.dialogs, `бренд сохранён в окне — выбран в форме, карточка говорит «создан и выбран»: ${JSON.stringify(madeState)}`)
+  // Перезагрузка (26.11.2026): сохранённый ответ называл бренд «новым» — теперь он есть, выбран и уходит в товар
+  const writes13 = ai.writes.filter(w => w.article === 'PO-1013').length
+  await page.reload({ waitUntil: 'networkidle' })
+  const back13 = await appeared(page.locator('[data-testid=ai-writer-filled]'))
+  await page.locator('img[src^="blob:"]').first().waitFor({ timeout: 30000 }).catch(() => {})
+  const brandBack = await textOf(page.locator('[data-testid=ai-writer-brand]'))
+  check(back13 && brandBack === `Бренд: ${NEW_BRAND}` && await page.locator('[data-testid=ai-brand]').count() === 0 && await page.locator('button[role=combobox]').filter({ hasText: NEW_BRAND }).count() === 1 && await page.locator('#name').inputValue() === t13.name && ai.writes.filter(w => w.article === 'PO-1013').length === writes13, `после перезагрузки бренд, созданный кнопкой, — уже не «новый» и выбран, тексты на месте, к модели не ходили: «${brandBack}»`)
   await page.locator('#price').fill('1990')
   await page.getByRole('button', { name: 'Создать товар' }).click()
   await page.waitForURL(u => u.pathname === '/admin/products', { timeout: 60000 })
-  const made = JSON.parse(psql(`SELECT json_build_object('n', count(*), 'cost', max(cost_price), 'price', max(price), 'supplier', max(supplier_id::text), 'images', (SELECT count(*) FROM public.product_images i JOIN public.products p ON p.id = i.product_id WHERE p.sku = 'PO-1013' AND p.name = 'Игрушка PO-1013')) FROM public.products WHERE sku = 'PO-1013' AND name = 'Игрушка PO-1013';`))
+  const brandRow = JSON.parse(psql(`SELECT coalesce((SELECT json_build_object('id', id, 'slug', slug, 'logo', logo_url) FROM public.brands WHERE name = :'n'), 'null');`, { n: NEW_BRAND }))
+  check(brandRow?.slug === 'probetoys' && brandRow.logo === null, `бренд, созданный в окне, — в базе с названием от ИИ и слагом: ${brandRow ? brandRow.slug : 'бренда нет'}`)
+  const made = JSON.parse(psql(`SELECT json_build_object('n', count(*), 'cost', max(cost_price), 'price', max(price), 'supplier', max(supplier_id::text), 'category', max(category_id::text), 'brand', max(brand_id::text), 'description', max(description), 'seo', max(seo_description), 'images', (SELECT count(*) FROM public.product_images i JOIN public.products p ON p.id = i.product_id WHERE p.sku = 'PO-1013' AND p.name = :'n')) FROM public.products WHERE sku = 'PO-1013' AND name = :'n';`, { n: t13.name }))
   const supplierOpenId = psql(`SELECT id FROM public.suppliers WHERE name = '${SUPPLIER_OPEN}';`)
   check(made.n === 1 && Number(made.cost) === 1013 && Number(made.price) === 1990 && made.supplier === supplierOpenId && made.images === 1, `товар создан: закупочная ${made.cost}, розничная ${made.price}, поставщик свой, фото ${made.images}`)
+  check(made.category === categoryId && Boolean(made.brand) && made.brand === brandRow?.id && made.description === t13.description && made.seo === t13.seo_description, `у товара — раздел, новый бренд и тексты ИИ: раздел ${made.category === categoryId ? 'свой' : made.category}, бренд ${made.brand && made.brand === brandRow?.id ? 'новый' : made.brand}`)
   check(psql(`SELECT status FROM public.supplier_offers WHERE id = '${offerIdOf(1013)}';`) === 'added', 'у поставщика товар отмечен «Добавлен»')
+  // С 26.11.2026 созданный из «На сайт» ложится в формирующийся заказ своему поставщику и скрыт до приёмки («Поставки»)
+  const drafted = JSON.parse(psql(`SELECT json_build_object('active', p.is_active, 'qty', (SELECT i.quantity FROM public.supplier_order_items i JOIN public.supplier_orders o ON o.id = i.order_id WHERE i.product_id = p.id AND o.status = 'draft' AND o.supplier_id = p.supplier_id)) FROM public.products p WHERE p.sku = 'PO-1013' AND p.name = :'n';`, { n: t13.name }))
+  check(drafted.active === false && drafted.qty === 5, `товар — в формирующемся заказе поставщику (${drafted.qty} шт.) и скрыт с сайта до приёмки`)
   await page.unroute('**/api/seo/notify-indexing')
+
+  console.log('\n== «Тексты для сайта»: отказ модели и «Написать заново»')
+  const f24 = await newPage({ width: 1366, height: 900 }, `/admin/products/new?offer=${offerIdOf(1024)}`)
+  const t24 = TEXTS['PO-1024']
+  await appeared(f24.locator('[data-testid=ai-writer-start]'))
+  await clickIf(f24.locator('[data-testid=ai-writer-start]'))
+  const refused = await appeared(f24.locator('[data-testid=ai-writer-error]'))
+  check(refused && await textOf(f24.locator('[data-testid=ai-writer-error]')) === 'Модель отказалась писать текст для этого товара — заполните вручную' && await f24.locator('#name').inputValue() === 'Игрушка PO-1024' && await textOf(f24.locator('[data-testid=ai-writer-retry]')) === 'Повторить', 'отказ модели — причина над формой, в форме прочитанное с фото, кнопка «Повторить»')
+  await clickIf(f24.locator('[data-testid=ai-writer-retry]'))
+  const retried = await appeared(f24.locator('[data-testid=ai-writer-filled]'))
+  check(retried && await f24.locator('#name').inputValue() === t24.name && await textOf(f24.locator('[data-testid=ai-writer-category]')) === 'Раздел: ИИ не подобрал — выберите в форме', '«Повторить» — тексты в форме; раздела не подобрал — «выберите в форме»')
+  check(await textOf(f24.locator('[data-testid=ai-writer-brand]')) === `Бренд: «${FACTORY_BRAND}» — такого на сайте нет` && await f24.locator('[data-testid=ai-brand-create]').count() === 1 && !ai.searches.length, 'и этот бренд — «Создать бренд», в интернете не ищется')
+  const writesBefore = ai.writes.length
+  await clickIf(f24.locator('[data-testid=ai-writer-retry]'))
+  for (let i = 0; i < 100 && ai.writes.length === writesBefore; i++)
+    await sleep(100)
+  const rewrote = await appeared(f24.locator('[data-testid=ai-writer-filled]'))
+  await sleep(1000)
+  check(rewrote && ai.writes.length === writesBefore + 1 && !ai.searches.length, `«Написать заново» — тексты заново одним запросом, без поиска: запросов текстов +${ai.writes.length - writesBefore}, поиска ${ai.searches.length}`)
+
+  // Форма товара (24.11.2026): выбор и поиск бренда и линейки. Было: Command держал выбранный пункт в той же
+  // ref, что и поиск, — после выбора список сужался до одного бренда, окно «Создать…» получало прошлый
+  // выбор вместо набранного, а слаг в окне оставался пустым («Сохранить» — «обязательные поля»)
+  console.log('\n== форма товара: выбор и создание бренда и линейки')
+  // Список закрылся: ни списка, ни его обёртки — PopoverContent тоже role=dialog
+  const listGone = () => f24.locator('[role=listbox]').first().waitFor({ state: 'detached', timeout: 3000 }).then(() => true, () => false)
+  await f24.locator('button[role=combobox]').filter({ hasText: 'Выберите бренд' }).click()
+  const brandOptions = f24.locator('[role=option]')
+  await appeared(brandOptions.first(), 10000)
+  const optionsBefore = await brandOptions.count()
+  await brandOptions.filter({ hasText: PROBE_BRAND }).first().click()
+  // Было: выбранный пункт оставлял список открытым — закрывался он только кликом мимо
+  const brandListClosed = await listGone()
+  check(brandListClosed && await f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }).count() === 1, `выбранный бренд — в поле, список брендов закрылся: ${brandListClosed ? 'закрыт' : 'открыт'}`)
+  // Открытый заново список — все бренды, а не один выбранный (не закрылся — считать в нём же)
+  await sleep(500)
+  if (brandListClosed)
+    await f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }).click()
+  await appeared(brandOptions.first(), 10000)
+  const optionsAfter = await brandOptions.count()
+  check(optionsBefore >= 3 && optionsAfter === optionsBefore, `список брендов после выбора не сужается до выбранного: пунктов ${optionsBefore} → ${optionsAfter}`)
+  // Кнопку окна можно нажать: прокруткой окна она доходит до экрана, и сверху её ничто не закрывает
+  const reachable = async (button) => {
+    await button.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {})
+    return button.evaluate((b) => {
+      const r = b.getBoundingClientRect()
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+      return r.top >= 0 && r.bottom <= window.innerHeight && Boolean(hit && (hit === b || b.contains(hit)))
+    }).catch(() => false)
+  }
+  const typedIn = async (trigger, placeholder, value, create, nameId, slugId, save) => {
+    if (!await f24.getByPlaceholder(placeholder).count())
+      await trigger.click()
+    await f24.getByPlaceholder(placeholder).fill(value)
+    // Не нажалось — проверка ниже скажет «null», а не оборвёт страж
+    await f24.getByText(create).first().click({ timeout: 10000 }).catch(() => {})
+    const dialog = f24.getByRole('dialog')
+    // Ширина окна: содержимое не шире окна, окно и его кнопки и поля — в экране
+    const width = () => dialog.filter({ has: f24.locator(slugId) }).evaluate((d) => {
+      const r = d.getBoundingClientRect()
+      const out = [...d.querySelectorAll('button, input, textarea, h2')].map(el => el.getBoundingClientRect()).filter(b => b.width > 0 && (b.right > r.right + 0.5 || b.left < r.left - 0.5)).length
+      return { fits: d.scrollWidth <= d.clientWidth + 1 && r.left >= 0 && r.right <= window.innerWidth + 0.5 && !out, wide: `${d.scrollWidth}/${d.clientWidth}`, out }
+    }).catch(() => ({ fits: false }))
+    const opened = await appeared(dialog.locator(slugId), 10000)
+    // Список под окном закрылся, а курсор остался в окне: список, уходя, возвращает фокус своей кнопке за окном
+    const listClosed = opened && await listGone()
+    await sleep(300)
+    const focus = await f24.evaluate(sel => Boolean(document.activeElement?.closest('[role=dialog]')?.querySelector(sel)), slugId)
+    const shown = opened
+      ? { name: await dialog.locator(nameId).inputValue(), slug: await dialog.locator(slugId).inputValue(), listClosed, focus, ...await width(), save: await reachable(dialog.getByRole('button', { name: save })) }
+      : null
+    // Окно и список уходят с анимацией и потом возвращают фокус своей кнопке: список, открытый раньше, тут же
+    // закрылся бы, а закрытый бывает, что открывается снова (телефон) — закрывать по одному, пока не уйдёт всё
+    for (let i = 0; i < 6 && await f24.locator('[role=dialog], [role=listbox]').count(); i++) {
+      await f24.keyboard.press('Escape')
+      await f24.locator('[role=dialog], [role=listbox]').first().waitFor({ state: 'detached', timeout: 2000 }).catch(() => {})
+      await sleep(500)
+    }
+    return shown
+  }
+  const newBrandForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }), 'Поиск или создание бренда...', TYPED_BRAND, '➕ Создать новый бренд', '#brand-name', '#brand-slug', 'Сохранить бренд')
+  check(newBrandForm?.name === TYPED_BRAND && newBrandForm.slug === 'probe-typed-brand', `«➕ Создать новый бренд» — набранное название и слаг по нему: ${JSON.stringify(newBrandForm)}`)
+  check(newBrandForm?.save === true, `окно бренда выше экрана прокручивается — «Сохранить бренд» можно нажать: ${JSON.stringify(newBrandForm)}`)
+  check(newBrandForm?.listClosed === true && newBrandForm.focus === true, `«➕ Создать новый бренд» — список брендов закрылся, курсор в окне: ${JSON.stringify({ listClosed: newBrandForm?.listClosed, focus: newBrandForm?.focus })}`)
+  const newLineForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: 'Выберите линейку' }), 'Поиск или создание линейки...', TYPED_LINE, '➕ Создать новую линейку', '#line-name', '#line-slug', 'Сохранить линейку')
+  check(newLineForm?.name === TYPED_LINE && newLineForm.slug === 'probe-typed-line', `«➕ Создать новую линейку» — набранное название и слаг по нему: ${JSON.stringify(newLineForm)}`)
+  check(newLineForm?.save === true, `«Сохранить линейку» в окне можно нажать: ${JSON.stringify(newLineForm)}`)
+  check(newLineForm?.listClosed === true && newLineForm.focus === true, `«➕ Создать новую линейку» — список линеек закрылся, курсор в окне: ${JSON.stringify({ listClosed: newLineForm?.listClosed, focus: newLineForm?.focus })}`)
+  // Выбор в списке линеек тоже закрывает его
+  await f24.locator('button[role=combobox]').filter({ hasText: 'Выберите линейку' }).click()
+  await appeared(f24.locator('[role=option]').first(), 10000)
+  await f24.locator('[role=option]').filter({ hasText: 'Без линейки' }).first().click()
+  const lineListClosed = await listGone()
+  check(lineListClosed, `выбор в списке линеек закрывает список: ${lineListClosed ? 'закрыт' : 'открыт'}`)
+  for (let i = 0; i < 6 && await f24.locator('[role=dialog], [role=listbox]').count(); i++) {
+    await f24.keyboard.press('Escape')
+    await f24.locator('[role=dialog], [role=listbox]').first().waitFor({ state: 'detached', timeout: 2000 }).catch(() => {})
+    await sleep(500)
+  }
+  // Телефон. Было: колонку сетки окна бренда распирала неразрывная строка формы — окно 356 px, содержимое 457,
+  // «Промпт для нейросети» уезжала за край
+  await f24.setViewportSize({ width: 390, height: 844 })
+  const phoneBrandForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: PROBE_BRAND }), 'Поиск или создание бренда...', TYPED_BRAND, '➕ Создать новый бренд', '#brand-name', '#brand-slug', 'Сохранить бренд')
+  check(phoneBrandForm?.fits === true && phoneBrandForm.save === true, `окно бренда на телефоне 390 px — в ширину экрана, «Сохранить бренд» можно нажать: ${JSON.stringify(phoneBrandForm)}`)
+  const phoneLineForm = await typedIn(f24.locator('button[role=combobox]').filter({ hasText: 'Выберите линейку' }), 'Поиск или создание линейки...', TYPED_LINE, '➕ Создать новую линейку', '#line-name', '#line-slug', 'Сохранить линейку')
+  check(phoneLineForm?.fits === true && phoneLineForm.save === true, `окно линейки на телефоне 390 px — в ширину экрана: ${JSON.stringify(phoneLineForm)}`)
+  check(psql(`SELECT (SELECT count(*) FROM public.brands WHERE name = :'b') + (SELECT count(*) FROM public.product_lines WHERE name = :'l');`, { b: TYPED_BRAND, l: TYPED_LINE }) === '0', 'окна закрыты без сохранения — ни бренда, ни линейки не создано')
+  // Страница правки бренда на телефоне. Было: строка «SEO оптимизация» без переноса — «Сгенерировать» уезжала
+  // за правый край (до 550 px при ширине 390), а прокрутки вбок у страницы нет
+  await f24.goto(`${BASE}/admin/brands/${probeBrandId}`, { waitUntil: 'networkidle', timeout: 120000 })
+  const seoRow = f24.locator('h3', { hasText: 'SEO оптимизация' }).locator('xpath=..')
+  const measureRow = row => row.evaluate((el) => {
+    const buttons = [...el.querySelectorAll('button')].map(b => b.getBoundingClientRect())
+    return { buttons: buttons.length, fits: el.scrollWidth <= el.clientWidth + 1 && buttons.every(b => b.left >= 0 && b.right <= window.innerWidth + 0.5), rights: buttons.map(b => Math.round(b.right)) }
+  }).catch(() => null)
+  const rowWidth = await appeared(seoRow, 30000) ? await measureRow(seoRow) : null
+  check(rowWidth?.fits === true && rowWidth.buttons >= 2, `страница бренда на телефоне 390 px — кнопки строки «SEO оптимизация» на экране: ${JSON.stringify(rowWidth)}`)
+  await f24.context().close()
+  // Отказ модели выше — ожидаемый ответ, а не сбой страницы
+  failedResponses.splice(0, failedResponses.length, ...failedResponses.filter(r => r !== '502 /api/admin/content-writer/product'))
+  const textUsage = JSON.parse(psql(`SELECT json_build_object('rows', count(*), 'in', coalesce(sum(input_tokens), 0), 'out', coalesce(sum(output_tokens), 0), 'posts', coalesce(sum(posts), 0)) FROM public.ai_usage_daily WHERE model = 'anthropic/${WRITER}';`))
+  check(textUsage.rows === 1 && textUsage.posts === 0 && ai.textSpent.in > 0 && textUsage.in === ai.textSpent.in && textUsage.out === ai.textSpent.out, `журнал расхода — тексты и отказ модели своей строкой, вход вместе с кешем, постов не прибавляют: ${textUsage.in}/${textUsage.out}, заглушка отдала ${ai.textSpent.in}/${ai.textSpent.out}`)
 
   console.log('\n== заказ поставщику')
   await page.goto(`${BASE}/admin/supplier-offers`, { waitUntil: 'networkidle', timeout: 120000 })
@@ -864,9 +1666,13 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
     const t = s => el?.querySelector(`[data-testid=${s}]`)?.textContent.replace(/\s+/g, ' ').trim() ?? null
     return { state: el?.dataset.state, value: t('battery-value'), reset: t('battery-reset'), note: t('battery-note'), width: el?.querySelector('[data-testid=battery-bar]')?.style.width, now: el?.querySelector('[role=meter]')?.getAttribute('aria-valuenow') }
   }, id)
-  const usage = JSON.parse(psql(`SELECT json_build_object('posts', coalesce(sum(posts), 0), 'in', coalesce(sum(input_tokens), 0), 'out', coalesce(sum(output_tokens), 0), 'rows', count(*)) FROM public.ai_usage_daily;`))
+  const usage = JSON.parse(psql(`SELECT json_build_object('posts', coalesce(sum(posts), 0), 'in', coalesce(sum(input_tokens), 0), 'out', coalesce(sum(output_tokens), 0), 'rows', count(*)) FROM public.ai_usage_daily WHERE model = 'anthropic/${VISION}';`))
+  // «Тексты для сайта» (23.11) — своей строкой по Sonnet 5.5, сверена выше
+  const texts = JSON.parse(psql(`SELECT json_build_object('in', coalesce(sum(input_tokens), 0), 'out', coalesce(sum(output_tokens), 0)) FROM public.ai_usage_daily WHERE model = 'anthropic/${WRITER}';`))
   const readNow = Number(psql(`SELECT count(*) FROM public.supplier_offers WHERE read_items IS NOT NULL;`))
-  check(usage.posts === readNow && usage.in === readNow * 2000 && usage.out === readNow * 300 && usage.rows === 1, `журнал расхода — все удачные чтения, одной строкой за день: ${usage.posts} из ${readNow}, токены ${usage.in}/${usage.out}`)
+  // Подбор запросов покупателя (18.11) и разбор ИИ (22.11) — в тот же журнал, постов не прибавляют:
+  // 800/400 и 600/200 токенов на запрос заглушки
+  check(usage.posts === readNow && usage.in === readNow * 2000 + ai.queries.length * 800 + ai.guesses.length * 600 && usage.out === readNow * 300 + ai.queries.length * 400 + ai.guesses.length * 200 && usage.rows === 1, `журнал расхода — все удачные чтения, подборы запросов (${ai.queries.length}) и разборы (${ai.guesses.length}), одной строкой за день: ${usage.posts} из ${readNow}, токены ${usage.in}/${usage.out}`)
   const lim = await battery('ai_limits')
   check(lim.state === 'ok' && lim.value === '40 000 из 50 000 токенов входа' && lim.now === '80' && /^сброс в \d\d:\d\d$/.test(lim.reset ?? ''), `лимит ИИ — по слабому месту, со сбросом: ${lim.value} · ${lim.reset} · ${lim.now}%`)
   const noBudget = await battery('ai_budget')
@@ -879,7 +1685,8 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   await saved
   await toastWith(page, 'Бюджет ИИ сохранён').waitFor({ timeout: 15000 })
   await page.locator('[data-testid=battery-ai_budget][data-state=ok]').waitFor({ timeout: 15000 })
-  const left = 1 - usage.posts * (2000 * 0.10 + 300 * 0.50) / 1e6
+  // Бюджет считает весь журнал: чтение по цене Haiku 5.5 ($0,10 и $0,50 за миллион), тексты — Sonnet 5.5 ($2 и $10)
+  const left = 1 - (usage.in * 0.10 + usage.out * 0.50 + texts.in * 2 + texts.out * 10) / 1e6
   const budget = await battery('ai_budget')
   const nextMonth = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Almaty', day: 'numeric', month: 'long' }).format(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1, 12)))
   check(budget.value === `$${left.toFixed(2).replace('.', ',')} из $1,00` && budget.reset === `сброс ${nextMonth}` && budget.note?.includes(`${usage.posts} чтени`), `бюджет $1 со сбросом 1-го: ${budget.value} · ${budget.reset} · ${budget.note}`)
@@ -904,7 +1711,7 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   psql(`DELETE FROM public.supplier_channels WHERE id = '${floodId}'; DELETE FROM public.service_meters WHERE key = 'telegram_flood';`)
   check((await battery('dataforseo')).value === 'ключа нет', 'DataForSEO без ключа — «ключа нет»')
   if (SHOTS)
-    await page.locator('[data-testid=batteries]').screenshot({ path: `${SHOTS}/batteries-1366.png` })
+    await page.locator('[data-testid=usage-card]').screenshot({ path: `${SHOTS}/batteries-1366.png` })
   await page.locator('[data-testid=budget-edit]').click()
   await page.locator('[data-testid=budget-remove]').click()
   await toastWith(page, 'Бюджет ИИ убран').waitFor({ timeout: 15000 })
@@ -915,7 +1722,7 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   const phone = await newPage({ width: 390, height: 844 })
   check(await noScroll(phone), 'без горизонтальной прокрутки')
   const box = await cards(phone).first().boundingBox()
-  check(box && box.width > 150 && box.width < 200, `карточки в два столбца: ${Math.round(box?.width ?? 0)} px`)
+  check(box && box.width > 300 && box.width < 370, `карточки в один столбец, как в макете: ${Math.round(box?.width ?? 0)} px`)
   const buttons = await cards(phone).locator('button, a[data-testid=offer-to-site]').evaluateAll(bs => bs.slice(0, 24).map(b => b.scrollWidth <= b.clientWidth + 1))
   check(buttons.length === 24 && buttons.every(Boolean), `надписи кнопок помещаются — «На сайт», «В заказ», «Добавил», «Не брать»: ${buttons.filter(Boolean).length} из ${buttons.length}`)
   const prices = await cards(phone).locator('[data-testid=offer-price]').evaluateAll(ps => ps.slice(0, 12).map(p => p.getClientRects().length === 1 && p.getBoundingClientRect().right <= p.closest('[data-testid=offer-card]').getBoundingClientRect().right + 0.5))
@@ -928,16 +1735,53 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
     await phone.screenshot({ path: `${SHOTS}/offers-390-cards.png` })
   }
   await phone.goto(`${BASE}/admin/purchasing`, { waitUntil: 'load', timeout: 120000 })
-  await phone.locator('[data-testid=batteries] [data-testid=battery-ai_limits]').waitFor({ timeout: 30000 })
+  await phone.locator('[data-testid=usage-card] [data-testid=battery-ai_limits]').waitFor({ timeout: 30000 })
   check(await noScroll(phone), 'дашборд с батарейками на телефоне — без горизонтальной прокрутки')
   if (SHOTS)
-    await phone.locator('[data-testid=batteries]').screenshot({ path: `${SHOTS}/batteries-390.png` })
+    await phone.locator('[data-testid=usage-card]').screenshot({ path: `${SHOTS}/batteries-390.png` })
   await phone.context().close()
 
   console.log('\n== секреты')
   const leaked = SECRETS.filter(s => bodies.some(b => b.includes(s)))
   check(!leaked.length, `ни один ответ маршрутов не несёт секретов${leaked.length ? ` — нашлось: ${leaked.join(', ')}` : ''}`)
-  check(offerBodies.length && !offerBodies.some(b => b.includes('last4')), `ответы «Товаров поставщиков» — без последних знаков ключа ИИ: ${offerBodies.length} ответов`)
+  check(offerBodies.length && !offerBodies.some(b => b.includes('last4')), `ответы «Товаров поставщиков» и «Текстов для сайта» — без последних знаков ключа ИИ: ${offerBodies.length} ответов`)
+
+  console.log('\n== без миграции текстов для сайта')
+  renameTexts(false)
+  textsRenamed = true
+  await new Promise(r => setTimeout(r, 1500))
+  const draftOff = await api(`/api/admin/supplier-offers/draft?id=${offerIdOf(1024)}`, adminToken)
+  check(draftOff.status === 200 && JSON.stringify(draftOff.json?.written) === '{}' && draftOff.json.items?.length > 0, `черновик без миграции текстов — прочитанное есть, сохранённых текстов нет, не 500: ${draftOff.status}`)
+  const offTexts = await newPage({ width: 1366, height: 900 }, `/admin/products/new?offer=${offerIdOf(1024)}`)
+  const writesOff = ai.writes.length
+  const offIdle = await appeared(offTexts.locator('[data-testid=ai-writer-start]'))
+  await clickIf(offTexts.locator('[data-testid=ai-writer-start]'))
+  const offWrote = await appeared(offTexts.locator('[data-testid=ai-writer-filled]'))
+  check(offIdle && offWrote && ai.writes.length === writesOff + 1 && await offTexts.locator('#name').inputValue() === t24.name && await offTexts.locator('[data-testid=ai-writer-saved]').count() === 0, `без миграции «Сгенерировать» пишет тексты в форму, строки «сохранено» нет: запросов +${ai.writes.length - writesOff}`)
+  await offTexts.context().close()
+  renameTexts(true)
+  textsRenamed = false
+  await new Promise(r => setTimeout(r, 1500))
+  const draftBack = await api(`/api/admin/supplier-offers/draft?id=${offerIdOf(1024)}`, adminToken)
+  check(draftBack.status === 200 && draftBack.json?.written?.['0']?.name === t24.name, 'миграция на месте — сохранённый раньше ответ снова в черновике')
+
+  console.log('\n== без миграции разбора ИИ')
+  guessOff(true)
+  guessRenamed = true
+  await new Promise(r => setTimeout(r, 1500))
+  const unguessed = await api('/api/admin/supplier-offers', adminToken)
+  check(unguessed.status === 200 && unguessed.json?.narrow?.withoutGuess === null && JSON.stringify(unguessed.json.narrow.guessVolumes) === '{}' && unguessed.json.offers?.length > 0 && unguessed.json.offers.every(o => o.guess === null) && unguessed.json.offers.some(o => o.queries), `список без миграции разбора — точный спрос как был, разбора нет, не 500: ${unguessed.status}`)
+  const guessOffReply = await api('/api/admin/supplier-offers/guess', adminToken, {})
+  check(guessOffReply.status === 200 && guessOffReply.json?.off === 'migration' && guessOffReply.json.done === 0, `разбор без миграции — off: migration: ${JSON.stringify(guessOffReply.json)}`)
+  const guessedNow = ai.guesses.length
+  await page.goto(`${BASE}/admin/supplier-offers`, { waitUntil: 'networkidle', timeout: 120000 })
+  await painted(page)
+  check(await page.locator('[data-testid=offers-guess-about]').count() === 0 && await page.locator('[data-testid=offer-guess]').count() === 0 && await page.locator('[data-testid=offer-card]').count() === await page.locator('[data-testid=offer-demand-level]').count() && ai.guesses.length === guessedNow, 'страница без миграции разбора — как прежде: ни строки, ни «как такое ищут», уровни на месте, к модели не ходили')
+  guessOff(false)
+  guessRenamed = false
+  await new Promise(r => setTimeout(r, 1500))
+  const reguess = await api('/api/admin/supplier-offers', adminToken)
+  check(reguess.status === 200 && reguess.json?.narrow?.withoutGuess != null && reguess.json.offers.some(o => o.guess), 'миграция на месте — разбор вернулся')
 
   console.log('\n== без миграции чтения')
   renameRead(false)
@@ -985,13 +1829,36 @@ NOTIFY pgrst, 'reload schema';`)
 finally {
   await browser.close()
   server.close()
+  ai.release?.()
   aiServer.close()
+  dfsServer.close()
+  if (gucSet) {
+    psqlSuper(`ALTER ROLE authenticator IN DATABASE postgres RESET app.market_demand_api;`)
+    await restartRest()
+  }
   if (renamed) {
     psql(`ALTER TABLE public.supplier_offers_check_off RENAME TO supplier_offers;
 NOTIFY pgrst, 'reload schema';`)
   }
   if (readRenamed)
     renameRead(true)
+  if (textsRenamed) {
+    try {
+      renameTexts(true)
+    }
+    catch (e) {
+      console.error(`колонка written_texts не вернулась — верните руками: ${e.message}`)
+    }
+  }
+  // Не вернулось — сказать и всё равно убрать данные стража: секреты не должны остаться
+  if (guessRenamed) {
+    try {
+      guessOff(false)
+    }
+    catch (e) {
+      console.error(`разбор ИИ не вернулся на место — верните руками: ${e.message}`)
+    }
+  }
   await cleanup()
   for (const id of users)
     await fetch(`${SUPA}/auth/v1/admin/users/${id}`, { method: 'DELETE', headers: serviceHeaders })

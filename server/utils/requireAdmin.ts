@@ -1,4 +1,5 @@
 import type { H3Event } from 'h3'
+import { Buffer } from 'node:buffer'
 import { serverSupabaseUser } from '#supabase/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -29,15 +30,42 @@ export function serviceSupabase() {
 export async function requireAdmin(event: H3Event) {
   const db = serviceSupabase()
   const bearer = getRequestHeader(event, 'authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1]
-  const user = bearer
-    ? (await db.auth.getUser(bearer)).data.user
-    : await serverSupabaseUser(event).catch(() => null)
+  const roleOf = async (id: string) => (await db.from('profiles').select('role').eq('id', id).maybeSingle()).data?.role
+  let user: { id: string } | null
+  let role: string | undefined
+  if (bearer) {
+    // Токен и роль — одним кругом (21.11.2026): функции в Вашингтоне, база в
+    // Сеуле, круг — 0,2–0,6 с, и так в каждом запросе админки. Роль берётся
+    // по id из токена ещё до проверки, но в дело идёт, только если Supabase
+    // подтвердил токен и id совпал; иначе — отдельным запросом, как раньше.
+    const claimed = tokenSubject(bearer)
+    const [auth, claimedRole] = await Promise.all([db.auth.getUser(bearer), claimed ? roleOf(claimed) : undefined])
+    user = auth.data.user
+    role = user ? (user.id === claimed ? claimedRole : await roleOf(user.id)) : undefined
+  }
+  else {
+    user = await serverSupabaseUser(event).catch(() => null)
+    role = user ? await roleOf(user.id) : undefined
+  }
   if (!user)
     throw createError({ statusCode: 401, message: 'Нужен вход' })
-  const { data } = await db.from('profiles').select('role').eq('id', user.id).single()
-  if (data?.role !== 'admin')
+  if (role !== 'admin')
     throw createError({ statusCode: 403, message: 'Только для администратора' })
   // Кто именно — для записей «кто сделал» (ручные бонусы)
   event.context.adminId = user.id
   return db
+}
+
+/** `sub` из JWT без проверки подписи — только чтобы начать запрос роли пораньше; null — не JWT */
+export function tokenSubject(token: string): string | null {
+  try {
+    const payload = token.split('.')[1]
+    if (!payload)
+      return null
+    const sub = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))?.sub
+    return typeof sub === 'string' && /^[0-9a-f-]{36}$/i.test(sub) ? sub : null
+  }
+  catch {
+    return null
+  }
 }

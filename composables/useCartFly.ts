@@ -9,15 +9,24 @@
  * Анимация не участвует в вёрстке: призрак живёт в `document.body` с
  * `position: fixed` и снимается по завершении. Своего состояния нет, стор не
  * читается и не пишется — полёт ничего не ждёт и ничего не задерживает.
+ * Единственное, что он трогает снаружи, — просит показаться нижнюю панель
+ * телефона, если её спрятала прокрутка (useBottomNavReveal).
  *
  * Тайминги, кривые и геометрия взяты из макета один в один.
  */
+
+import { revealBottomNav } from '@/composables/useBottomNavReveal'
 
 /**
  * Явный `data-cart-target` надёжнее подписи: `aria-label` оставлен запасным
  * путём на случай, если атрибут где-то не проставлен.
  */
 const CART_TARGET_SELECTOR = '[data-cart-target],[aria-label="Корзина"]'
+/**
+ * Панель, которая уезжает за край экрана при прокрутке, — нижняя навигация
+ * телефона. Корзина в ней меряется там, где панель стоит, а не где она сейчас.
+ */
+const DOCK_SELECTOR = '[data-cart-dock]'
 const GHOST_Z_INDEX = 9999
 /** Один клик — один полёт, даже если обработчик стоит и на карточке, и на странице. */
 const THROTTLE_MS = 200
@@ -28,6 +37,8 @@ interface CartTarget {
   el: HTMLElement
   rect: DOMRect
   explicit: boolean
+  /** Корзина в нижней панели: перед полётом панель просят показаться. */
+  docked: boolean
 }
 
 let lastFlightAt = 0
@@ -43,16 +54,37 @@ function isOnScreen(rect: DOMRect): boolean {
 }
 
 /**
+ * Место корзины в панели, когда панель стоит на месте. Спрятанная панель
+ * сдвинута `transform` (translateY(140%) у MobileBottomNav) или едет на
+ * полпути; на месте transform у неё нет, поэтому сдвиг просто вычитается.
+ */
+function restRect(el: HTMLElement, dock: HTMLElement): DOMRect {
+  const rect = el.getBoundingClientRect()
+  const transform = getComputedStyle(dock).transform
+  if (!transform || transform === 'none')
+    return rect
+  const shift = new DOMMatrixReadOnly(transform)
+  return new DOMRect(rect.left - shift.m41, rect.top - shift.m42, rect.width, rect.height)
+}
+
+/**
  * Иконок корзины на странице несколько (шапка, нижняя панель, панель каталога).
  * Берётся видимая: на узком экране самая нижняя, на широком — самая верхняя.
+ *
+ * Корзина нижней панели считается видимой, пока панель есть на этой ширине,
+ * даже если прокрутка её спрятала: на телефоне корзина живёт в ней, туда товар
+ * и летит, а панель выезжает навстречу. До 25.11.2026 спрятанная панель
+ * выпадала из выбора, и полёт уходил вверх — в корзину шапки, а где её не
+ * видно (главная, каталог, товар, корзина) — в запасную точку, правый верхний угол.
  */
 function findCartTarget(): CartTarget | null {
   let pool: CartTarget[] = []
 
   document.querySelectorAll<HTMLElement>(CART_TARGET_SELECTOR).forEach((el) => {
-    const rect = el.getBoundingClientRect()
+    const dock = el.closest<HTMLElement>(DOCK_SELECTOR)
+    const rect = dock ? restRect(el, dock) : el.getBoundingClientRect()
     if (isOnScreen(rect))
-      pool.push({ el, rect, explicit: el.hasAttribute('data-cart-target') })
+      pool.push({ el, rect, explicit: el.hasAttribute('data-cart-target'), docked: !!dock })
   })
 
   if (pool.length === 0)
@@ -174,6 +206,10 @@ function flyToCart(
     source = fallback
 
   const target = findCartTarget()
+  // Цель в нижней панели, а её могла спрятать прокрутка: панель выезжает
+  // (0,28 с — раньше, чем долетит призрак), и товар садится в её корзину.
+  if (target?.docked)
+    revealBottomNav()
 
   if (!source || !source.animate || prefersReducedMotion()) {
     pulse(target?.el)
@@ -186,7 +222,8 @@ function flyToCart(
     return
   }
 
-  // Корзины на экране нет — целимся в правый верхний угол, откуда она приедет.
+  // Корзины на экране нет — бывает только на широком экране, где нижней
+  // панели нет: целимся в правый верхний угол, где корзина шапки.
   const to = target ? target.rect : new DOMRect(window.innerWidth - 74, 16, 46, 46)
   const url = imageUrl || findImageUrl(source)
   const size = Math.min(Math.max(Math.min(from.width, from.height), 62), 128)
@@ -259,6 +296,8 @@ function flyToCart(
     landed = true
     wrap.remove()
     // Цель ищется заново: страницу могли прокрутить, пока призрак летел.
+    // Кольцо — по живому месту иконки: если панель снова спрятали, оно уйдёт
+    // за край вместе с ней, а не повиснет в пустом углу.
     const arrival = findCartTarget() ?? target
     if (arrival) {
       pulse(arrival.el)

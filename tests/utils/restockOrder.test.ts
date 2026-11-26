@@ -103,4 +103,10 @@ describe('needsRestock', () => {
     expect(needsRestock({ stock: 2, minStock: 2, pending: 1 })).toBe(false)
     expect(needsRestock({ stock: 0, minStock: 2, pending: 2 })).toBe(true)
   })
+
+  it('лежащее в формирующемся заказе — тоже в счёт: второй раз не предлагать', () => {
+    expect(needsRestock({ stock: 1, minStock: 2, forming: 2 })).toBe(false)
+    expect(needsRestock({ stock: 0, minStock: 3, pending: 1, forming: 1 })).toBe(true)
+    expect(needsRestock({ stock: 0, minStock: 2, pending: 1, forming: 2 })).toBe(false)
+  })
 })

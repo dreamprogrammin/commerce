@@ -45,9 +45,12 @@ export interface RestockProduct {
   wishlist: number
   /** Заказано у поставщика и ещё не пришло — по открытым заказам */
   pending: number
+  /** В формирующихся заказах («Поставки»): поставщику ещё не отправлено */
+  forming: number
 }
 
-export type SupplierOrderStatus = 'ordered' | 'in_transit' | 'received' | 'cancelled'
+// 'draft' — формирующийся заказ «Поставок» (26.11.2026); как в utils/supplierOrders.ts
+export type SupplierOrderStatus = 'draft' | 'ordered' | 'in_transit' | 'received' | 'cancelled'
 
 export interface SupplierOrderLine {
   /** null — товар потом удалили; название и артикул — снимок на момент заказа */
@@ -68,6 +71,10 @@ export interface SupplierOrder {
   createdAt: string
   shippedAt: string | null
   closedAt: string | null
+  /** Когда ушёл поставщику (26.11.2026): заказ из «Поставок» копился раньше; нет — база до миграции 20261126140000 */
+  orderedAt?: string | null
+  /** Примерная дата поставки, ГГГГ-ММ-ДД */
+  expectedAt?: string | null
   lines: SupplierOrderLine[]
 }
 
@@ -176,24 +183,32 @@ interface OrderRow {
   status: SupplierOrderStatus
   note: string | null
   created_at: string
+  ordered_at?: string | null
+  expected_at?: string | null
   shipped_at: string | null
   closed_at: string | null
   supplier_order_items: { product_id: string | null, product_name: string, sku: string | null, quantity: number, received_quantity: number, cost_price: number | null }[]
 }
 
 /**
- * Заказы поставщикам (шаг 2, 31.10.2026): открытые и закрытые за 30 дней.
+ * Заказы поставщикам (шаг 2, 31.10.2026): открытые и закрытые за 30 дней,
+ * плюс формирующиеся («Поставки», 26.11.2026) — их строки идут в счёт
+ * `forming`, а в список заказов «К закупке» не попадают.
  * `null` — таблиц ещё нет: миграция `20261031160000_supplier_orders` не
  * применена (превью `dev` смотрит в боевую базу). Тогда страница работает
  * как в шаге 1, без заказов, — выкатка безопасна в любом порядке.
  */
 async function loadOrders(db: SupabaseClient, now: Date): Promise<SupplierOrder[] | null> {
   const since = new Date(now.getTime() - 30 * DAY).toISOString()
-  const { data, error } = await db.from('supplier_orders')
-    .select('id, number, supplier_id, status, note, created_at, shipped_at, closed_at, supplier_order_items(product_id, product_name, sku, quantity, received_quantity, cost_price)')
-    .or(`status.in.(ordered,in_transit),closed_at.gte.${since}`)
+  const query = (dates: string) => db.from('supplier_orders')
+    .select(`id, number, supplier_id, status, note, created_at, ${dates}shipped_at, closed_at, supplier_order_items(product_id, product_name, sku, quantity, received_quantity, cost_price)`)
+    .or(`status.in.(draft,ordered,in_transit),closed_at.gte.${since}`)
     .order('number', { ascending: false })
     .limit(500)
+  // Даты «Поставок» — с миграции 20261126140000; до неё колонок нет (42703)
+  let { data, error } = await query('ordered_at, expected_at, ')
+  if (error?.code === '42703')
+    ({ data, error } = await query(''))
   if (error) {
     // Таблиц нет. Проверено 31.10.2026 на PostgREST 12.2.3, обе таблицы спрятаны:
     // запрос с вложенными строками отвечает PGRST200 («нет связи»), простой —
@@ -204,13 +219,14 @@ async function loadOrders(db: SupabaseClient, now: Date): Promise<SupplierOrder[
     }
     throw createError({ statusCode: 500, message: error.message })
   }
-  return (data as OrderRow[] ?? []).map(o => ({
+  return (data as unknown as OrderRow[] ?? []).map(o => ({
     id: o.id,
     number: o.number,
     supplierId: o.supplier_id,
     status: o.status,
     note: o.note,
     createdAt: o.created_at,
+    ...(o.ordered_at !== undefined ? { orderedAt: o.ordered_at, expectedAt: o.expected_at ?? null } : {}),
     shippedAt: o.shipped_at,
     closedAt: o.closed_at,
     lines: o.supplier_order_items
@@ -239,6 +255,24 @@ export function pendingByProduct(orders: Pick<SupplierOrder, 'status' | 'lines'>
     }
   }
   return pending
+}
+
+/**
+ * Сколько каждого товара лежит в формирующихся заказах («Поставки»):
+ * поставщику ещё не отправлено, но заказывать второй раз не нужно. Без этого
+ * «К закупке» предлагала товар, уже лежащий в таком заказе (26.11.2026).
+ */
+export function formingByProduct(orders: Pick<SupplierOrder, 'status' | 'lines'>[]): Map<string, number> {
+  const forming = new Map<string, number>()
+  for (const order of orders) {
+    if (order.status !== 'draft')
+      continue
+    for (const line of order.lines) {
+      if (line.productId && line.quantity > 0)
+        forming.set(line.productId, (forming.get(line.productId) ?? 0) + line.quantity)
+    }
+  }
+  return forming
 }
 
 export async function loadRestock(db: SupabaseClient, now = new Date()): Promise<{ suppliers: RestockSupplier[], products: RestockProduct[], orders: SupplierOrder[] | null }> {
@@ -285,6 +319,7 @@ export async function loadRestock(db: SupabaseClient, now = new Date()): Promise
   const alertCount = countBy(alerts)
   const wishlistCount = countBy(wishlist)
   const pending = pendingByProduct(orders ?? [])
+  const forming = formingByProduct(orders ?? [])
 
   return {
     suppliers: (suppliersRes.data ?? []).map(s => ({
@@ -315,7 +350,9 @@ export async function loadRestock(db: SupabaseClient, now = new Date()): Promise
       alerts: alertCount.get(p.id) ?? 0,
       wishlist: wishlistCount.get(p.id) ?? 0,
       pending: pending.get(p.id) ?? 0,
+      forming: forming.get(p.id) ?? 0,
     })),
-    orders,
+    // Формирующимися занимаются «Поставки»; здесь они только в счёте `forming`
+    orders: orders && orders.filter(o => o.status !== 'draft'),
   }
 }

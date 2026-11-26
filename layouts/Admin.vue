@@ -2,6 +2,7 @@
 import {
   AlertTriangle,
   BarChart3,
+  ChevronLeft,
   Home,
   Menu,
   Package,
@@ -11,13 +12,26 @@ import { useAuth } from '@/composables/auth/useAuth'
 import { useCacheManager } from '@/composables/useCacheManager'
 import { useAdminQuestionsStore } from '@/stores/adminStore/adminQuestionsStore'
 import { useAdminReviewsStore } from '@/stores/adminStore/adminReviewsStore'
-import { PURCHASING_PAGES } from '@/utils/smartPurchasing'
+import { useProfileStore } from '@/stores/core/profileStore'
+import { PURCHASING_HUB, PURCHASING_PAGES, purchasingBack } from '@/utils/smartPurchasing'
 
 const { handleOut } = useAuth()
 const { clearAllQueryCache, hardReset } = useCacheManager()
 const adminQuestionsStore = useAdminQuestionsStore()
 const adminReviewsStore = useAdminReviewsStore()
 const route = useRoute()
+const router = useRouter()
+const profileStore = useProfileStore()
+const { fullName, profile } = storeToRefs(profileStore)
+// Пока профиль не загружен, fullName — «Гость»: имени не показываем вовсе.
+// И только после монтирования: в браузере профиль приходит из localStorage
+// раньше гидрации, и имя из серверной разметки с ним не совпало бы
+const mounted = ref(false)
+onMounted(() => {
+  mounted.value = true
+})
+const adminName = computed(() => mounted.value && profile.value ? fullName.value : '')
+const initial = computed(() => adminName.value.trim().charAt(0).toUpperCase())
 
 const isMobileMenuOpen = ref(false)
 
@@ -34,36 +48,36 @@ onMounted(() => {
 // Умный закуп — одним пунктом (владелец 3.11.2026: «собери всё в одном месте»,
 // «лишнее с сайд-меню убрать»). Его страницы — кнопками на дашборде, и пункт
 // горит на них так же, как на самом дашборде
-const PURCHASING = '/admin/purchasing'
+const PURCHASING = PURCHASING_HUB.to
 const inPurchasing = computed(() => [PURCHASING, ...PURCHASING_PAGES.map(p => p.to)]
   .some(to => route.path === to || route.path.startsWith(`${to}/`)))
 
-// Все ссылки навигации
-const navLinks = [
-  { to: '/admin', label: 'Дашборд', exact: true },
-  { to: '/admin/categories', label: 'Управление меню' },
-  { to: '/admin/popular-categories', label: 'Популярные категории' },
-  { to: '/admin/slides', label: 'Управление слайдами' },
-  { to: '/admin/users', label: 'Пользователи' },
-  { to: '/admin/products', label: 'Управление товарами' },
-  { to: '/admin/brands', label: 'Добавление бренда' },
-  { to: '/admin/brand-seo', label: 'SEO: Бренд + Категория' },
-  { to: '/admin/image-seo', label: 'SEO: Alt-тексты изображений' },
-  { to: '/admin/attributes', label: 'Управление атрибутами' },
-  { to: '/admin/banners', label: 'Управление банерами' },
-  { to: '/admin/questions', label: 'Вопросы', badge: () => adminQuestionsStore.unansweredCount },
-  { to: '/admin/reviews', label: 'Отзывы', badge: () => adminReviewsStore.unpublishedCount },
-  { to: PURCHASING, label: 'Умный закуп' },
-  { to: '/admin/pickup-points', label: 'Пункты самовывоза' },
-  { to: '/admin/pos', label: 'Оффлайн касса' },
-  { to: '/admin/returns', label: 'Возвраты' },
-  { to: '/admin/sales', label: 'Продажи' },
-  { to: '/admin/reports', label: 'Отчёты' },
-  { to: '/admin/carts', label: 'Корзины' },
-  { to: '/admin/promotions', label: 'Акции' },
-  { to: '/admin/broadcast', label: 'Рассылка' },
-  { to: '/admin/kaspi-export', label: 'Выгрузка Kaspi' },
-]
+// «Назад» на страницах закупа (владелец 23.11.2026: «непонятно, как обратно»;
+// в приложении на телефоне кнопки браузера нет) — utils/smartPurchasing.ts.
+// Прежний адрес вкладки — history.state.back от vue-router; читаем только в
+// браузере после монтирования, чтобы шапка при гидрации совпала с серверной
+const historyBack = ref<string | null>(null)
+function readHistoryBack() {
+  const back: unknown = window.history.state?.back
+  historyBack.value = typeof back === 'string' ? back : null
+}
+onMounted(readHistoryBack)
+watch(() => route.fullPath, () => {
+  if (import.meta.client)
+    readHistoryBack()
+})
+const back = computed(() => purchasingBack(route.fullPath, historyBack.value))
+function goBack(event: MouseEvent) {
+  const target = back.value
+  // Ctrl/⌘/Shift и средняя кнопка — ссылку откроет сам браузер
+  if (!target || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+    return
+  event.preventDefault()
+  if (target.history)
+    router.back()
+  else
+    navigateTo(target.to)
+}
 </script>
 
 <template>
@@ -72,44 +86,79 @@ const navLinks = [
     он рисует компактную мобильную плашку — в админке она не нужна.
   -->
   <div class="hidden lg:block">
-    <CommonSiteHeader />
+    <!--
+      В потоке, а не плавающей (23.11.2026): плавая при прокрутке, шапка сайта
+      закрывала строку админки с кнопкой «назад» и верх бокового меню.
+      Сверху прилипает строка админки, шапка сайта уезжает со страницей
+    -->
+    <CommonSiteHeader :sticky="false" />
   </div>
   <div class="flex min-h-screen w-full bg-muted/40">
-    <!-- Десктоп сайдбар -->
-    <aside class="hidden w-64 flex-col border-r bg-background md:flex">
-      <div class="flex h-16 items-center border-b px-6">
-        <NuxtLink to="/" class="flex items-center gap-2 font-semibold">
-          <span>Мой проект</span>
+    <!-- Десктоп сайдбар: карточка по макету AdminSidebar.dc.html -->
+    <!-- 272 = карточка 248, как в макете, и поля по 12 -->
+    <aside class="hidden w-[272px] shrink-0 p-3 md:block">
+      <div
+        class="sticky top-3 flex max-h-[calc(100vh-1.5rem)] flex-col gap-[22px] overflow-y-auto rounded-[20px] bg-background px-3.5 pt-5 pb-4 shadow-sm"
+        data-testid="admin-sidebar"
+      >
+        <NuxtLink to="/" class="flex items-center gap-2.5 px-1.5">
+          <span class="flex size-[38px] shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-[0_6px_16px_rgba(43,127,255,0.35)]">
+            <Icon name="ic:round-toys" class="text-[22px]" />
+          </span>
+          <span class="flex flex-col gap-0.5">
+            <span class="text-[17px] leading-tight font-bold tracking-[-0.01em]">Ухтышка</span>
+            <span class="text-xs text-muted-foreground">Панель администратора</span>
+          </span>
         </NuxtLink>
-      </div>
 
-      <nav class="flex-1 space-y-1 overflow-y-auto p-4">
-        <NuxtLink
-          v-for="link in navLinks"
-          :key="link.to"
-          :to="link.to"
-          class="flex items-center justify-between rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-          :class="{ 'bg-muted text-primary': link.to === PURCHASING && inPurchasing }"
-          active-class="bg-muted text-primary"
-        >
-          <span>{{ link.label }}</span>
-          <Badge
-            v-if="link.badge && link.badge() > 0"
-            variant="destructive"
-            class="text-xs"
-          >
-            {{ link.badge() }}
-          </Badge>
-        </NuxtLink>
-      </nav>
+        <AdminNav />
+
+        <div class="mt-auto flex items-center gap-2.5 border-t border-neutral-100 px-2 pt-3">
+          <Avatar class="size-9">
+            <AvatarImage v-if="profile?.avatar_url" :src="profile.avatar_url" alt="" />
+            <AvatarFallback>
+              <template v-if="initial">
+                {{ initial }}
+              </template>
+              <Icon v-else name="lucide:user" class="text-base" />
+            </AvatarFallback>
+          </Avatar>
+          <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span v-if="adminName" class="truncate text-sm font-semibold" data-testid="admin-sidebar-name">{{ adminName }}</span>
+            <span class="text-xs text-muted-foreground">Администратор</span>
+          </div>
+          <Button variant="ghost" size="icon" aria-label="Выйти" @click="handleOut">
+            <Icon name="lucide:log-out" class="text-[18px]" />
+          </Button>
+        </div>
+      </div>
     </aside>
 
-    <div class="flex flex-1 flex-col pb-16 md:pb-0">
+    <div class="flex min-w-0 flex-1 flex-col pb-16 md:pb-0">
       <!-- Хедер -->
       <header
         class="sticky top-0 z-10 flex h-14 md:h-16 items-center gap-4 border-b bg-background px-4 md:px-6"
       >
-        <h1 class="text-lg md:text-xl font-semibold truncate">
+        <!-- На страницах умного закупа — «‹ куда» вместо заголовка: шапка прилипает, кнопка видна и внизу длинных списков -->
+        <Button
+          v-if="back"
+          as-child
+          variant="ghost"
+          class="-ml-3 h-10 min-w-0 shrink gap-1 text-base font-semibold md:text-lg"
+        >
+          <a
+            :href="back.to"
+            :aria-label="back.label === 'Назад' ? 'Назад' : `Назад: ${back.label}`"
+            data-testid="admin-back"
+            @click="goBack"
+          >
+            <ChevronLeft class="size-5" />
+            <!-- md…lg: рядом меню и «Очистить кеш» / «Полный сброс» — имя не влезает, коротко -->
+            <span class="truncate md:max-lg:hidden" data-testid="admin-back-label">{{ back.label }}</span>
+            <span class="hidden md:max-lg:inline">Назад</span>
+          </a>
+        </Button>
+        <h1 v-else class="text-lg md:text-xl font-semibold truncate">
           Панель администратора
         </h1>
         <div class="ml-auto flex items-center gap-2">
@@ -131,7 +180,7 @@ const navLinks = [
             <Icon name="lucide:refresh-cw" class="w-4 h-4 sm:mr-2" />
             <span class="hidden sm:inline">Полный сброс</span>
           </Button>
-          <Button size="sm" @click="handleOut">
+          <Button size="sm" class="md:hidden" @click="handleOut">
             Выйти
           </Button>
         </div>
@@ -210,25 +259,9 @@ const navLinks = [
         <SheetHeader class="p-4 border-b">
           <SheetTitle>Навигация</SheetTitle>
         </SheetHeader>
-        <nav class="flex-1 overflow-y-auto p-3 space-y-1 max-h-[calc(100vh-8rem)]">
-          <NuxtLink
-            v-for="link in navLinks"
-            :key="link.to"
-            :to="link.to"
-            class="flex items-center justify-between rounded-lg px-3 py-2.5 text-muted-foreground transition-all hover:text-primary active:bg-muted"
-            :class="{ 'bg-muted text-primary': link.to === PURCHASING && inPurchasing }"
-            active-class="bg-muted text-primary"
-          >
-            <span class="text-sm">{{ link.label }}</span>
-            <Badge
-              v-if="link.badge && link.badge() > 0"
-              variant="destructive"
-              class="text-xs"
-            >
-              {{ link.badge() }}
-            </Badge>
-          </NuxtLink>
-        </nav>
+        <div class="max-h-[calc(100vh-12rem)] flex-1 overflow-y-auto px-3.5 py-4">
+          <AdminNav />
+        </div>
         <div class="border-t p-3 space-y-2">
           <Button variant="outline" size="sm" class="w-full" @click="clearAllQueryCache">
             <Icon name="lucide:trash-2" class="w-4 h-4 mr-2" />

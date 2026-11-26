@@ -11,11 +11,14 @@ export default defineEventHandler(async (event) => {
   const spec = typeof body?.model === 'string' ? body.model.trim() : ''
   if (typeof task !== 'string' || !Object.hasOwn(AI_TASKS, task))
     throw createError({ statusCode: 400, message: 'Неизвестная задача' })
+  const rules = AI_TASKS[task as AiTaskKey]
   const slash = spec.indexOf('/')
   const provider = spec.slice(0, slash)
   const model = spec.slice(slash + 1)
   if (slash < 1 || !model || !isAiProvider(provider))
     throw createError({ statusCode: 400, message: 'Модель — в виде «провайдер/модель», провайдер anthropic, openai или gemini' })
+  if (rules.providers && !rules.providers.includes(provider))
+    throw createError({ statusCode: 400, message: `«${rules.label}» — только ${rules.providers.map(p => AI_PROVIDERS[p].label).join(', ')}` })
 
   const { data: key } = await db.rpc('ai_key_get', { p_provider: provider })
   if (!key)
@@ -24,7 +27,7 @@ export default defineEventHandler(async (event) => {
   const found = models.find(m => m.id === model)
   if (!found)
     throw createError({ statusCode: 400, message: `У ${AI_PROVIDERS[provider].label} нет модели ${model}` })
-  if (found.vision === false)
+  if (rules.vision && found.vision === false)
     throw createError({ statusCode: 400, message: `${found.label} не понимает картинки` })
 
   const { error } = await db.from('ai_settings').upsert({

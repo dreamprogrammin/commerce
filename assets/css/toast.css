@@ -289,6 +289,94 @@ html [data-sonner-toaster]:hover [data-sonner-toast] [data-content]::after {
 }
 
 /*
+ * Телефон: та же карточка, только плотнее. Владелец 25.11.2026: «тост на
+ * мобилке слишком большой». По макету на 390px тост был 113px в высоту
+ * (14% экрана 800px), а под текст оставалось 168–198px ширины: чип 38 и
+ * фото 44 слева, крестик справа — и название товара всегда шло в две строки.
+ * Здесь все части пропорционально меньше, а название товара — одной строкой.
+ * Ширина и место над таб-баром прежние: их задаёт библиотека (см. выше).
+ *
+ * Тоста «Добавили в корзину» на телефоне с того же дня нет вовсе: о
+ * добавлении говорит нижняя панель (макет MobileNav.dc.html, см.
+ * composables/useCartAdded.ts). Плотная карточка — у удаления с «Вернуть»,
+ * избранного, ошибок.
+ *
+ * 600px — граница, на которой библиотека переходит на мобильную раскладку.
+ */
+@media (max-width: 600px) {
+  html [data-sonner-toast][data-styled='true'] {
+    /* Между рядами — названием и действием — ровно 6px: у библиотеки свой
+       `gap: 6px`, но держаться за чужое значение не стоит. */
+    gap: 6px 10px;
+    padding: 8px 10px 10px;
+    border-radius: 12px;
+  }
+
+  /* Чип: у простого тоста это сам контейнер иконки, у богатого — узел в нём. */
+  html [data-sonner-toast][data-styled='true']:not(.uh-toast--rich) [data-icon],
+  html [data-sonner-toast][data-styled='true'] .uh-toast-chip {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
+
+  html [data-sonner-toast][data-styled='true']:not(.uh-toast--rich) [data-icon] > svg,
+  html [data-sonner-toast][data-styled='true']:not(.uh-toast--rich) [data-icon] > span {
+    width: 16px;
+    height: 16px;
+  }
+
+  html [data-sonner-toast][data-styled='true'] .uh-toast-chip {
+    font-size: 16px;
+  }
+
+  html [data-sonner-toast][data-styled='true'] .uh-toast-figure {
+    gap: 6px;
+  }
+
+  html [data-sonner-toast][data-styled='true'] .uh-toast-thumb {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+
+  html [data-sonner-toast][data-styled='true'] [data-content] {
+    gap: 1px;
+  }
+
+  html [data-sonner-toast][data-styled='true'] [data-title] {
+    font-size: 13px;
+    line-height: 1.3;
+  }
+
+  html [data-sonner-toast][data-styled='true'] [data-description] {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  /* Название товара — одной строкой; описания ошибок и бонусов — как были. */
+  html [data-sonner-toast][data-styled='true'].uh-toast--product [data-description] {
+    -webkit-line-clamp: 1;
+  }
+
+  html [data-sonner-toast][data-styled='true'] [data-button] {
+    margin-top: 0;
+    font-size: 12.5px;
+  }
+
+  html [data-sonner-toast][data-styled='true'] [data-close-button] {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+  }
+
+  html [data-sonner-toast][data-styled='true'] [data-close-button] svg {
+    width: 13px;
+    height: 13px;
+  }
+}
+
+/*
  * Страницы с собственной липкой кнопкой внизу: корзина («Перейти к
  * оформлению») и карточка товара («В корзину»). Макет отмерял отступ от
  * таб-бара, но на этих двух экранах между тостом и таб-баром стоит ещё одна
