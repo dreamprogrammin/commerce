@@ -1,6 +1,6 @@
 import type { SupplierOrder } from '../../utils/supplierOrders'
 import { describe, expect, it } from 'vitest'
-import { addDays, almatyDay, daysBetween, deliveryDay, expectedState, isOpenOrder, lineCheck, ORDER_STATUS_LABEL, orderCheck, orderMoney, orderSheetLines, orderSummary, receiveDefaults, receiveMoney, receivePlan, remaining, savedOrderMoney, supplierOrderText } from '../../utils/supplierOrders'
+import { addDays, almatyDay, calendarDay, daysBetween, deliveryDay, expectedState, isOpenOrder, lineCheck, longDay, monthGrid, monthTitle, ORDER_STATUS_LABEL, orderCheck, orderMoney, ordersByDay, orderSheetLines, orderSummary, postponedText, receiveDefaults, receiveMoney, receivePlan, remaining, savedOrderMoney, shiftMonth, supplierDeliveries, supplierOrderText } from '../../utils/supplierOrders'
 
 /**
  * Заказы поставщикам — шаг 2 «К закупке» (31.10.2026).
@@ -150,5 +150,83 @@ describe('поставки (26.11.2026)', () => {
     expect(supplierOrderText(order({ orderedAt: null }), now)).toContain('28.11.2026')
     expect(supplierOrderText(order({ createdAt: '2026-11-20T06:00:00Z', orderedAt: '2026-11-26T06:00:00Z' }), now)).toContain('26.11.2026')
     expect(supplierOrderText(order({ createdAt: '2026-11-20T06:00:00Z' }), now)).toContain('20.11.2026')
+  })
+})
+
+describe('календарь и поставщики (27.11.2026)', () => {
+  const today = '2026-11-27'
+  const order = (over: Partial<SupplierOrder>): SupplierOrder => ({
+    id: over.id ?? 'o',
+    number: 1,
+    supplierId: 's1',
+    status: 'ordered',
+    note: null,
+    createdAt: '2026-11-20T00:00:00Z',
+    shippedAt: null,
+    closedAt: null,
+    lines: [{ productId: 'p', name: 'Кукла', sku: null, quantity: 2, received: 0, costPrice: null }],
+    ...over,
+  })
+
+  it('postponedText: сколько раз и когда ждали сначала; не переносилась — null', () => {
+    expect(postponedText({ postponed: 2, plannedAt: '2026-11-24' })).toBe('перенесена 2 раза · сначала ждали 24.11')
+    expect(postponedText({ postponed: 5, plannedAt: null })).toBe('перенесена 5 раз')
+    expect(postponedText({ postponed: 1, plannedAt: '2026-11-26' })).toBe('перенесена 1 раз · сначала ждали 26.11')
+    expect(postponedText({ postponed: 0, plannedAt: '2026-11-24' })).toBeNull()
+    expect(postponedText({})).toBeNull()
+  })
+
+  it('calendarDay: прошедший день ещё не перенесён ночью — уже сегодня; без даты и закрытый — null', () => {
+    expect(calendarDay(order({ expectedAt: '2026-11-30' }), today)).toBe('2026-11-30')
+    expect(calendarDay(order({ expectedAt: '2026-11-25' }), today)).toBe(today)
+    expect(calendarDay(order({ expectedAt: null }), today)).toBeNull()
+    expect(calendarDay(order({ status: 'received', expectedAt: '2026-11-30' }), today)).toBeNull()
+    expect(calendarDay(order({ status: 'draft', expectedAt: '2026-11-30' }), today)).toBeNull()
+  })
+
+  it('monthGrid: недели с понедельника, края — соседние месяцы', () => {
+    const weeks = monthGrid('2026-11')
+    // 1 ноября 2026 — воскресенье: первая неделя с 26 октября
+    expect(weeks[0]![0]).toEqual({ day: '2026-10-26', date: 26, inMonth: false })
+    expect(weeks[0]![6]).toEqual({ day: '2026-11-01', date: 1, inMonth: true })
+    expect(weeks.every(w => w.length === 7)).toBe(true)
+    expect(weeks.at(-1)!.at(-1)!.day).toBe('2026-12-06')
+    expect(weeks.flat().filter(c => c.inMonth)).toHaveLength(30)
+    // Февраль невисокосного года с понедельника — ровно 4 недели
+    expect(monthGrid('2027-02')).toHaveLength(4)
+  })
+
+  it('shiftMonth и подписи', () => {
+    expect(shiftMonth('2026-12', 1)).toBe('2027-01')
+    expect(shiftMonth('2026-01', -1)).toBe('2025-12')
+    expect(monthTitle('2026-11')).toBe('Ноябрь 2026')
+    expect(longDay('2026-11-27')).toBe('27 ноября, пятница')
+  })
+
+  it('supplierDeliveries: сегодня → скоро → без даты → только формируется; закрытые мимо', () => {
+    const names: Record<string, string> = { a: 'Альфа', b: 'Бета', c: 'Вега', d: 'Гамма', e: 'Дельта' }
+    const list = supplierDeliveries([
+      order({ id: '1', number: 1, supplierId: 'b', expectedAt: '2026-12-01' }),
+      order({ id: '2', number: 2, supplierId: 'a', expectedAt: '2026-11-29' }),
+      order({ id: '3', number: 3, supplierId: 'c', expectedAt: today, postponed: 2, plannedAt: '2026-11-25' }),
+      order({ id: '4', number: 4, supplierId: 'c', expectedAt: '2026-12-03' }),
+      order({ id: '5', number: 5, supplierId: 'd', expectedAt: null }),
+      order({ id: '6', number: 6, supplierId: 'e', status: 'draft' }),
+      order({ id: '7', number: 7, supplierId: 'e', status: 'received', expectedAt: today }),
+      // Ночью ещё не перенесён — всё равно сегодня, опоздание 1 день
+      order({ id: '8', number: 8, supplierId: 'a', expectedAt: '2026-11-26' }),
+    ], today, id => names[id]!)
+    expect(list.map(e => [e.supplierId, e.group])).toEqual([['a', 'today'], ['c', 'today'], ['b', 'ahead'], ['d', 'nodate'], ['e', 'forming']])
+    const c = list.find(e => e.supplierId === 'c')!
+    expect(c).toMatchObject({ nextDay: today, today: 1, postponed: 2 })
+    expect(c.waiting.map(o => o.number)).toEqual([3, 4])
+    expect(list[0]).toMatchObject({ supplierId: 'a', today: 1, postponed: 1 })
+    expect(list.find(e => e.supplierId === 'e')!.forming?.number).toBe(6)
+    expect(list.find(e => e.supplierId === 'e')!.waiting).toEqual([])
+  })
+
+  it('ordersByDay — открытые по дням календаря', () => {
+    const map = ordersByDay([order({ id: '1', expectedAt: '2026-11-20' }), order({ id: '2', expectedAt: today }), order({ id: '3', expectedAt: '2026-12-01' }), order({ id: '4', expectedAt: null })], today)
+    expect([...map].map(([d, l]) => [d, l.map(o => o.id)])).toEqual([[today, ['1', '2']], ['2026-12-01', ['3']]])
   })
 })

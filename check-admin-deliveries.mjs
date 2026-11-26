@@ -33,6 +33,12 @@
  *     шаг дашборда — «позже»; «К закупке» работает;
  *  8) видимый товар («0» в «В заказ поставщику») и его правка — поисковикам
  *     по одному запросу, а не по два (стор и страница);
+ *  9) (27.11.2026, миграция 20261127120000) список поставщиков → страница
+ *     поставщика; календарь месяца — у дня число поставок и от кого, клик по
+ *     дню — список дня; дата в окне ставится кликом по календарю; поставка,
+ *     не пришедшая в свой день, ночным переносом переезжает на сегодня —
+ *     «перенесена 2 раза · сначала ждали …»; ручная дата — новый план; база
+ *     без переносов — предупреждение, остальное работает;
  *  без ошибок консоли.
  *
  * Данные заводит сам — поставщик с каналом и двумя постами, товар с остатком
@@ -202,6 +208,17 @@ COMMIT;
 NOTIFY pgrst, 'reload schema';`)
 }
 
+// База «до 20261127120000»: без колонок переноса
+function hideRollover(off) {
+  const [from, to] = off ? ['', '_check_off'] : ['_check_off', '']
+  psqlSuper(`BEGIN;
+ALTER TABLE public.supplier_orders RENAME COLUMN planned_at${from} TO planned_at${to};
+ALTER TABLE public.supplier_orders RENAME COLUMN postponed${from} TO postponed${to};
+COMMIT;
+NOTIFY pgrst, 'reload schema';`)
+}
+let hiddenRollover = false
+
 const browser = await chromium.launch()
 const pages = []
 const errors = []
@@ -274,7 +291,8 @@ try {
       await page.goto(`${BASE}${path}`, { waitUntil: 'load', timeout: 120000 })
     return page
   }
-  const dbOrders = () => rest(`supplier_orders?select=id,number,status,ordered_at,expected_at,closed_at,supplier_order_items(id,product_id,quantity,received_quantity,show_on_receipt)&supplier_id=eq.${d.sup}&order=number`)
+  const SUP_PAGE = `/admin/deliveries/${d.sup}`
+  const dbOrders = () => rest(`supplier_orders?select=id,number,status,ordered_at,expected_at,planned_at,postponed,closed_at,supplier_order_items(id,product_id,quantity,received_quantity,show_on_receipt)&supplier_id=eq.${d.sup}&order=number`)
   const productBy = async sku => (await rest(`products?select=id,slug,is_active,stock_quantity&sku=eq.${sku}`))[0] ?? null
   const stock = async id => (await rest(`products?select=stock_quantity&id=eq.${id}`))[0].stock_quantity
   const lineOf = (o, id) => o?.supplier_order_items.find(i => i.product_id === id)
@@ -315,8 +333,17 @@ try {
   check(stepState === 'action' && stepFacts.includes('формируется 1 заказ: 2 позиции'), `дашборд: шаг «Поставки» ждёт «Заказано» — «${stepFacts}»`)
   check(await page.locator('[data-testid=purchasing-pages] a[href="/admin/deliveries"]').count() === 1, 'дашборд: кнопка «Поставки»')
 
-  console.log('\n== формируется, 1366 px')
+  console.log('\n== список поставщиков → страница поставщика')
   await page.goto(`${BASE}/admin/deliveries`, { waitUntil: 'load', timeout: 120000 })
+  const supLink = page.locator(`[data-testid=deliveries-group][data-group=forming] [data-testid=deliveries-supplier][data-supplier="${d.sup}"]`)
+  await supLink.waitFor({ timeout: 30000 })
+  check(flat(await supLink.innerText()).includes(SUPPLIER) && flat(await supLink.innerText()).includes('заказ ещё не отправлен') && flat(await supLink.innerText()).includes('формируется 2 позиции'), `в списке — «Только формируется заказ»: «${flat(await supLink.innerText())}»`)
+  check(await page.locator('[data-testid=delivery-calendar]').getAttribute('data-month') === today.slice(0, 7) && await page.locator(`[data-testid=calendar-day][data-day="${today}"]`).getAttribute('data-count') === '0', 'календарь — этот месяц, на сегодня поставок нет')
+  await supLink.click()
+  await page.waitForURL(u => u.pathname === SUP_PAGE, { timeout: 30000 })
+  check(await until(async () => flat(await page.locator('[data-testid=supplier-title]').innerText()) === SUPPLIER), `клик — страница поставщика с его именем: «${flat(await page.locator('[data-testid=supplier-title]').innerText())}»`)
+
+  console.log('\n== формируется, 1366 px')
   const draftCard = page.locator(`[data-testid=deliveries-forming] [data-testid=delivery-order][data-number="${o1.number}"]`)
   await draftCard.waitFor({ timeout: 30000 })
   check(flat(await draftCard.locator('[data-testid=delivery-totals]').innerText()).startsWith('2 позиции, 5 шт.'), `«${flat(await draftCard.locator('[data-testid=delivery-totals]').innerText())}»`)
@@ -342,7 +369,7 @@ try {
     await page.screenshot({ path: `${SHOTS}/deliveries-forming-1366.png`, fullPage: true })
 
   console.log('\n== телефон 390 px — формируется')
-  const mobile = await newPage({ width: 390, height: 844 }, '/admin/deliveries')
+  const mobile = await newPage({ width: 390, height: 844 }, SUP_PAGE)
   await mobile.locator(`[data-testid=delivery-order][data-number="${o1.number}"]`).waitFor({ timeout: 30000 })
   check(await mobile.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'формирующийся заказ на телефоне — без горизонтальной прокрутки')
   if (SHOTS)
@@ -370,7 +397,7 @@ try {
   await pick.click()
   const formingRow = restockBlock.locator(`[data-testid=restock-row][data-product="${d.old}"] [data-testid=row-forming]`)
   await formingRow.waitFor({ timeout: 10000 })
-  check(flat(await formingRow.innerText()) === 'в формирующемся заказе 4 шт.' && await formingRow.getAttribute('href') === '/admin/deliveries', `добавлен вручную — «${flat(await formingRow.innerText())}» со ссылкой на «Поставки»`)
+  check(flat(await formingRow.innerText()) === 'в формирующемся заказе 4 шт.' && await formingRow.getAttribute('href') === SUP_PAGE, `добавлен вручную — «${flat(await formingRow.innerText())}» со ссылкой на «Поставки»`)
   if (SHOTS)
     await restockBlock.screenshot({ path: `${SHOTS}/restock-forming-1366.png` })
   // Телефон: строки — карточками (md:hidden), ссылка своя
@@ -381,13 +408,13 @@ try {
     await phoneBlock.locator('[data-slot=card-header]').first().click()
   await phoneBlock.locator('[data-testid=order-add]').click()
   await phone.locator('[data-testid=order-add-item]', { hasText: d.oldName }).click()
-  const phoneForming = phoneBlock.locator('a[href="/admin/deliveries"]:visible', { hasText: 'в формирующемся заказе' })
+  const phoneForming = phoneBlock.locator(`a[href="${SUP_PAGE}"]:visible`, { hasText: 'в формирующемся заказе' })
   await phoneForming.waitFor({ timeout: 10000 })
   check(flat(await phoneForming.innerText()) === 'в формирующемся заказе 4 шт.' && await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `телефон 390 px: в карточке — «${flat(await phoneForming.innerText())}», без горизонтальной прокрутки`)
   if (SHOTS)
     await phoneBlock.screenshot({ path: `${SHOTS}/restock-forming-390.png` })
   psql(`UPDATE public.products SET min_stock_level = :'m' WHERE id = :'p';`, { p: d.old, m: String(d.saved.min_stock_level) })
-  await page.goto(`${BASE}/admin/deliveries`, { waitUntil: 'load', timeout: 120000 })
+  await page.goto(`${BASE}${SUP_PAGE}`, { waitUntil: 'load', timeout: 120000 })
   await draftCard.waitFor({ timeout: 30000 })
 
   console.log('\n== «Заказано»')
@@ -427,8 +454,9 @@ try {
 
   await waitCard.locator('[data-testid=order-expected]').click()
   await dateDialog.waitFor()
-  await dateDialog.locator('[data-testid=date-input]').fill(today)
-  check(flat(await dateDialog.locator('[data-testid=date-hint]').innerText()) === 'сегодня', 'подсказка у даты — «сегодня»')
+  check(await dateDialog.locator(`[data-testid=calendar-day][data-day="${addDays(today, -1)}"]`).isDisabled() && await dateDialog.locator(`[data-testid=calendar-day][data-day="${addDays(today, 3)}"]`).getAttribute('aria-pressed') === 'true', 'календарь в окне: выбран день поставки, вчера — закрыт')
+  await dateDialog.locator(`[data-testid=calendar-day][data-day="${today}"]`).click()
+  check(await dateDialog.locator('[data-testid=date-input]').inputValue() === today && flat(await dateDialog.locator('[data-testid=date-hint]').innerText()) === 'сегодня', 'день выбран кликом по календарю — «сегодня»')
   await dateDialog.locator('[data-testid=date-submit]').click()
   await until(async () => await expected.getAttribute('data-kind') === 'today')
   check(await expected.getAttribute('data-kind') === 'today' && (await dbOrders())[0].expected_at === today, `дату поправили на сегодня: «${flat(await expected.innerText())}»`)
@@ -436,7 +464,50 @@ try {
   await page.reload({ waitUntil: 'load' })
   await waitCard.waitFor({ timeout: 30000 })
   check(await expected.getAttribute('data-kind') === 'late' && flat(await expected.innerText()) === `ждали ${dm(addDays(today, -2))} — опаздывает на 2 дня`, `прошла — опаздывает: «${flat(await expected.innerText())}»`)
-  check(flat(await page.locator('[data-testid=deliveries-summary]').innerText()).includes('опаздывает 1'), 'сверху — «опаздывает 1»')
+  check(await waitCard.locator('[data-testid=delivery-postponed]').count() === 0, 'до ночного переноса — «опаздывает», переносов ещё нет')
+
+  console.log('\n== не пришла в свой день — на следующий')
+  const moved = Number(psqlSuper('SELECT public.supplier_orders_rollover();'))
+  check(moved >= 1, `ночной перенос отработал: переехало ${moved}`)
+  ;[o1] = await dbOrders()
+  check(o1.expected_at === today && o1.postponed === 2 && o1.planned_at === addDays(today, -2), `в базе: ждём ${o1.expected_at}, переносов ${o1.postponed}, сначала ждали ${o1.planned_at}`)
+  await page.reload({ waitUntil: 'load' })
+  await waitCard.waitFor({ timeout: 30000 })
+  const postponedLine = flat(await waitCard.locator('[data-testid=delivery-postponed]').innerText())
+  check(await expected.getAttribute('data-kind') === 'today' && postponedLine === `перенесена 2 раза · сначала ждали ${dm(addDays(today, -2))}`, `на странице поставщика: «${flat(await expected.innerText())}», «${postponedLine}»`)
+  await page.goto(`${BASE}/admin/deliveries`, { waitUntil: 'load', timeout: 120000 })
+  const todayLink = page.locator(`[data-testid=deliveries-group][data-group=today] [data-testid=deliveries-supplier][data-supplier="${d.sup}"]`)
+  await todayLink.waitFor({ timeout: 30000 })
+  check(flat(await todayLink.locator('[data-testid=supplier-when]').innerText()) === 'ждём сегодня' && flat(await todayLink.locator('[data-testid=supplier-postponed]').innerText()) === 'переносилась 2 раза', `в списке — «Сегодня ждём»: «${flat(await todayLink.innerText())}»`)
+  const todayCell = page.locator(`[data-testid=deliveries-calendar-card] [data-testid=calendar-day][data-day="${today}"]`)
+  check(await todayCell.getAttribute('data-count') === '1' && flat(await todayCell.innerText()).includes('1'), 'в календаре на сегодня — 1 поставка')
+  check(flat(await page.locator('[data-testid=deliveries-summary]').innerText()).includes('Переносились: 1'), 'сверху — «Переносились: 1»')
+  // Клик по другому дню — его список; обратно — заказ дня
+  await page.locator(`[data-testid=deliveries-calendar-card] [data-testid=calendar-day][data-day="${addDays(today, 1)}"]`).click()
+  check(await page.locator('[data-testid=calendar-day-list]').getAttribute('data-day') === addDays(today, 1) && await page.locator('[data-testid=calendar-day-order]').count() === 0, 'клик по завтра — поставок на этот день не ждём')
+  await todayCell.click()
+  const dayOrder = page.locator('[data-testid=calendar-day-order]')
+  check(await dayOrder.count() === 1 && flat(await dayOrder.innerText()).includes(`${SUPPLIER} · №${o1.number}`) && flat(await dayOrder.innerText()).includes('перенесена 2 раза'), `список дня: «${flat(await dayOrder.innerText().catch(() => ''))}»`)
+  if (SHOTS)
+    await page.screenshot({ path: `${SHOTS}/deliveries-list-1366.png`, fullPage: true })
+  const mobileList = await newPage({ width: 390, height: 844 }, '/admin/deliveries')
+  await mobileList.locator('[data-testid=deliveries-calendar-card]').waitFor({ timeout: 30000 })
+  check(await mobileList.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'список и календарь на телефоне — без горизонтальной прокрутки')
+  if (SHOTS)
+    await mobileList.screenshot({ path: `${SHOTS}/deliveries-list-390.png`, fullPage: true })
+  await dayOrder.click()
+  await page.waitForURL(u => u.pathname === SUP_PAGE, { timeout: 30000 })
+  await waitCard.waitFor({ timeout: 30000 })
+  // Ручная дата — новый план: счёт переносов с нуля
+  await waitCard.locator('[data-testid=order-expected]').click()
+  await dateDialog.waitFor()
+  await dateDialog.locator(`[data-testid=calendar-day][data-day="${addDays(today, 1)}"]`).click()
+  await dateDialog.locator('[data-testid=date-submit]').click()
+  await until(async () => (await dbOrders())[0].expected_at === addDays(today, 1))
+  ;[o1] = await dbOrders()
+  check(o1.postponed === 0 && o1.planned_at === addDays(today, 1), `дата руками — новый план: переносов ${o1.postponed}, сначала ждали ${o1.planned_at}`)
+  await until(async () => await waitCard.locator('[data-testid=delivery-postponed]').count() === 0)
+  check(await waitCard.locator('[data-testid=delivery-postponed]').count() === 0, 'строка переносов убрана')
 
   const next = await api('/api/admin/deliveries/add', adminToken, { productId: d.old, quantity: 1, showOnReceipt: false })
   check(next.status === 200 && next.json.created === true && next.json.number !== o1.number, `после «Заказано» товар этого поставщика — в новый заказ №${next.json?.number}`)
@@ -512,6 +583,9 @@ try {
   check(restockOff.status === 200 && restockOff.json.orders?.some(o => o.number === open.json.number), '«К закупке» без миграции — заказы на месте')
   await page.goto(`${BASE}/admin/deliveries`, { waitUntil: 'load', timeout: 120000 })
   await page.locator('[data-testid=deliveries-no-migration]').waitFor({ timeout: 30000 })
+  check(await page.locator(`[data-testid=deliveries-group][data-group=nodate] [data-testid=deliveries-supplier][data-supplier="${d.sup}"]`).count() === 1, 'без миграции: поставщик в списке — «Дата не указана»')
+  await page.goto(`${BASE}${SUP_PAGE}`, { waitUntil: 'load', timeout: 120000 })
+  await page.locator('[data-testid=deliveries-waiting]').waitFor({ timeout: 30000 })
   const offCard = page.locator(`[data-testid=deliveries-waiting] [data-testid=delivery-order][data-number="${open.json.number}"]`)
   check(await page.locator('[data-testid=deliveries-forming]').count() === 0 && await offCard.locator('[data-testid=order-receive]').count() === 1 && await offCard.locator('[data-testid=order-expected]').count() === 0, 'раздел ждёт миграции: формирующихся нет, заказ принимается, даты нет')
   await page.goto(`${BASE}/admin/purchasing`, { waitUntil: 'load', timeout: 120000 })
@@ -540,6 +614,22 @@ try {
   hide(false)
   hidden = false
   check(await until(async () => (await api('/api/admin/deliveries', adminToken)).json?.ready === true), 'миграция вернулась — раздел снова в работе')
+
+  console.log('\n== база без переносов (до 20261127120000)')
+  hideRollover(true)
+  hiddenRollover = true
+  const noRoll = await until(async () => {
+    const r = await api('/api/admin/deliveries', adminToken)
+    return r.json?.rollover === false ? r : null
+  })
+  check(noRoll?.json?.ready === true && noRoll.json.orders.some(o => o.number === open.json.number), 'без переносов: поставки работают, заказы на месте')
+  await page.goto(`${BASE}/admin/deliveries`, { waitUntil: 'load', timeout: 120000 })
+  check(await until(async () => await page.locator('[data-testid=deliveries-no-rollover]').count() === 1), 'предупреждение: перенос заработает после миграции')
+  const dash = await api('/api/admin/purchasing', adminToken)
+  check(dash.status === 200, `дашборд без переносов — ${dash.status}`)
+  hideRollover(false)
+  hiddenRollover = false
+  check(await until(async () => (await api('/api/admin/deliveries', adminToken)).json?.rollover === true), 'переносы вернулись')
 
   console.log('\n== видимый товар — поисковикам один раз на создание и на правку')
   // Стор и страница сообщали оба: на создание видимого и на каждую правку уходило по два запроса (найдено 26.11.2026)
@@ -589,6 +679,14 @@ finally {
     }
     catch (e) {
       console.error(`колонки поставок и функция добавления не вернулись (суффикс _check_off) — верните руками: ${e.message}`)
+    }
+  }
+  if (hiddenRollover) {
+    try {
+      hideRollover(false)
+    }
+    catch (e) {
+      console.error(`колонки переноса не вернулись (суффикс _check_off) — верните руками: ${e.message}`)
     }
   }
   cleanup()

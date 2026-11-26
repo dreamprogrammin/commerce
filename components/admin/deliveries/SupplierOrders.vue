@@ -8,7 +8,6 @@ import {
   FileSpreadsheet,
   MessageCircle,
   PackageCheck,
-  RefreshCw,
   Send,
   Trash2,
   Truck,
@@ -16,6 +15,7 @@ import {
   X,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
+import DeliveryCalendar from '@/components/admin/deliveries/DeliveryCalendar.vue'
 import ReceiveOrderDialog from '@/components/admin/purchasing/ReceiveOrderDialog.vue'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { jpegForSheet, saveOrderFile } from '@/composables/useOrderSheetFile'
@@ -34,69 +34,54 @@ import {
   lineCheck,
   ORDER_STATUS_LABEL,
   orderCheck,
+  ordersByDay,
   orderSheetLines,
   orderSummary,
+  postponedText,
   savedOrderMoney,
   supplierOrderText,
 } from '@/utils/supplierOrders'
 
-definePageMeta({ layout: 'admin' })
-
 /*
- * «Поставки» (26 ноября 2026). Владелец: «ещё один раздел — поставки от
- * поставщиков, в которых будут сформированы заказы при добавлении, с
- * примерной датой ожидания, и там должна происходить сверка товаров: сколько
- * пришло и сколько нет, как в SAP-портале. Как только я поставку оприходую,
- * она уже появляется в основном складе; пока поставка не принята, товары не
- * добавляются, а если тот же товар — остатки увеличиваются».
+ * Заказы одного поставщика в «Поставках» (26–27 ноября 2026): формируется,
+ * ждём, закрытые. Была страница `/admin/deliveries`; 27.11 владелец: «если
+ * товаров от разных поставщиков много, мы должны перейти к поставщику,
+ * который доставляет нам товар» — теперь это страница поставщика
+ * `/admin/deliveries/[supplier]`, а общий список и календарь — на
+ * `/admin/deliveries`.
  *
- * Формируются — товары из «На сайт» копятся по поставщику, пока не нажато
- * «Заказано» (тогда — дата поставки, по умолчанию через 3 дня). Ждём —
- * заказанные и в пути, по дате. Закрытые — за 60 дней. «Принять» — то же
- * окно, что в «К закупке»: остаток прибавляется, скрытый новый товар
- * появляется на сайте. Данные — `/api/admin/deliveries`.
+ * Владелец 26.11: «поставки от поставщиков, в которых будут сформированы
+ * заказы при добавлении, с примерной датой ожидания, и там должна происходить
+ * сверка товаров: сколько пришло и сколько нет, как в SAP-портале».
+ * Формируются — товары из «На сайт» копятся, пока не нажато «Заказано»
+ * (тогда — дата поставки по календарю, по умолчанию через 3 дня). Ждём —
+ * заказанные и в пути; не пришла в свой день — ночью сама переезжает на
+ * следующий (миграция 20261127120000). «Принять» — то же окно, что в
+ * «К закупке». Данные — `/api/admin/deliveries` у страницы.
  */
+const props = defineProps<{
+  data: DeliveriesData
+  supplierId: string
+  /** Перечитать данные страницы после действия */
+  reload: () => Promise<void>
+}>()
+
 const { getVariantUrl } = useSupabaseStorage()
-
-const data = ref<DeliveriesData | null>(null)
-const isLoading = ref(true)
-let loaded = false
-
-async function load() {
-  isLoading.value = true
-  try {
-    data.value = await adminFetch<DeliveriesData>('/api/admin/deliveries')
-    loaded = true
-  }
-  catch (error: any) {
-    toast.error('Не удалось загрузить поставки', { description: error.data?.message || error.message })
-  }
-  finally {
-    isLoading.value = false
-  }
-}
-onMounted(load)
-// Страницы админки держатся в памяти (app.vue, keepalive): вернулись сюда —
-// заказы свежие, «На сайт» мог положить товар в формирующийся
-onActivated(() => {
-  if (loaded && !isLoading.value)
-    load()
-})
+const data = computed(() => props.data)
+const load = () => props.reload()
 
 const today = computed(() => data.value?.today ?? almatyDay(new Date()))
 const supplierById = computed(() => new Map((data.value?.suppliers ?? []).map(s => [s.id, s])))
 const productMap = computed(() => new Map(Object.entries(data.value?.products ?? {})))
 const supplierName = (id: string) => supplierById.value.get(id)?.name ?? 'Поставщик'
 
-const orders = computed(() => data.value?.orders ?? [])
-const forming = computed(() => orders.value.filter(o => o.status === 'draft')
-  .sort((a, b) => supplierName(a.supplierId).localeCompare(supplierName(b.supplierId), 'ru')))
+const orders = computed(() => (data.value?.orders ?? []).filter(o => o.supplierId === props.supplierId))
+const forming = computed(() => orders.value.filter(o => o.status === 'draft'))
 // Ждём — по дате: раньше всех те, что уже опаздывают; без даты — в конце
 const waiting = computed(() => orders.value.filter(isOpenOrder)
   .sort((a, b) => (a.expectedAt ?? '9999-12-31').localeCompare(b.expectedAt ?? '9999-12-31') || a.number - b.number))
 const closed = computed(() => orders.value.filter(o => o.status === 'received' || o.status === 'cancelled')
   .sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? '') || b.number - a.number))
-const lateCount = computed(() => waiting.value.filter(o => expectedState(o, today.value)?.kind === 'late').length)
 const showClosed = ref(false)
 
 /** Приёмки заказа — одна приёмка пишет строки журнала с одним временем */
@@ -264,6 +249,13 @@ const dateOpen = computed({
   },
 })
 const maxDay = computed(() => addDays(today.value, 366))
+// В календаре окна — другие поставки этого поставщика: не назначить две на один день по ошибке
+const otherDeliveries = computed(() => {
+  const marks = new Map<string, { count: number, labels: string[], late?: boolean }>()
+  for (const [day, list] of ordersByDay(waiting.value.filter(o => o.id !== dating.value?.order.id), today.value))
+    marks.set(day, { count: list.length, labels: list.map(o => `№${o.number}`) })
+  return marks
+})
 const dateHint = computed(() => {
   if (!dateValue.value)
     return null
@@ -358,41 +350,8 @@ async function downloadSheet(order: SupplierOrder) {
 </script>
 
 <template>
-  <div class="container mx-auto space-y-6 p-4 md:p-8" data-testid="deliveries-page">
-    <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight md:text-3xl">
-          Поставки
-        </h1>
-        <p class="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Заказы поставщикам — от «Формируется» до приёмки. Товары из «На сайт» копятся в заказ своего поставщика;
-          отправили — «Заказано» с датой поставки; пришло — «Принять»: остаток прибавится, новый товар появится на сайте.
-        </p>
-      </div>
-      <Button variant="outline" size="sm" :disabled="isLoading" @click="load">
-        <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': isLoading }" />
-        Обновить
-      </Button>
-    </div>
-
-    <div v-if="isLoading && !data" class="space-y-3">
-      <Skeleton v-for="i in 3" :key="i" class="h-28 w-full rounded-xl" />
-    </div>
-
-    <template v-else-if="data">
-      <p v-if="!data.ordersReady" class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200" data-testid="deliveries-no-orders">
-        Заказов поставщикам на базе ещё нет — раздел заработает после миграции заказов.
-      </p>
-      <p v-else-if="!data.ready" class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200" data-testid="deliveries-no-migration">
-        Формирующиеся заказы и даты поставки заработают после миграции базы. Принимать по заказам из «К закупке» можно уже сейчас.
-      </p>
-
-      <div class="flex flex-wrap gap-2 text-sm" data-testid="deliveries-summary">
-        <a v-if="data.ready" href="#forming" class="rounded-full bg-muted px-3 py-1">Формируются: <span class="font-medium tabular-nums">{{ forming.length }}</span></a>
-        <a href="#waiting" class="rounded-full bg-muted px-3 py-1">Ждём: <span class="font-medium tabular-nums">{{ waiting.length }}</span><template v-if="lateCount">, <span class="text-destructive">{{ plural(lateCount, 'опаздывает', 'опаздывают', 'опаздывают') }} {{ lateCount }}</span></template></a>
-        <a href="#closed" class="rounded-full bg-muted px-3 py-1">Закрытые за 60 дней: <span class="font-medium tabular-nums">{{ closed.length }}</span></a>
-      </div>
-
+  <div class="space-y-6" data-testid="supplier-orders">
+    <template v-if="data">
       <!-- Формируются -->
       <section v-if="data.ready" id="forming" class="scroll-mt-20 space-y-3" data-testid="deliveries-forming">
         <h2 class="text-lg font-semibold">
@@ -406,7 +365,7 @@ async function downloadSheet(order: SupplierOrder) {
             <div class="flex flex-col justify-between gap-2 lg:flex-row lg:items-start">
               <div class="space-y-1 text-sm">
                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span class="font-medium">№{{ order.number }} · {{ supplierName(order.supplierId) }}</span>
+                  <span class="font-medium">№{{ order.number }}</span>
                   <Badge :variant="STATUS_VARIANT[order.status]">
                     {{ ORDER_STATUS_LABEL[order.status] }}
                   </Badge>
@@ -518,7 +477,7 @@ async function downloadSheet(order: SupplierOrder) {
             <div class="flex flex-col justify-between gap-2 lg:flex-row lg:items-start">
               <div class="space-y-1 text-sm">
                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span class="font-medium">№{{ order.number }} · {{ supplierName(order.supplierId) }}</span>
+                  <span class="font-medium">№{{ order.number }}</span>
                   <Badge :variant="STATUS_VARIANT[order.status]">
                     {{ ORDER_STATUS_LABEL[order.status] }}
                   </Badge>
@@ -532,6 +491,9 @@ async function downloadSheet(order: SupplierOrder) {
                 >
                   <CalendarDays class="h-4 w-4" />
                   {{ expectedState(order, today)!.label }}
+                </div>
+                <div v-if="postponedText(order)" class="text-xs text-amber-700 dark:text-amber-400" data-testid="delivery-postponed">
+                  {{ postponedText(order) }}
                 </div>
                 <div class="text-muted-foreground tabular-nums" data-testid="delivery-check">
                   {{ checkText(order) }}
@@ -659,7 +621,7 @@ async function downloadSheet(order: SupplierOrder) {
           <Card v-for="order in closed" :key="order.id" data-testid="delivery-order" :data-number="order.number" :data-status="order.status">
             <CardContent class="space-y-2 px-4 md:px-6">
               <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                <span class="font-medium">№{{ order.number }} · {{ supplierName(order.supplierId) }}</span>
+                <span class="font-medium">№{{ order.number }}</span>
                 <Badge :variant="STATUS_VARIANT[order.status]">
                   {{ ORDER_STATUS_LABEL[order.status] }}
                 </Badge>
@@ -714,6 +676,14 @@ async function downloadSheet(order: SupplierOrder) {
           </DialogDescription>
         </DialogHeader>
         <form v-if="dating" class="space-y-4" data-testid="date-dialog" @submit.prevent="submitDate">
+          <DeliveryCalendar
+            :today="today"
+            :selected="dateValue || null"
+            :marks="otherDeliveries"
+            :min="today"
+            :max="maxDay"
+            @select="(day: string) => (dateValue = day)"
+          />
           <div class="flex items-center gap-2">
             <Input v-model="dateValue" type="date" :min="today" :max="maxDay" class="h-10 w-44" aria-label="Примерная дата поставки" data-testid="date-input" />
             <span v-if="dateHint" class="text-sm text-muted-foreground" data-testid="date-hint">
