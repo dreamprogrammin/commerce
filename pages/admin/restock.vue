@@ -815,7 +815,7 @@ async function assignSupplier(productId: string, supplierId: string) {
                       <span v-if="row.manual" class="ml-2 text-primary">добавлен вручную</span>
                       <span v-else-if="row.quantity === 0" class="ml-2">не берём</span>
                       <span v-if="row.item.pending" class="ml-2 text-amber-700 dark:text-amber-400" data-testid="row-pending">уже заказано {{ row.item.pending }} шт.</span>
-                      <NuxtLink v-if="row.item.forming" to="/admin/deliveries" class="ml-2 text-amber-700 hover:underline dark:text-amber-400" data-testid="row-forming">
+                      <NuxtLink v-if="row.item.forming" to="/admin/deliveries" class="ml-2 whitespace-nowrap text-amber-700 hover:underline dark:text-amber-400" data-testid="row-forming">
                         в формирующемся заказе {{ row.item.forming }} шт.
                       </NuxtLink>
                     </div>
