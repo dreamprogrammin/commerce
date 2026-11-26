@@ -360,6 +360,9 @@ try {
   const restockBlock = page.locator(`[data-testid=supplier-block][data-supplier="${SUPPLIER}"]`)
   await restockBlock.waitFor({ timeout: 30000 })
   check(await restockBlock.locator(`[data-testid=restock-row][data-product="${d.old}"]`).count() === 0, 'товар из формирующегося заказа — не «на пороге», второй раз не предложен')
+  // Блок поставщика, у которого «на пороге» ничего, свёрнут — раскрыть заголовком
+  if (!await restockBlock.locator('[data-testid=order-add]').isVisible())
+    await restockBlock.locator('[data-slot=card-header]').first().click()
   await restockBlock.locator('[data-testid=order-add]').click()
   const pick = page.locator('[data-testid=order-add-item]', { hasText: d.oldName })
   await pick.waitFor({ timeout: 10000 })
