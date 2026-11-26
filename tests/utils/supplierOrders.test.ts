@@ -1,6 +1,6 @@
 import type { SupplierOrder } from '../../utils/supplierOrders'
 import { describe, expect, it } from 'vitest'
-import { isOpenOrder, ORDER_STATUS_LABEL, orderMoney, orderSheetLines, orderSummary, receiveDefaults, receiveMoney, receivePlan, remaining, savedOrderMoney, supplierOrderText } from '../../utils/supplierOrders'
+import { addDays, almatyDay, daysBetween, deliveryDay, expectedState, isOpenOrder, lineCheck, ORDER_STATUS_LABEL, orderCheck, orderMoney, orderSheetLines, orderSummary, receiveDefaults, receiveMoney, receivePlan, remaining, savedOrderMoney, supplierOrderText } from '../../utils/supplierOrders'
 
 /**
  * Заказы поставщикам — шаг 2 «К закупке» (31.10.2026).
@@ -95,5 +95,60 @@ describe('деньги заказа', () => {
       { name: 'Кукла', sku: 'A1', costPrice: 1000, quantity: 3, photoUrl: 'https://x/p.webp' },
       { name: 'Пусто', sku: null, costPrice: null, quantity: 0, photoUrl: null },
     ])).toEqual([{ supplier: 'Опт', name: 'Кукла', article: 'A1', price: 1000, quantity: 3, photoUrl: 'https://x/p.webp', link: null }])
+  })
+})
+
+describe('поставки (26.11.2026)', () => {
+  it('формирующийся заказ не открыт: принять по нему нельзя, в «К закупке» он не ждёт', () => {
+    expect(isOpenOrder({ status: 'draft' })).toBe(false)
+    expect(ORDER_STATUS_LABEL.draft).toBe('Формируется')
+  })
+
+  it('день по Алматы — UTC+5: 19:30 UTC уже завтра', () => {
+    expect(almatyDay(new Date('2026-11-26T18:59:00Z'))).toBe('2026-11-26')
+    expect(almatyDay(new Date('2026-11-26T19:30:00Z'))).toBe('2026-11-27')
+  })
+
+  it('дни по календарю — через конец месяца и года', () => {
+    expect(addDays('2026-11-29', 3)).toBe('2026-12-02')
+    expect(addDays('2026-12-30', 3)).toBe('2027-01-02')
+    expect(daysBetween('2026-11-26', '2026-12-01')).toBe(5)
+    expect(daysBetween('2026-11-26', '2026-11-24')).toBe(-2)
+    expect(deliveryDay('2026-12-01')).toBe('01.12')
+  })
+
+  it('когда ждать: впереди, сегодня, опаздывает, без даты; формирующийся и закрытый — нет', () => {
+    const today = '2026-11-26'
+    expect(expectedState({ status: 'ordered', expectedAt: '2026-11-29' }, today)).toEqual({ kind: 'ahead', days: 3, label: 'ждём 29.11 — через 3 дня' })
+    expect(expectedState({ status: 'in_transit', expectedAt: '2026-11-26' }, today)).toEqual({ kind: 'today', days: 0, label: 'ждём сегодня, 26.11' })
+    expect(expectedState({ status: 'ordered', expectedAt: '2026-11-21' }, today)).toEqual({ kind: 'late', days: 5, label: 'ждали 21.11 — опаздывает на 5 дней' })
+    expect(expectedState({ status: 'ordered', expectedAt: null }, today)?.kind).toBe('none')
+    expect(expectedState({ status: 'ordered' }, today)?.kind).toBe('none')
+    expect(expectedState({ status: 'draft', expectedAt: '2026-11-21' }, today)).toBeNull()
+    expect(expectedState({ status: 'received', expectedAt: '2026-11-21' }, today)).toBeNull()
+  })
+
+  it('сверка строки: заказано, пришло, не пришло, лишнее', () => {
+    expect(lineCheck({ quantity: 5, received: 3 })).toEqual({ ordered: 5, received: 3, missing: 2, extra: 0 })
+    expect(lineCheck({ quantity: 2, received: 4 })).toEqual({ ordered: 2, received: 4, missing: 0, extra: 2 })
+  })
+
+  it('сверка заказа: штуки и строки по исходу', () => {
+    const o = order({
+      lines: [
+        { productId: 'a', name: 'А', sku: null, quantity: 5, received: 5, costPrice: null },
+        { productId: 'b', name: 'Б', sku: null, quantity: 5, received: 2, costPrice: null },
+        { productId: 'c', name: 'В', sku: null, quantity: 3, received: 0, costPrice: null },
+        { productId: 'd', name: 'Г', sku: null, quantity: 1, received: 3, costPrice: null },
+      ],
+    })
+    expect(orderCheck(o)).toEqual({ positions: 4, ordered: 14, received: 10, missing: 6, extra: 2, full: 1, short: 1, over: 1, none: 1 })
+  })
+
+  it('текст формирующегося — с сегодняшней датой, отправленного — с датой «Заказано»', () => {
+    const now = new Date('2026-11-28T06:00:00Z')
+    expect(supplierOrderText(order({ orderedAt: null }), now)).toContain('28.11.2026')
+    expect(supplierOrderText(order({ createdAt: '2026-11-20T06:00:00Z', orderedAt: '2026-11-26T06:00:00Z' }), now)).toContain('26.11.2026')
+    expect(supplierOrderText(order({ createdAt: '2026-11-20T06:00:00Z' }), now)).toContain('20.11.2026')
   })
 })

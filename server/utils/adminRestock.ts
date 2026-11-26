@@ -68,6 +68,10 @@ export interface SupplierOrder {
   createdAt: string
   shippedAt: string | null
   closedAt: string | null
+  /** Когда ушёл поставщику (26.11.2026): заказ из «Поставок» копился раньше; нет — база до миграции 20261126140000 */
+  orderedAt?: string | null
+  /** Примерная дата поставки, ГГГГ-ММ-ДД */
+  expectedAt?: string | null
   lines: SupplierOrderLine[]
 }
 
@@ -176,6 +180,8 @@ interface OrderRow {
   status: SupplierOrderStatus
   note: string | null
   created_at: string
+  ordered_at?: string | null
+  expected_at?: string | null
   shipped_at: string | null
   closed_at: string | null
   supplier_order_items: { product_id: string | null, product_name: string, sku: string | null, quantity: number, received_quantity: number, cost_price: number | null }[]
@@ -189,11 +195,15 @@ interface OrderRow {
  */
 async function loadOrders(db: SupabaseClient, now: Date): Promise<SupplierOrder[] | null> {
   const since = new Date(now.getTime() - 30 * DAY).toISOString()
-  const { data, error } = await db.from('supplier_orders')
-    .select('id, number, supplier_id, status, note, created_at, shipped_at, closed_at, supplier_order_items(product_id, product_name, sku, quantity, received_quantity, cost_price)')
+  const query = (dates: string) => db.from('supplier_orders')
+    .select(`id, number, supplier_id, status, note, created_at, ${dates}shipped_at, closed_at, supplier_order_items(product_id, product_name, sku, quantity, received_quantity, cost_price)`)
     .or(`status.in.(ordered,in_transit),closed_at.gte.${since}`)
     .order('number', { ascending: false })
     .limit(500)
+  // Даты «Поставок» — с миграции 20261126140000; до неё колонок нет (42703)
+  let { data, error } = await query('ordered_at, expected_at, ')
+  if (error?.code === '42703')
+    ({ data, error } = await query(''))
   if (error) {
     // Таблиц нет. Проверено 31.10.2026 на PostgREST 12.2.3, обе таблицы спрятаны:
     // запрос с вложенными строками отвечает PGRST200 («нет связи»), простой —
@@ -204,13 +214,14 @@ async function loadOrders(db: SupabaseClient, now: Date): Promise<SupplierOrder[
     }
     throw createError({ statusCode: 500, message: error.message })
   }
-  return (data as OrderRow[] ?? []).map(o => ({
+  return (data as unknown as OrderRow[] ?? []).map(o => ({
     id: o.id,
     number: o.number,
     supplierId: o.supplier_id,
     status: o.status,
     note: o.note,
     createdAt: o.created_at,
+    ...(o.ordered_at !== undefined ? { orderedAt: o.ordered_at, expectedAt: o.expected_at ?? null } : {}),
     shippedAt: o.shipped_at,
     closedAt: o.closed_at,
     lines: o.supplier_order_items

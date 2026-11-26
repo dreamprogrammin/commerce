@@ -9,6 +9,7 @@ import {
   Check,
   Gauge,
   Inbox,
+  PackageCheck,
   PackageSearch,
   PackageX,
   RefreshCw,
@@ -49,6 +50,7 @@ const PAGE_ICON: Record<(typeof PURCHASING_PAGES)[number]['to'], Component> = {
   '/admin/demand': Search,
   '/admin/ai': Bot,
   '/admin/restock': ShoppingCart,
+  '/admin/deliveries': PackageCheck,
 }
 
 const CARD = 'rounded-[20px] bg-background shadow-sm'

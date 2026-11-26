@@ -3112,6 +3112,7 @@ export interface Database {
           product_name: string
           quantity: number
           received_quantity: number
+          show_on_receipt: boolean
           sku: string | null
         }
         Insert: {
@@ -3122,6 +3123,7 @@ export interface Database {
           product_name: string
           quantity: number
           received_quantity?: number
+          show_on_receipt?: boolean
           sku?: string | null
         }
         Update: {
@@ -3132,6 +3134,7 @@ export interface Database {
           product_name?: string
           quantity?: number
           received_quantity?: number
+          show_on_receipt?: boolean
           sku?: string | null
         }
         Relationships: [
@@ -3156,9 +3159,11 @@ export interface Database {
           closed_at: string | null
           created_at: string
           created_by: string | null
+          expected_at: string | null
           id: string
           note: string | null
           number: number
+          ordered_at: string | null
           shipped_at: string | null
           status: string
           supplier_id: string
@@ -3168,9 +3173,11 @@ export interface Database {
           closed_at?: string | null
           created_at?: string
           created_by?: string | null
+          expected_at?: string | null
           id?: string
           note?: string | null
           number?: never
+          ordered_at?: string | null
           shipped_at?: string | null
           status?: string
           supplier_id: string
@@ -3180,9 +3187,11 @@ export interface Database {
           closed_at?: string | null
           created_at?: string
           created_by?: string | null
+          expected_at?: string | null
           id?: string
           note?: string | null
           number?: never
+          ordered_at?: string | null
           shipped_at?: string | null
           status?: string
           supplier_id?: string
@@ -3463,6 +3472,15 @@ export interface Database {
         }
         Returns: Json
       }
+      admin_add_to_supplier_draft: {
+        Args: {
+          p_admin_id: string
+          p_product_id: string
+          p_quantity: number
+          p_show_on_receipt: boolean
+        }
+        Returns: Json
+      }
       admin_create_supplier_order: {
         Args: {
           p_admin_id: string
@@ -3470,6 +3488,10 @@ export interface Database {
           p_note?: string
           p_supplier_id: string
         }
+        Returns: Json
+      }
+      admin_edit_supplier_draft: {
+        Args: { p_admin_id: string, p_items: Json, p_order_id: string }
         Returns: Json
       }
       admin_merge_offline_customer: {
@@ -3480,6 +3502,10 @@ export interface Database {
         }
         Returns: Json
       }
+      admin_place_supplier_order: {
+        Args: { p_admin_id: string, p_expected_at: string, p_order_id: string }
+        Returns: Json
+      }
       admin_receive_supplier_order: {
         Args: {
           p_admin_id: string
@@ -3487,6 +3513,10 @@ export interface Database {
           p_items: Json
           p_order_id: string
         }
+        Returns: Json
+      }
+      admin_set_supplier_order_expected: {
+        Args: { p_admin_id: string, p_expected_at: string, p_order_id: string }
         Returns: Json
       }
       admin_set_supplier_order_status: {

@@ -5,11 +5,14 @@
  */
 import type { OrderSheetLine } from './orderSheet'
 import type { DraftRow, RestockItem } from './restockOrder'
-import { orderText } from './restockOrder'
+import { orderText, plural } from './restockOrder'
 
-export type SupplierOrderStatus = 'ordered' | 'in_transit' | 'received' | 'cancelled'
+/** draft — «Формируется» (26.11.2026): копится, поставщику ещё не отправлен */
+export type SupplierOrderStatus = 'draft' | 'ordered' | 'in_transit' | 'received' | 'cancelled'
 
 export interface SupplierOrderLine {
+  /** Строка заказа — ею правится формирующийся; нет — ответ «К закупке», там правок нет */
+  id?: string
   /** null — товар потом удалили; название и артикул — снимок на момент заказа */
   productId: string | null
   name: string
@@ -17,6 +20,8 @@ export interface SupplierOrderLine {
   quantity: number
   received: number
   costPrice: number | null
+  /** Новый товар скрыт с сайта до первой приёмки (26.11.2026) */
+  showOnReceipt?: boolean
 }
 
 export interface SupplierOrder {
@@ -26,12 +31,17 @@ export interface SupplierOrder {
   status: SupplierOrderStatus
   note: string | null
   createdAt: string
+  /** Когда ушёл поставщику; null — формируется. Нет поля — ответ «К закупке» (26.11.2026) */
+  orderedAt?: string | null
+  /** Примерная дата поставки, ГГГГ-ММ-ДД по Алматы; null — не указана */
+  expectedAt?: string | null
   shippedAt: string | null
   closedAt: string | null
   lines: SupplierOrderLine[]
 }
 
 export const ORDER_STATUS_LABEL: Record<SupplierOrderStatus, string> = {
+  draft: 'Формируется',
   ordered: 'Заказан',
   in_transit: 'В пути',
   received: 'Принят',
@@ -76,6 +86,23 @@ export function receiveDefaults(order: Pick<SupplierOrder, 'lines'>): Record<str
   return quantities
 }
 
+/** Ответ «Принять» (`/api/admin/restock/orders/{id}/receive`) */
+export interface ReceiveResult {
+  status: 'in_transit' | 'received'
+  units: number
+  notified: number
+  received: { product_id: string, quantity: number }[]
+  /** Скрытые до приёмки товары, которые она показала (26.11.2026); нет — база до миграции */
+  shown?: { product_id: string, slug: string }[]
+}
+
+/** Что окну приёмки нужно знать о товаре строки */
+export interface ReceiveProduct {
+  stock: number
+  alerts: number
+  price: number
+}
+
 export interface ReceivePlan {
   units: number
   /** Ждут «Сообщить о поступлении» товаров, которых сейчас 0, — им придёт уведомление */
@@ -106,14 +133,18 @@ export function receivePlan(
   return { units, notified, short }
 }
 
-/** Текст сохранённого заказа — тот же, что уходил поставщику, с номером. */
-export function supplierOrderText(order: Pick<SupplierOrder, 'number' | 'createdAt' | 'lines'>): string {
+/**
+ * Текст сохранённого заказа — тот же, что уходил поставщику, с номером.
+ * Дата — когда заказ ушёл; формирующийся (`orderedAt: null`) уходит сейчас.
+ */
+export function supplierOrderText(order: Pick<SupplierOrder, 'number' | 'createdAt' | 'lines' | 'orderedAt'>, now = new Date()): string {
   const rows: DraftRow<RestockItem>[] = order.lines.map((line, i) => ({
     item: { id: line.productId ?? `deleted-${i}`, name: line.name, sku: line.sku, stock: 0, minStock: 0, restockQty: 0, costPrice: line.costPrice },
     quantity: line.quantity,
     manual: false,
   }))
-  return orderText(rows, new Date(order.createdAt), order.number)
+  const date = order.orderedAt ? new Date(order.orderedAt) : order.orderedAt === null ? now : new Date(order.createdAt)
+  return orderText(rows, date, order.number)
 }
 
 /**
@@ -179,4 +210,148 @@ export function orderSheetLines(
   lines: { name: string, sku: string | null, costPrice: number | null, quantity: number, photoUrl: string | null }[],
 ): OrderSheetLine[] {
   return lines.filter(l => l.quantity > 0).map(l => ({ supplier, name: l.name, article: l.sku, price: l.costPrice, quantity: l.quantity, photoUrl: l.photoUrl, link: null }))
+}
+
+// ---------- Поставки (26.11.2026) ----------
+
+/**
+ * «Поставки» — заказы поставщикам от «Формируется» до «Принят» и сверка, как
+ * в SAP-портале. Владелец 26.11: «там должна происходить сверка товаров —
+ * сколько пришло и сколько нет». Даты — дни по Алматы, ГГГГ-ММ-ДД.
+ */
+
+/** Сегодня по Алматы */
+export function almatyDay(now: Date): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Almaty' }).format(now)
+}
+
+/** День через N дней — по календарю, без часовых поясов */
+export function addDays(day: string, n: number): string {
+  const d = new Date(`${day}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Сколько дней от `from` до `to`; отрицательное — `to` уже прошёл */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000)
+}
+
+/** «28.11» */
+export function deliveryDay(day: string): string {
+  return `${day.slice(8, 10)}.${day.slice(5, 7)}`
+}
+
+/** Через сколько дней по умолчанию ждать поставку после «Заказано» */
+export const DEFAULT_LEAD_DAYS = 3
+
+const daysWord = (n: number) => `${n} ${plural(n, 'день', 'дня', 'дней')}`
+
+export interface ExpectedState {
+  /** none — даты нет; ahead — впереди; today — сегодня; late — прошла */
+  kind: 'none' | 'ahead' | 'today' | 'late'
+  /** Сколько дней до даты или сколько опаздывает */
+  days: number
+  label: string
+}
+
+/** Когда ждать открытый заказ; формирующийся и закрытый — null */
+export function expectedState(order: Pick<SupplierOrder, 'status' | 'expectedAt'>, today: string): ExpectedState | null {
+  if (!isOpenOrder(order))
+    return null
+  if (!order.expectedAt)
+    return { kind: 'none', days: 0, label: 'дата поставки не указана' }
+  const days = daysBetween(today, order.expectedAt)
+  const date = deliveryDay(order.expectedAt)
+  if (days > 0)
+    return { kind: 'ahead', days, label: `ждём ${date} — через ${daysWord(days)}` }
+  if (days === 0)
+    return { kind: 'today', days: 0, label: `ждём сегодня, ${date}` }
+  return { kind: 'late', days: -days, label: `ждали ${date} — опаздывает на ${daysWord(-days)}` }
+}
+
+/**
+ * Сверка строки: заказано, пришло, не пришло и лишнее. У открытого заказа
+ * «не пришло» — ещё ждём, у закрытого — недостача.
+ */
+export interface LineCheck {
+  ordered: number
+  received: number
+  missing: number
+  extra: number
+}
+
+export function lineCheck(line: Pick<SupplierOrderLine, 'quantity' | 'received'>): LineCheck {
+  return {
+    ordered: line.quantity,
+    received: line.received,
+    missing: Math.max(line.quantity - line.received, 0),
+    extra: Math.max(line.received - line.quantity, 0),
+  }
+}
+
+export interface OrderCheck extends LineCheck {
+  positions: number
+  /** Строк: пришло ровно, пришло не всё, пришло больше, не пришло ничего */
+  full: number
+  short: number
+  over: number
+  none: number
+}
+
+/** Сверка заказа — по строкам и в штуках */
+export function orderCheck(order: Pick<SupplierOrder, 'lines'>): OrderCheck {
+  const sum: OrderCheck = { positions: order.lines.length, ordered: 0, received: 0, missing: 0, extra: 0, full: 0, short: 0, over: 0, none: 0 }
+  for (const line of order.lines) {
+    const c = lineCheck(line)
+    sum.ordered += c.ordered
+    sum.received += c.received
+    sum.missing += c.missing
+    sum.extra += c.extra
+    if (!c.received && c.ordered)
+      sum.none++
+    else if (c.missing)
+      sum.short++
+    else if (c.extra)
+      sum.over++
+    else
+      sum.full++
+  }
+  return sum
+}
+
+/** Товар строки поставки — сегодняшний, не снимок в заказе */
+export interface DeliveryProduct {
+  name: string
+  slug: string | null
+  imageUrl: string | null
+  /** Цена на сайте со скидкой */
+  price: number
+  stock: number
+  /** Подписаны на «Сообщить о поступлении» */
+  alerts: number
+  /** Виден на сайте */
+  active: boolean
+}
+
+/** Строка журнала приёмки (`stock_receipts`) */
+export interface DeliveryReceipt {
+  orderId: string
+  productId: string
+  quantity: number
+  receivedAt: string
+}
+
+/** Ответ `/api/admin/deliveries` */
+export interface DeliveriesData {
+  /** false — миграция 20261126140000 не применена: дат и формирующихся нет, принимать можно */
+  ready: boolean
+  /** false — нет и самих заказов (до 20261031160000) */
+  ordersReady: boolean
+  /** Сегодня по Алматы, ГГГГ-ММ-ДД — по часам сервера */
+  today: string
+  suppliers: { id: string, name: string, phone: string | null }[]
+  orders: SupplierOrder[]
+  products: Record<string, DeliveryProduct>
+  receipts: DeliveryReceipt[]
 }

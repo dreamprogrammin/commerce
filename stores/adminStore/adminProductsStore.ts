@@ -323,8 +323,10 @@ export const useAdminProductsStore = defineStore('adminProductsStore', () => {
       // 🎯 Управляем картинками с blur (🔍 SEO: передаём имя товара для названия файлов)
       await _manageProductImages(newProduct.id, newProduct.name, newImageFiles, [], 0, [])
 
-      // 🔍 SEO: Уведомляем поисковики о новом товаре
-      if (newProduct.slug) {
+      // 🔍 SEO: Уведомляем поисковики о новом товаре. Скрытый — нет: на сайте
+      // его не видно, а «На сайт» с заказом поставщику скрывает товар до
+      // приёмки, и о нём скажет приёмка (26.11.2026)
+      if (newProduct.slug && productData.is_active !== false) {
         notifySearchEngines(newProduct.slug)
       }
       revalidateProductPages({ productId: newProduct.id })

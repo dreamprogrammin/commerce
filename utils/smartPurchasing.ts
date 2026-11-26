@@ -24,6 +24,7 @@ export const PURCHASING_PAGES = [
   { to: '/admin/kaspi', label: 'Цифры Kaspi' },
   { to: '/admin/ai', label: 'Модели ИИ' },
   { to: '/admin/restock', label: 'К закупке' },
+  { to: '/admin/deliveries', label: 'Поставки' },
 ] as const
 
 /** Дашборд — корень раздела */
@@ -178,6 +179,16 @@ export interface PurchasingStatus {
     /** Заказаны или в пути; null — миграции заказов ещё нет */
     openOrders: number | null
   }
+  /**
+   * «Поставки» (26.11.2026): формирующиеся заказы и сколько в них позиций,
+   * открытые и из них опаздывающие; null — миграции 20261126140000 ещё нет
+   */
+  deliveries: {
+    forming: number
+    formingPositions: number
+    waiting: number
+    late: number
+  } | null
   /** Поставщики по числу товаров на сайте */
   supplierLoad: SupplierLoad[]
   /** Активные товары без поставщика */
@@ -188,7 +199,7 @@ export interface PurchasingStatus {
 export type StepState = 'done' | 'action' | 'running' | 'later'
 
 export interface PurchasingStep {
-  id: 'suppliers' | 'demand' | 'ai' | 'offers' | 'order'
+  id: 'suppliers' | 'demand' | 'ai' | 'offers' | 'order' | 'deliveries'
   title: string
   /** Зачем шаг — одной строкой */
   about: string
@@ -446,7 +457,42 @@ function orderStep(s: PurchasingStatus): PurchasingStep {
   return { ...step, state: 'done', facts, next: null }
 }
 
-/** Шаги умного закупа по порядку: откуда товар → спрос → чтение постов → товары поставщиков → заказ. */
+/**
+ * «Поставки» (26.11.2026): товары из «На сайт» копятся в заказ поставщику,
+ * «Заказано» — с датой, «Принять» — со сверкой, сколько пришло и сколько нет.
+ */
+function deliveriesStep(s: PurchasingStatus): PurchasingStep {
+  const step = {
+    id: 'deliveries' as const,
+    title: 'Поставки',
+    about: 'Товары из «На сайт» копятся в заказ своему поставщику; отправили — «Заказано» с датой, пришло — «Принять» и сверка.',
+    link: { to: '/admin/deliveries', label: 'Поставки' },
+  }
+  const d = s.deliveries
+  if (!d)
+    return { ...step, state: 'later', facts: ['миграции поставок нет'], next: NO_MIGRATION }
+  const facts: string[] = []
+  if (d.forming)
+    facts.push(`${plural(d.forming, 'формируется', 'формируются', 'формируются')} ${count(d.forming, 'заказ', 'заказа', 'заказов')}: ${count(d.formingPositions, 'позиция', 'позиции', 'позиций')}`)
+  if (d.waiting)
+    facts.push(`ждём ${count(d.waiting, 'поставку', 'поставки', 'поставок')}`)
+  if (d.late)
+    facts.push(`опаздывают: ${d.late}`)
+  if (!facts.length)
+    facts.push('открытых поставок нет')
+
+  const todo = [
+    d.forming && 'Отправьте сформированный заказ поставщику и нажмите «Заказано».',
+    d.late && 'Опаздывающие — уточните у поставщика и поправьте дату.',
+  ].filter(Boolean).join(' ')
+  if (todo)
+    return { ...step, state: 'action', facts, next: todo }
+  if (d.waiting)
+    return { ...step, state: 'running', facts, next: 'Пришло — «Принять» у поставки: остаток прибавится, новый товар появится на сайте.' }
+  return { ...step, state: 'done', facts, next: null }
+}
+
+/** Шаги умного закупа по порядку: откуда товар → спрос → чтение постов → товары поставщиков → заказ → поставки. */
 export function purchasingSteps(s: PurchasingStatus): PurchasingStep[] {
-  return [suppliersStep(s), demandStep(s), aiStep(s), offersStep(s), orderStep(s)]
+  return [suppliersStep(s), demandStep(s), aiStep(s), offersStep(s), orderStep(s), deliveriesStep(s)]
 }

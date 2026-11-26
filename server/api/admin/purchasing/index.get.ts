@@ -8,7 +8,7 @@ import { isOpenOrder } from '~/utils/supplierOrders'
 /**
  * «Умный закуп» (3 ноября 2026): сводка для дашборда — спрос по темам, остаток
  * DataForSEO, поставщики с товарами и каналами, аккаунт Telegram для закрытых
- * каналов, товары поставщиков, ключ ИИ, заказы поставщикам.
+ * каналов, товары поставщиков, ключ ИИ, заказы поставщикам и поставки.
  * Показатели и шаги из неё собирает `utils/smartPurchasing.ts`.
  *
  * Наружу ходит только за балансом — бесплатный `/v3/appendix/user_data`, как
@@ -20,7 +20,7 @@ import { isOpenOrder } from '~/utils/supplierOrders'
 export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
   const db = await requireAdmin(event)
 
-  const [channels, telegramSecrets, offers, summary, candidates, runs, demandKey, aiKeys, aiModel, aiReading, restock] = await Promise.all([
+  const [channels, telegramSecrets, offers, summary, candidates, runs, demandKey, aiKeys, aiModel, aiReading, restock, deliveries] = await Promise.all([
     db.from('supplier_channels').select('supplier_id, web_preview'),
     db.rpc('telegram_secrets_status'),
     db.rpc('supplier_offers_summary'),
@@ -32,6 +32,7 @@ export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
     db.from('ai_settings').select('value').eq('key', 'supplier_vision_model').maybeSingle(),
     db.rpc('supplier_offers_read_summary'),
     loadRestock(db),
+    deliveriesSummary(db),
   ])
   // Таблицы или функции шага нет — миграция не применена; любая другая ошибка — 500
   const missing = (r: { error: { code?: string, message: string } | null }, notInstalled: (e: { code?: string }) => boolean) => {
@@ -144,6 +145,7 @@ export default defineEventHandler(async (event): Promise<PurchasingStatus> => {
       suppliers: new Set(atThreshold.flatMap(p => p.supplierId ? [p.supplierId] : [])).size,
       openOrders: restock.orders ? restock.orders.filter(isOpenOrder).length : null,
     },
+    deliveries,
     supplierLoad,
     unassigned: { products: unassigned.length, toRestock: unassigned.filter(needsRestock).length },
   }

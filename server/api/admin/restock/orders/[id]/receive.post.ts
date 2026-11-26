@@ -6,6 +6,10 @@
  * Остаток 0 → N будит `trigger_back_in_stock`: ждавшие товар получают «Товар
  * снова в наличии» — в ответе `notified`, сколько их. Кеш страниц товара
  * после приёмки сбрасывает страница (`adminRevalidateStore.flushNow`).
+ *
+ * С 26.11.2026 (миграция 20261126140000) им же принимают в «Поставках»;
+ * новый товар, скрытый до приёмки, она показывает на сайте — в ответе
+ * `shown`, страница скажет о нём поисковикам.
  */
 export default defineEventHandler(async (event) => {
   const db = await requireAdmin(event)
@@ -28,5 +32,7 @@ export default defineEventHandler(async (event) => {
     units: number
     notified: number
     received: { product_id: string, quantity: number, stock_before: number, stock_after: number, notified: number }[]
+    /** Скрытые до приёмки товары, которые она показала (26.11.2026); нет — база до миграции 20261126140000 */
+    shown?: { product_id: string, slug: string }[]
   }
 })
