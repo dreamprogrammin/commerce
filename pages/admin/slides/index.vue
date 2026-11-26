@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import SlidesForm from '@/components/admin/slides/ SlidesForm.vue'
+import SlidesForm from '@/components/admin/slides/SlidesForm.vue'
 import { useAdminSlides } from '@/composables/admin/useAdminSlides'
 import { useSupabaseStorage } from '@/composables/menuItems/useSupabaseStorage'
 import { BUCKET_NAME_SLIDES } from '@/constants'
