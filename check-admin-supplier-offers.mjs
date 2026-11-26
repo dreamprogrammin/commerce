@@ -53,7 +53,7 @@
  *     первым; тема по смыслу даёт уровень товару без темы; по названию не
  *     ищут — уровень по примерному запросу, а не «спроса нет»; без миграции
  *     20261122120000 — страница как прежде, разбор — off: 'migration';
- * 15) «Тексты для сайта» (23.11.2026): после «На сайт» модель задачи «Тексты
+ * 15) «Тексты для сайта» (23.11.2026): по «Сгенерировать» (26.11.2026) модель задачи «Тексты
  *     для сайта» (по умолчанию Sonnet 5.5; заглушка) пишет название, описание
  *     и SEO-описание и выбирает раздел и бренд номерами из списков сайта — в
  *     запросе правила кнопки «Скопировать промпт» без строк «Имя поля:», ответ
@@ -72,6 +72,12 @@
  *     «Сохранить» в нём можно нажать; на телефоне 390 px оба окна в ширину
  *     экрана, а на странице правки бренда кнопки строки «SEO оптимизация»
  *     не уезжают за край.
+ * 17) тексты по кнопке и сохраняются (26.11.2026): «На сайт» к модели не
+ *     ходит — над формой «Сгенерировать»; ответ лежит у товара поставщика
+ *     (без остатка бюджета), после перезагрузки он в форме без нового
+ *     запроса, расход — «тогда»; бренд, созданный кнопкой «Создать бренд»,
+ *     после перезагрузки уже не «новый» и уходит в товар; без миграции
+ *     20261126120000 «Сгенерировать» работает, просто ответ не сохраняется.
  *
  * Данные заводит сам — администратор, покупатель, два поставщика с каналами,
  * вход подделки Telegram, ключ ИИ для заглушки, раздел и бренд для «Текстов
@@ -563,6 +569,13 @@ COMMIT;
 NOTIFY pgrst, 'reload schema';`)
 }
 
+// База «до 20261126120000»: колонки сохранённых текстов нет; функций на ней нет — достаточно имени
+function renameTexts(back) {
+  const [from, to] = back ? ['_check_off', ''] : ['', '_check_off']
+  psql(`ALTER TABLE public.supplier_offers RENAME COLUMN written_texts${from} TO written_texts${to};
+NOTIFY pgrst, 'reload schema';`)
+}
+
 function psqlSuper(sql) {
   return execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=postgres', DB_CONTAINER, 'psql', '-w', '-h', '127.0.0.1', '-U', 'supabase_admin', '-d', 'postgres', '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1'], { input: sql, encoding: 'utf8' }).trim()
 }
@@ -618,6 +631,7 @@ let gucSet = false
 let renamed = false
 let readRenamed = false
 let guessRenamed = false
+let textsRenamed = false
 try {
   if (psql(`SELECT to_regclass('public.supplier_offers') IS NOT NULL;`) !== 't')
     throw new Error('На локальной базе нет миграции 20261104160000_supplier_offers')
@@ -1299,8 +1313,16 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   await form.locator('[data-testid=draft-duplicate]').waitFor({ timeout: 30000 })
   check(sp(await form.locator('[data-testid=draft-duplicate]').textContent()).startsWith('Артикул PO-1014 уже есть на сайте: «Проверка дубля».') && await form.locator(`[data-testid=draft-duplicate] a[href="/admin/products/${dupId}"]`).count() === 1, 'артикул уже на сайте — предупреждение и ссылка на товар')
   check(await form.locator('#cost_price').inputValue() === '2500', `цена с фото — тоже в закупочную: ${await form.locator('#cost_price').inputValue()}`)
+  // ИИ — только по кнопке (26.11.2026): «будут ситуации, когда я не захочу добавлять такой товар, а токены были уже потрачены»
+  const start14 = form.locator('[data-testid=ai-writer-start]')
+  const idle14 = await appeared(start14)
+  await sleep(1500)
+  check(idle14 && await textOf(start14) === 'Сгенерировать' && (await textOf(form.locator('[data-testid=ai-writer]'))).includes('Токены тратятся, только когда нажмёте «Сгенерировать»') && !ai.writes.some(w => w.article === 'PO-1014'), `форма открылась — к модели не ходили, над формой «Сгенерировать»: запросов текстов ${ai.writes.filter(w => w.article === 'PO-1014').length}`)
+  if (SHOTS)
+    await form.locator('[data-testid=ai-writer]').screenshot({ path: `${SHOTS}/ai-writer-idle-1366.png` })
+  await clickIf(start14)
   const writing = await appeared(form.locator('[data-testid=ai-writer-status]'))
-  check(writing && (await textOf(form.locator('[data-testid=ai-writer]'))).includes('ИИ пишет название и описание, подбирает раздел и бренд'), 'сразу после «На сайт» ИИ пишет тексты — «Пишу…» над формой')
+  check(writing && (await textOf(form.locator('[data-testid=ai-writer]'))).includes('ИИ пишет название и описание, подбирает раздел и бренд'), '«Сгенерировать» — ИИ пишет тексты, «Пишу…» над формой')
   await form.locator('#seo_description').fill(OWN_SEO)
   ai.release()
   ai.hold = null
@@ -1324,6 +1346,25 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   const lines14 = await usageLines(form)
   check(lines14[0] === SPENT_LINE && lines14.at(-1) === RATE_LINE, `под ответом — расход в токенах, тенге и долларах и курс с датой — курс заглушки, не nationalbank.kz и не из кода: ${JSON.stringify([lines14[0], lines14.at(-1)])}`)
   check(lines14.length === 4 && writerLineOk(lines14[1], 'за 30 дней') && lines14[2] === 'Бюджет ИИ не задан — задайте сумму на счёте Anthropic в «Умном закупе», карточка «Бюджет ИИ»: здесь будет видно, на сколько описаний хватит', `бюджета нет — всё на описания за 30 дней по журналу (${ai.textSpent.in}/${ai.textSpent.out}) и подсказка, где задать бюджет: ${JSON.stringify(lines14.slice(1, 3))}`)
+  // Ответ — у товара поставщика (26.11.2026): «контент, который был сгенерирован, должен сохраняться даже после перезагрузки»
+  const saved14 = await textOf(form.locator('[data-testid=ai-writer-saved]'))
+  const stored14 = JSON.parse(psql(`SELECT coalesce(written_texts->'0', 'null') FROM public.supplier_offers WHERE id = :'o';`, { o: offerIdOf(1014) }))
+  check(saved14 === 'Ответ сохранён — после перезагрузки страницы он вернётся без новых трат.' && stored14?.name === t14.name && stored14.description === t14.description && stored14.usage?.output === 600 && !('budget' in stored14) && !Number.isNaN(Date.parse(stored14.writtenAt)), `ответ сохранён у товара поставщика — тексты и расход, без остатка бюджета: «${saved14}» · ${stored14 ? Object.keys(stored14).join(',') : 'в базе пусто'}`)
+  const writes14 = ai.writes.filter(w => w.article === 'PO-1014').length
+  await form.reload({ waitUntil: 'networkidle' })
+  const back14 = await appeared(form.locator('[data-testid=ai-writer-filled]'))
+  await sleep(1000)
+  const r14 = await form.evaluate(() => ({ name: document.querySelector('#name')?.value, description: document.querySelector('#description')?.value, seo: document.querySelector('#seo_description')?.value }))
+  const savedBack = await textOf(form.locator('[data-testid=ai-writer-saved]'))
+  check(back14 && r14.name === t14.name && r14.description === t14.description && r14.seo === t14.seo_description && /^Написано \d\d\.\d\d в \d\d:\d\d — взято сохранённое, токены не потрачены\.$/.test(savedBack) && ai.writes.filter(w => w.article === 'PO-1014').length === writes14, `после перезагрузки — сохранённые тексты в форме, к модели не ходили: «${savedBack}», запросов текстов +${ai.writes.filter(w => w.article === 'PO-1014').length - writes14}`)
+  const back14Lines = await usageLines(form)
+  await form.setViewportSize({ width: 390, height: 844 })
+  const restoredPhone = await form.locator('[data-testid=ai-writer]').evaluate(el => el.scrollWidth <= el.clientWidth + 1 && el.getBoundingClientRect().right <= window.innerWidth + 0.5 && document.documentElement.scrollWidth <= window.innerWidth).catch(() => false)
+  check(restoredPhone, 'сохранённый ответ на телефоне 390 px — карточка в ширину экрана, без горизонтальной прокрутки')
+  if (SHOTS)
+    await form.locator('[data-testid=ai-writer]').screenshot({ path: `${SHOTS}/ai-writer-restored-390.png` })
+  await form.setViewportSize({ width: 1366, height: 900 })
+  check(await textOf(form.locator('[data-testid=ai-writer-filled]')) === 'Подставлено в форму: название, описание, SEO-описание, раздел, бренд.' && back14Lines.length === 2 && back14Lines[0] === SPENT_LINE.replace('Расход:', 'Расход тогда:') && back14Lines[1] === RATE_LINE && await textOf(form.locator('[data-testid=ai-writer-retry]')) === 'Написать заново' && await form.locator('[data-testid=ai-writer-start]').count() === 0, `у сохранённого — расход того раза без остатка бюджета, «Написать заново»: ${JSON.stringify(back14Lines)}`)
   await form.context().close()
 
   // Бюджет ИИ на время второго описания (24.11.2026) — строка «осталось»; батарейке ниже нужен «не задан», после проверки убрать
@@ -1336,6 +1377,8 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   await page.locator('[data-testid=offer-card]', { hasText: 'PO-1013' }).locator('[data-testid=offer-to-site]').click()
   await page.waitForURL(u => u.pathname === '/admin/products/new' && u.searchParams.get('offer') === offerIdOf(1013), { timeout: 30000 })
   const t13 = TEXTS['PO-1013']
+  await appeared(page.locator('[data-testid=ai-writer-start]'))
+  await clickIf(page.locator('[data-testid=ai-writer-start]'))
   const wrote13 = await appeared(page.locator('[data-testid=ai-writer-filled]'))
   await page.locator('img[src^="blob:"]').first().waitFor({ timeout: 30000 })
   const filled = await page.evaluate(() => ({
@@ -1407,6 +1450,13 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   await page.getByRole('dialog').first().waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
   const madeState = { card: await textOf(page.locator('[data-testid=ai-brand]')), picked: await page.locator('button[role=combobox]').filter({ hasText: NEW_BRAND }).count(), dialogs: await page.getByRole('dialog').count(), left: (await textOf(page.getByRole('dialog'))).slice(0, 80) }
   check(brandMade && madeState.card === `Бренд «${NEW_BRAND}» создан и выбран в форме.` && madeState.picked === 1 && !madeState.dialogs, `бренд сохранён в окне — выбран в форме, карточка говорит «создан и выбран»: ${JSON.stringify(madeState)}`)
+  // Перезагрузка (26.11.2026): сохранённый ответ называл бренд «новым» — теперь он есть, выбран и уходит в товар
+  const writes13 = ai.writes.filter(w => w.article === 'PO-1013').length
+  await page.reload({ waitUntil: 'networkidle' })
+  const back13 = await appeared(page.locator('[data-testid=ai-writer-filled]'))
+  await page.locator('img[src^="blob:"]').first().waitFor({ timeout: 30000 }).catch(() => {})
+  const brandBack = await textOf(page.locator('[data-testid=ai-writer-brand]'))
+  check(back13 && brandBack === `Бренд: ${NEW_BRAND}` && await page.locator('[data-testid=ai-brand]').count() === 0 && await page.locator('button[role=combobox]').filter({ hasText: NEW_BRAND }).count() === 1 && await page.locator('#name').inputValue() === t13.name && ai.writes.filter(w => w.article === 'PO-1013').length === writes13, `после перезагрузки бренд, созданный кнопкой, — уже не «новый» и выбран, тексты на месте, к модели не ходили: «${brandBack}»`)
   await page.locator('#price').fill('1990')
   await page.getByRole('button', { name: 'Создать товар' }).click()
   await page.waitForURL(u => u.pathname === '/admin/products', { timeout: 60000 })
@@ -1422,6 +1472,8 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   console.log('\n== «Тексты для сайта»: отказ модели и «Написать заново»')
   const f24 = await newPage({ width: 1366, height: 900 }, `/admin/products/new?offer=${offerIdOf(1024)}`)
   const t24 = TEXTS['PO-1024']
+  await appeared(f24.locator('[data-testid=ai-writer-start]'))
+  await clickIf(f24.locator('[data-testid=ai-writer-start]'))
   const refused = await appeared(f24.locator('[data-testid=ai-writer-error]'))
   check(refused && await textOf(f24.locator('[data-testid=ai-writer-error]')) === 'Модель отказалась писать текст для этого товара — заполните вручную' && await f24.locator('#name').inputValue() === 'Игрушка PO-1024' && await textOf(f24.locator('[data-testid=ai-writer-retry]')) === 'Повторить', 'отказ модели — причина над формой, в форме прочитанное с фото, кнопка «Повторить»')
   await clickIf(f24.locator('[data-testid=ai-writer-retry]'))
@@ -1689,6 +1741,25 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   check(!leaked.length, `ни один ответ маршрутов не несёт секретов${leaked.length ? ` — нашлось: ${leaked.join(', ')}` : ''}`)
   check(offerBodies.length && !offerBodies.some(b => b.includes('last4')), `ответы «Товаров поставщиков» и «Текстов для сайта» — без последних знаков ключа ИИ: ${offerBodies.length} ответов`)
 
+  console.log('\n== без миграции текстов для сайта')
+  renameTexts(false)
+  textsRenamed = true
+  await new Promise(r => setTimeout(r, 1500))
+  const draftOff = await api(`/api/admin/supplier-offers/draft?id=${offerIdOf(1024)}`, adminToken)
+  check(draftOff.status === 200 && JSON.stringify(draftOff.json?.written) === '{}' && draftOff.json.items?.length > 0, `черновик без миграции текстов — прочитанное есть, сохранённых текстов нет, не 500: ${draftOff.status}`)
+  const offTexts = await newPage({ width: 1366, height: 900 }, `/admin/products/new?offer=${offerIdOf(1024)}`)
+  const writesOff = ai.writes.length
+  const offIdle = await appeared(offTexts.locator('[data-testid=ai-writer-start]'))
+  await clickIf(offTexts.locator('[data-testid=ai-writer-start]'))
+  const offWrote = await appeared(offTexts.locator('[data-testid=ai-writer-filled]'))
+  check(offIdle && offWrote && ai.writes.length === writesOff + 1 && await offTexts.locator('#name').inputValue() === t24.name && await offTexts.locator('[data-testid=ai-writer-saved]').count() === 0, `без миграции «Сгенерировать» пишет тексты в форму, строки «сохранено» нет: запросов +${ai.writes.length - writesOff}`)
+  await offTexts.context().close()
+  renameTexts(true)
+  textsRenamed = false
+  await new Promise(r => setTimeout(r, 1500))
+  const draftBack = await api(`/api/admin/supplier-offers/draft?id=${offerIdOf(1024)}`, adminToken)
+  check(draftBack.status === 200 && draftBack.json?.written?.['0']?.name === t24.name, 'миграция на месте — сохранённый раньше ответ снова в черновике')
+
   console.log('\n== без миграции разбора ИИ')
   guessOff(true)
   guessRenamed = true
@@ -1766,6 +1837,14 @@ NOTIFY pgrst, 'reload schema';`)
   }
   if (readRenamed)
     renameRead(true)
+  if (textsRenamed) {
+    try {
+      renameTexts(true)
+    }
+    catch (e) {
+      console.error(`колонка written_texts не вернулась — верните руками: ${e.message}`)
+    }
+  }
   // Не вернулось — сказать и всё равно убрать данные стража: секреты не должны остаться
   if (guessRenamed) {
     try {

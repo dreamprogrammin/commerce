@@ -9,6 +9,7 @@ import type { Offer, OfferChannel, OfferReading, OfferStatus } from '~/utils/sup
 import type { PreviewPost } from '~/utils/telegramPreview'
 import { Buffer } from 'node:buffer'
 import process from 'node:process'
+import { savedOfferTexts } from '~/utils/aiWriter'
 import { guessesOf } from '~/utils/offerGuess'
 import { isPreviewPage, parsePreviewPosts } from '~/utils/telegramPreview'
 import { pgrstTableNotFound } from './pgrstErrors'
@@ -68,6 +69,8 @@ const READ_COLUMNS = 'read_items, read_error'
 const QUERY_COLUMNS = 'search_queries'
 /** Разбор ИИ: как такую вещь ищут, тема по смыслу — миграция 20261122120000 */
 const GUESS_COLUMNS = 'demand_guess'
+/** Тексты для сайта, написанные ИИ, — миграция 20261126120000 */
+const TEXT_COLUMNS = 'written_texts'
 
 interface OfferRow {
   id: string
@@ -83,6 +86,7 @@ interface OfferRow {
   read_error?: string | null
   search_queries?: unknown
   demand_guess?: unknown
+  written_texts?: unknown
 }
 
 /** Фразы товаров поста из базы: массив массивов строк, иначе null */
@@ -229,7 +233,10 @@ export async function supplierOfferDraft(db: SupabaseClient, id: string) {
     .select(`${columns}, supplier_channels(supplier_id, suppliers(name))`)
     .eq('id', id)
     .maybeSingle()
-  let res = await one(`id, caption, post_url, photo_url, ${READ_COLUMNS}`)
+  let res = await one(`id, caption, post_url, photo_url, ${READ_COLUMNS}, ${TEXT_COLUMNS}`)
+  // Без миграции текстов — черновик без сохранённого ответа ИИ
+  if (res.error?.code === '42703')
+    res = await one(`id, caption, post_url, photo_url, ${READ_COLUMNS}`)
   // Без миграции чтения — черновик без прочитанного
   if (res.error?.code === '42703')
     res = await one('id, caption, post_url, photo_url')
@@ -247,6 +254,8 @@ export async function supplierOfferDraft(db: SupabaseClient, id: string) {
     supplierId: row.supplier_channels?.supplier_id ?? null,
     supplierName: row.supplier_channels?.suppliers?.name ?? null,
     items: items(row.read_items),
+    /** Ответы ИИ по номерам товаров поста (26.11.2026) */
+    written: savedOfferTexts(row.written_texts),
   }
 }
 

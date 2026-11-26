@@ -1,9 +1,11 @@
+import type { SavedOfferProduct } from '~/utils/aiWriter'
 import type { OfferItem } from '~/utils/supplierOfferList'
 import { describe, expect, it } from 'vitest'
 import { buildAdminPrompt, PROMPT_SHOP_RULES } from '~/constants/adminPrompts'
 import {
   categoryPaths,
   cleanCaption,
+  freshSavedTexts,
   matchSiteBrand,
   normBrandName,
   offerProductData,
@@ -174,5 +176,61 @@ describe('ответ модели о товаре', () => {
 
   it('не JSON — ошибка, а не пустая форма', () => {
     expect(() => parseProductReply('Не могу помочь', categories, brands)).toThrow('Ответ модели не разобрался')
+  })
+})
+
+describe('сохранённый ответ — к сегодняшним разделам и брендам (26.11.2026)', () => {
+  const fakeDb = (categories: { id: string, name: string, parent_id: string | null }[], brands: { id: string, name: string, slug: string }[]) => ({
+    from: (table: string) => ({
+      select: () => Promise.resolve({ data: table === 'categories' ? categories : brands, error: null }),
+    }),
+  }) as unknown as Parameters<typeof freshSavedTexts>[0]
+  const text = (over: Partial<SavedOfferProduct>): SavedOfferProduct => ({
+    name: 'Машинка',
+    description: '<p>Машинка</p>',
+    seoDescription: 'Машинка',
+    category: { id: 'c2', path: 'Мальчикам › Машинки' },
+    brand: null,
+    newBrand: null,
+    warnings: [],
+    model: 'anthropic/claude-sonnet-5-5',
+    photo: true,
+    writtenAt: '2026-11-26T09:00:00Z',
+    ...over,
+  })
+  const cats = [{ id: 'c1', name: 'Мальчикам', parent_id: null }, { id: 'c2', name: 'Машинки и транспорт', parent_id: 'c1' }]
+
+  it('бренд, которого не было, создали кнопкой формы — подставляется', async () => {
+    const fresh = await freshSavedTexts(fakeDb(cats, [{ id: 'b1', name: 'Rastar', slug: 'rastar' }]), { 0: text({ newBrand: 'RASTAR' }) })
+    expect(fresh['0']!.brand).toEqual({ id: 'b1', name: 'Rastar' })
+    expect(fresh['0']!.newBrand).toBeNull()
+  })
+
+  it('бренд удалили — его название снова «новое»: форма предложит создать', async () => {
+    const fresh = await freshSavedTexts(fakeDb(cats, []), { 0: text({ brand: { id: 'gone', name: 'Bburago' } }) })
+    expect(fresh['0']!.brand).toBeNull()
+    expect(fresh['0']!.newBrand).toBe('Bburago')
+  })
+
+  it('бренд на месте — как был', async () => {
+    const fresh = await freshSavedTexts(fakeDb(cats, [{ id: 'b2', name: 'LEGO', slug: 'lego' }]), { 0: text({ brand: { id: 'b2', name: 'LEGO' } }) })
+    expect(fresh['0']!.brand).toEqual({ id: 'b2', name: 'LEGO' })
+    expect(fresh['0']!.newBrand).toBeNull()
+  })
+
+  it('раздел переименовали — путь сегодняшний; удалили — раздела нет', async () => {
+    const renamed = await freshSavedTexts(fakeDb(cats, []), { 0: text({}) })
+    expect(renamed['0']!.category).toEqual({ id: 'c2', path: 'Мальчикам › Машинки и транспорт' })
+    const gone = await freshSavedTexts(fakeDb([cats[0]!], []), { 0: text({}) })
+    expect(gone['0']!.category).toBeNull()
+  })
+
+  it('сохранённого нет — в базу не ходит', async () => {
+    const db = {
+      from: () => {
+        throw new Error('не должен ходить')
+      },
+    } as unknown as Parameters<typeof freshSavedTexts>[0]
+    expect(await freshSavedTexts(db, {})).toEqual({})
   })
 })
