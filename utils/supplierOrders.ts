@@ -35,6 +35,10 @@ export interface SupplierOrder {
   orderedAt?: string | null
   /** Примерная дата поставки, ГГГГ-ММ-ДД по Алматы; null — не указана */
   expectedAt?: string | null
+  /** День, поставленный руками, — «сначала ждали»; переносы его не трогают (27.11.2026) */
+  plannedAt?: string | null
+  /** Сколько дней поставка переезжала сама — не пришла в свой день (27.11.2026) */
+  postponed?: number
   shippedAt: string | null
   closedAt: string | null
   lines: SupplierOrderLine[]
@@ -346,6 +350,8 @@ export interface DeliveryReceipt {
 export interface DeliveriesData {
   /** false — миграция 20261126140000 не применена: дат и формирующихся нет, принимать можно */
   ready: boolean
+  /** false — миграции 20261127120000 нет: поставки сами не переносятся */
+  rollover?: boolean
   /** false — нет и самих заказов (до 20261031160000) */
   ordersReady: boolean
   /** Сегодня по Алматы, ГГГГ-ММ-ДД — по часам сервера */
@@ -354,4 +360,146 @@ export interface DeliveriesData {
   orders: SupplierOrder[]
   products: Record<string, DeliveryProduct>
   receipts: DeliveryReceipt[]
+}
+
+/*
+ * Календарь поставок и переход к поставщику (27 ноября 2026). Владелец 26.11:
+ * «если товаров от разных поставщиков много, мы должны перейти к поставщику,
+ * который доставляет нам товар; мы планируем время ожидания поставки, у нас
+ * там должен быть календарь; если поставка сегодня не пришла, она переносится
+ * на следующий день». Переносит база ночью (миграция 20261127120000).
+ */
+
+/** «перенесена 2 раза · сначала ждали 24.11»; не переносилась — null */
+export function postponedText(order: Pick<SupplierOrder, 'postponed' | 'plannedAt'>): string | null {
+  const n = order.postponed ?? 0
+  if (n <= 0)
+    return null
+  const times = `перенесена ${n} ${plural(n, 'раз', 'раза', 'раз')}`
+  return order.plannedAt ? `${times} · сначала ждали ${deliveryDay(order.plannedAt)}` : times
+}
+
+/**
+ * День в календаре: открытый заказ — в свой день; прошедший (ночью ещё не
+ * перенесён) — уже сегодня: туда его и перенесут. Без даты — null.
+ */
+export function calendarDay(order: Pick<SupplierOrder, 'status' | 'expectedAt'>, today: string): string | null {
+  if (!isOpenOrder(order) || !order.expectedAt)
+    return null
+  return order.expectedAt < today ? today : order.expectedAt
+}
+
+/** Открытые заказы по дням календаря */
+export function ordersByDay<T extends Pick<SupplierOrder, 'status' | 'expectedAt'>>(orders: T[], today: string): Map<string, T[]> {
+  const map = new Map<string, T[]>()
+  for (const order of orders) {
+    const day = calendarDay(order, today)
+    if (!day)
+      continue
+    const list = map.get(day) ?? []
+    list.push(order)
+    map.set(day, list)
+  }
+  return map
+}
+
+export interface CalendarCell {
+  /** ГГГГ-ММ-ДД */
+  day: string
+  /** Число месяца */
+  date: number
+  /** День этого месяца, а не соседнего */
+  inMonth: boolean
+}
+
+/** Сетка месяца `ГГГГ-ММ` — недели с понедельника, дни соседних месяцев добивают края */
+export function monthGrid(month: string): CalendarCell[][] {
+  const first = `${month}-01`
+  const weekday = (new Date(`${first}T00:00:00Z`).getUTCDay() + 6) % 7
+  const nextMonth = addDays(first, 32).slice(0, 7)
+  const last = addDays(`${nextMonth}-01`, -1)
+  const lastWeekday = (new Date(`${last}T00:00:00Z`).getUTCDay() + 6) % 7
+  const start = addDays(first, -weekday)
+  const end = addDays(last, 6 - lastWeekday)
+  const weeks: CalendarCell[][] = []
+  for (let day = start; day <= end; day = addDays(day, 1)) {
+    if (!weeks.length || weeks.at(-1)!.length === 7)
+      weeks.push([])
+    weeks.at(-1)!.push({ day, date: Number(day.slice(8, 10)), inMonth: day.slice(0, 7) === month })
+  }
+  return weeks
+}
+
+/** Соседний месяц `ГГГГ-ММ` */
+export function shiftMonth(month: string, n: number): string {
+  const [y, m] = month.split('-').map(Number) as [number, number]
+  const total = y * 12 + (m - 1) + n
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
+}
+
+const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+/** «Ноябрь 2026» */
+export function monthTitle(month: string): string {
+  return `${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`
+}
+
+const WEEKDAYS_LONG = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота']
+const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
+/** «27 ноября, пятница» */
+export function longDay(day: string): string {
+  const d = new Date(`${day}T00:00:00Z`)
+  return `${d.getUTCDate()} ${MONTHS_GEN[d.getUTCMonth()]}, ${WEEKDAYS_LONG[d.getUTCDay()]}`
+}
+
+/** Поставщик в списке «Поставок» */
+export interface SupplierDeliveries {
+  supplierId: string
+  /** Открытые заказы — по дню календаря */
+  waiting: SupplierOrder[]
+  /** Формирующийся заказ, если есть */
+  forming: SupplierOrder | null
+  /** Ближайший день поставки (прошедшие — сегодня); null — дат нет */
+  nextDay: string | null
+  /** Заказов, которые ждём сегодня (с перенесёнными) */
+  today: number
+  /** Переносились — самый большой счёт среди открытых */
+  postponed: number
+  /** Где поставщик в списке */
+  group: 'today' | 'ahead' | 'nodate' | 'forming'
+}
+
+/**
+ * Поставщики с поставками — для списка «Поставок»: сначала те, кого ждём
+ * сегодня, потом по ближайшей дате, потом без даты, в конце — у кого только
+ * формируется заказ. Закрытые заказы в список не попадают.
+ */
+export function supplierDeliveries(orders: SupplierOrder[], today: string, nameOf: (id: string) => string): SupplierDeliveries[] {
+  const by = new Map<string, SupplierDeliveries>()
+  const entry = (id: string) => {
+    let e = by.get(id)
+    if (!e) {
+      e = { supplierId: id, waiting: [], forming: null, nextDay: null, today: 0, postponed: 0, group: 'forming' }
+      by.set(id, e)
+    }
+    return e
+  }
+  for (const order of orders) {
+    if (order.status === 'draft')
+      entry(order.supplierId).forming = order
+    else if (isOpenOrder(order))
+      entry(order.supplierId).waiting.push(order)
+  }
+  const rank = { today: 0, ahead: 1, nodate: 2, forming: 3 } as const
+  const list = [...by.values()]
+  for (const e of list) {
+    const days = e.waiting.map(o => calendarDay(o, today)).filter((d): d is string => Boolean(d)).sort()
+    e.nextDay = days[0] ?? null
+    e.today = days.filter(d => d === today).length
+    e.postponed = Math.max(0, ...e.waiting.map(o => o.postponed ?? 0), ...e.waiting.map(o => o.expectedAt && o.expectedAt < today ? daysBetween(o.expectedAt, today) : 0))
+    e.waiting.sort((a, b) => (calendarDay(a, today) ?? '9999-12-31').localeCompare(calendarDay(b, today) ?? '9999-12-31') || a.number - b.number)
+    e.group = e.today ? 'today' : e.nextDay ? 'ahead' : e.waiting.length ? 'nodate' : 'forming'
+  }
+  return list.sort((a, b) => rank[a.group] - rank[b.group]
+    || (a.nextDay ?? '').localeCompare(b.nextDay ?? '')
+    || nameOf(a.supplierId).localeCompare(nameOf(b.supplierId), 'ru'))
 }

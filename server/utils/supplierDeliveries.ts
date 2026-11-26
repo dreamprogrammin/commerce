@@ -50,6 +50,8 @@ interface OrderRow {
   created_at: string
   ordered_at?: string | null
   expected_at?: string | null
+  planned_at?: string | null
+  postponed?: number
   shipped_at: string | null
   closed_at: string | null
   supplier_order_items: ItemRow[]
@@ -69,6 +71,8 @@ function toOrder(o: OrderRow, ready: boolean): SupplierOrder {
     // До миграции заказ уходил поставщику, когда его сохранили
     orderedAt: ready ? o.ordered_at ?? null : o.created_at,
     expectedAt: ready ? o.expected_at ?? null : null,
+    plannedAt: ready ? o.planned_at ?? o.expected_at ?? null : null,
+    postponed: o.postponed ?? 0,
     shippedAt: o.shipped_at,
     closedAt: o.closed_at,
     lines: o.supplier_order_items
@@ -86,7 +90,7 @@ function toOrder(o: OrderRow, ready: boolean): SupplierOrder {
   }
 }
 
-async function loadOrders(db: SupabaseClient, now: Date): Promise<{ ready: boolean, orders: SupplierOrder[] | null }> {
+async function loadOrders(db: SupabaseClient, now: Date): Promise<{ ready: boolean, rollover: boolean, orders: SupplierOrder[] | null }> {
   const since = new Date(now.getTime() - CLOSED_DAYS * DAY).toISOString()
   const query = (orderColumns: string, itemColumns: string) => db.from('supplier_orders')
     .select(`${orderColumns}, supplier_order_items(${itemColumns})`)
@@ -94,12 +98,21 @@ async function loadOrders(db: SupabaseClient, now: Date): Promise<{ ready: boole
     .order('number', { ascending: false })
     .limit(500)
 
+  // Переносы (20261127120000) — поверх поставок; нет их — поставки без переносов
+  const rolled = await query(`${ORDER_COLUMNS}, ordered_at, expected_at, planned_at, postponed`, `id, ${ITEM_COLUMNS}, show_on_receipt`)
+  if (!rolled.error)
+    return { ready: true, rollover: true, orders: (rolled.data as unknown as OrderRow[] ?? []).map(o => toOrder(o, true)) }
+  if (NO_TABLES.has(rolled.error.code)) {
+    console.warn('[deliveries] заказов поставщикам нет — миграция 20261031160000 не применена?', rolled.error.code)
+    return { ready: false, rollover: false, orders: null }
+  }
+  if (rolled.error.code !== '42703')
+    throw createError({ statusCode: 500, message: rolled.error.message })
+
   const full = await query(`${ORDER_COLUMNS}, ordered_at, expected_at`, `id, ${ITEM_COLUMNS}, show_on_receipt`)
-  if (!full.error)
-    return { ready: true, orders: (full.data as unknown as OrderRow[] ?? []).map(o => toOrder(o, true)) }
-  if (NO_TABLES.has(full.error.code)) {
-    console.warn('[deliveries] заказов поставщикам нет — миграция 20261031160000 не применена?', full.error.code)
-    return { ready: false, orders: null }
+  if (!full.error) {
+    console.warn('[deliveries] переносов нет — миграция 20261127120000 не применена?', rolled.error.message)
+    return { ready: true, rollover: false, orders: (full.data as unknown as OrderRow[] ?? []).map(o => toOrder(o, true)) }
   }
   if (full.error.code !== '42703')
     throw createError({ statusCode: 500, message: full.error.message })
@@ -110,7 +123,7 @@ async function loadOrders(db: SupabaseClient, now: Date): Promise<{ ready: boole
   const old = await query(ORDER_COLUMNS, ITEM_COLUMNS)
   if (old.error)
     throw createError({ statusCode: 500, message: old.error.message })
-  return { ready: false, orders: (old.data as unknown as OrderRow[] ?? []).map(o => toOrder(o, false)) }
+  return { ready: false, rollover: false, orders: (old.data as unknown as OrderRow[] ?? []).map(o => toOrder(o, false)) }
 }
 
 function chunks<T>(items: T[]): T[][] {
@@ -137,7 +150,7 @@ async function byIds<T>(ids: string[], page: (ids: string[], from: number, to: n
 }
 
 export async function loadDeliveries(db: SupabaseClient, now = new Date()): Promise<DeliveriesData> {
-  const [suppliersRes, { ready, orders }] = await Promise.all([
+  const [suppliersRes, { ready, rollover, orders }] = await Promise.all([
     db.from('suppliers').select('id, name, phone').order('name'),
     loadOrders(db, now),
   ])
@@ -205,6 +218,7 @@ export async function loadDeliveries(db: SupabaseClient, now = new Date()): Prom
 
   return {
     ready,
+    rollover,
     ordersReady: orders !== null,
     today: almatyDay(now),
     suppliers: (suppliersRes.data ?? []).map(s => ({ id: s.id, name: s.name?.trim() || 'Без названия', phone: s.phone || null })),
@@ -216,23 +230,28 @@ export async function loadDeliveries(db: SupabaseClient, now = new Date()): Prom
 
 /** Счётчики «Поставок» для дашборда «Умный закуп»; null — миграции 20261126140000 нет */
 export async function deliveriesSummary(db: SupabaseClient, now = new Date()): Promise<PurchasingStatus['deliveries']> {
-  const { data, error } = await db.from('supplier_orders')
-    .select('status, expected_at, supplier_order_items(id)')
+  const query = (columns: string) => db.from('supplier_orders')
+    .select(`${columns}, supplier_order_items(id)`)
     .in('status', ['draft', 'ordered', 'in_transit'])
+  // Переносы (20261127120000): перенесённая поставка — тоже опоздание
+  let res = await query('status, expected_at, postponed')
+  if (res.error?.code === '42703')
+    res = await query('status, expected_at')
+  const { data, error } = res
   if (error) {
     if (error.code === '42703' || NO_TABLES.has(error.code))
       return null
     throw createError({ statusCode: 500, message: error.message })
   }
   const today = almatyDay(now)
-  const rows = (data ?? []) as unknown as { status: SupplierOrderStatus, expected_at: string | null, supplier_order_items: { id: string }[] }[]
+  const rows = (data ?? []) as unknown as { status: SupplierOrderStatus, expected_at: string | null, postponed?: number, supplier_order_items: { id: string }[] }[]
   const drafts = rows.filter(r => r.status === 'draft')
   const open = rows.filter(r => r.status !== 'draft')
   return {
     forming: drafts.length,
     formingPositions: drafts.reduce((n, r) => n + r.supplier_order_items.length, 0),
     waiting: open.length,
-    late: open.filter(r => r.expected_at && r.expected_at < today).length,
+    late: open.filter(r => (r.expected_at && r.expected_at < today) || (r.postponed ?? 0) > 0).length,
   }
 }
 

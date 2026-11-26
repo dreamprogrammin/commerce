@@ -3160,6 +3160,8 @@ export interface Database {
           created_at: string
           created_by: string | null
           expected_at: string | null
+          planned_at: string | null
+          postponed: number
           id: string
           note: string | null
           number: number
@@ -3174,6 +3176,8 @@ export interface Database {
           created_at?: string
           created_by?: string | null
           expected_at?: string | null
+          planned_at?: string | null
+          postponed?: number
           id?: string
           note?: string | null
           number?: never
@@ -3188,6 +3192,8 @@ export interface Database {
           created_at?: string
           created_by?: string | null
           expected_at?: string | null
+          planned_at?: string | null
+          postponed?: number
           id?: string
           note?: string | null
           number?: never
