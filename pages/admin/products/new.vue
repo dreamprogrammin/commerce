@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AttributeValuePayload, Database, ProductInsert } from '@/types'
-import type { AiProductFill, WrittenOfferProduct } from '@/utils/aiWriter'
+import type { AiProductFill, SavedOfferProduct, WrittenOfferProduct } from '@/utils/aiWriter'
 import type { OfferDraftSource } from '@/utils/supplierOfferList'
 import { LoaderCircle, Plus, RefreshCw, Sparkles } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
@@ -42,8 +42,14 @@ onMounted(async () => {
     toast.error(e?.data?.message || 'Товар поставщика не загрузился')
     return
   }
+  // ИИ — только кнопкой «Сгенерировать» (26.11.2026); уже написанное — сразу
+  const saved = offer.value.written?.[String(offerItem)]
+  if (saved) {
+    // Черновик ложится в форму раньше: ответ ИИ заменяет прочитанное с фото, а не наоборот
+    await nextTick()
+    restoreTexts(saved)
+  }
   // Своим запросом, не fetchProductBySku: тот на «не найдено» отвечает 406 и тянет весь товар
-  writeTexts()
   const sku = draft.value?.sku
   if (sku) {
     const { data } = await supabase.from('products').select('id, name').eq('sku', sku).limit(1)
@@ -52,27 +58,37 @@ onMounted(async () => {
 })
 
 /*
- * «Тексты для сайта» (23 ноября 2026): сразу после «На сайт» ИИ пишет
- * название, описание и SEO-описание, подбирает раздел и бренд
- * (server/utils/contentWriter.ts). Бренда на сайте нет — ИИ только называет
- * его, а заполняет бренд человек: кнопка открывает окно «Создать новый бренд»
- * формы с этим названием. Поиск бренда в интернете убран 24.11.2026 —
- * «чтобы не уходила много денег на бренд».
+ * «Тексты для сайта» (23 ноября 2026): ИИ пишет название, описание и
+ * SEO-описание, подбирает раздел и бренд (server/utils/contentWriter.ts).
+ * Бренда на сайте нет — ИИ только называет его, а заполняет бренд человек:
+ * кнопка открывает окно «Создать новый бренд» формы с этим названием. Поиск
+ * бренда в интернете убран 24.11.2026 — «чтобы не уходила много денег на бренд».
+ *
+ * С 26.11.2026 ИИ пишет только по кнопке «Сгенерировать»: владелец — «будут
+ * ситуации, когда я не захочу добавлять такой товар, а токены были уже
+ * потрачены». Ответ сервер сохраняет у товара поставщика, и после
+ * перезагрузки форма берёт его, не тратя токенов снова (`restored`).
  */
 const errorText = (e: any, fallback: string) => e?.data?.message || e?.statusMessage || fallback
 type WriterState
   = | { state: 'writing' }
-    | { state: 'done', result: WrittenOfferProduct, filled: string[] | null }
+    | { state: 'done', result: WrittenOfferProduct, filled: string[] | null, restored: boolean }
     | { state: 'error', message: string }
 const writer = ref<WriterState | null>(null)
 const aiFill = ref<AiProductFill | null>(null)
 const productForm = ref<InstanceType<typeof ProductForm> | null>(null)
 /** Бренд, созданный в окне формы, — карточка говорит, что он выбран */
 const createdBrand = ref<{ id: string, name: string } | null>(null)
-/** «Расход: … токенов ≈ … ₸» под ответом ИИ (24.11.2026); ответ старой сборки без usage — строки нет */
-const writerUsage = computed(() => writer.value?.state === 'done' && writer.value.result.usage
-  ? aiUsageLines(writer.value.result.model, writer.value.result.usage)
-  : null)
+/**
+ * «Расход: … токенов ≈ … ₸» под ответом ИИ (24.11.2026); ответ старой сборки
+ * без usage — строки нет. У сохранённого ответа это расход того раза.
+ */
+const writerUsage = computed(() => {
+  if (writer.value?.state !== 'done' || !writer.value.result.usage)
+    return null
+  const lines = aiUsageLines(writer.value.result.model, writer.value.result.usage)
+  return writer.value.restored ? { ...lines, spent: lines.spent.replace(/^Расход:/, 'Расход тогда:') } : lines
+})
 /** «Описания … с …: N токенов» и «Бюджет ИИ: осталось … — примерно на N таких описаний» (24.11.2026) */
 const writerBudgetLines = computed(() => writer.value?.state === 'done' && writer.value.result.usage && writer.value.result.budget
   ? aiBudgetLines(writer.value.result.model, writer.value.result.budget, writer.value.result.usage)
@@ -85,18 +101,37 @@ async function writeTexts() {
   writer.value = { state: 'writing' }
   try {
     const result = await adminFetch<WrittenOfferProduct>('/api/admin/content-writer/product', { method: 'POST', body: { id: offerId, item: offerItem } })
-    writer.value = { state: 'done', result, filled: null }
-    aiFill.value = {
-      name: result.name,
-      description: result.description,
-      seoDescription: result.seoDescription,
-      categoryId: result.category?.id ?? null,
-      brandId: result.brand?.id ?? null,
-    }
+    writer.value = { state: 'done', result, filled: null, restored: false }
+    fillForm(result)
   }
   catch (e) {
     writer.value = { state: 'error', message: errorText(e, 'ИИ не ответил') }
   }
+}
+
+/** Ответ, написанный раньше: токены за него уже заплачены — второй раз не просим */
+function restoreTexts(saved: SavedOfferProduct) {
+  const result: WrittenOfferProduct = { ...saved, savedAt: saved.writtenAt }
+  writer.value = { state: 'done', result, filled: null, restored: true }
+  fillForm(result)
+}
+
+function fillForm(result: WrittenOfferProduct) {
+  aiFill.value = {
+    name: result.name,
+    description: result.description,
+    seoDescription: result.seoDescription,
+    categoryId: result.category?.id ?? null,
+    brandId: result.brand?.id ?? null,
+  }
+}
+
+/** «26.11 в 14:05» — по Алматы */
+function savedWhen(iso: string): string {
+  const parts = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Almaty', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    .formatToParts(new Date(iso))
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value ?? ''
+  return `${part('day')}.${part('month')} в ${part('hour')}:${part('minute')}`
 }
 
 function onAiFilled(fields: string[]) {
@@ -314,14 +349,17 @@ async function createFromForm(payload: {
         </CardContent>
       </Card>
 
-      <Card v-if="writer" class="mb-8" data-testid="ai-writer">
+      <Card v-if="writer || (offer && draft?.name)" class="mb-8" data-testid="ai-writer">
         <CardHeader>
           <CardTitle class="flex items-center gap-2">
             <Sparkles class="w-5 h-5" />
             Тексты от ИИ
           </CardTitle>
           <CardDescription>
-            <template v-if="writer.state === 'writing'">
+            <template v-if="!writer">
+              ИИ напишет название, описание и SEO-описание, подберёт раздел и бренд — обычно 10–30 секунд. Токены тратятся, только когда нажмёте «Сгенерировать»; ответ сохранится, и после перезагрузки страницы писать заново не придётся.
+            </template>
+            <template v-else-if="writer.state === 'writing'">
               ИИ пишет название и описание, подбирает раздел и бренд — обычно 10–30 секунд.
             </template>
             <template v-else-if="writer.state === 'done'">
@@ -333,7 +371,17 @@ async function createFromForm(payload: {
           </CardDescription>
         </CardHeader>
         <CardContent class="space-y-3 text-sm">
-          <p v-if="writer.state === 'writing'" class="flex items-center gap-2 text-muted-foreground" data-testid="ai-writer-status">
+          <Button
+            v-if="!writer"
+            type="button"
+            size="sm"
+            data-testid="ai-writer-start"
+            @click="writeTexts"
+          >
+            <Sparkles class="mr-2 h-4 w-4" />
+            Сгенерировать
+          </Button>
+          <p v-else-if="writer.state === 'writing'" class="flex items-center gap-2 text-muted-foreground" data-testid="ai-writer-status">
             <LoaderCircle class="w-4 h-4 animate-spin" />
             Пишу…
           </p>
@@ -341,6 +389,14 @@ async function createFromForm(payload: {
             {{ writer.message }}
           </p>
           <template v-else>
+            <p v-if="writer.result.savedAt" class="text-muted-foreground" data-testid="ai-writer-saved">
+              <template v-if="writer.restored">
+                Написано {{ savedWhen(writer.result.savedAt) }} — взято сохранённое, токены не потрачены.
+              </template>
+              <template v-else>
+                Ответ сохранён — после перезагрузки страницы он вернётся без новых трат.
+              </template>
+            </p>
             <p v-if="writer.filled" data-testid="ai-writer-filled">
               {{ writer.filled.length ? `Подставлено в форму: ${writer.filled.join(', ')}.` : 'Эти поля вы уже заполнили сами — ответ ИИ не подставлен.' }}
             </p>
@@ -375,7 +431,7 @@ async function createFromForm(payload: {
             </p>
           </template>
 
-          <div v-if="writer.state === 'done' && writer.result.newBrand" class="space-y-2 rounded-md border p-3" data-testid="ai-brand">
+          <div v-if="writer?.state === 'done' && writer.result.newBrand" class="space-y-2 rounded-md border p-3" data-testid="ai-brand">
             <p v-if="createdBrand">
               Бренд «{{ createdBrand.name }}» создан и выбран в форме.
             </p>
@@ -398,7 +454,7 @@ async function createFromForm(payload: {
           </div>
 
           <Button
-            v-if="writer.state !== 'writing'"
+            v-if="writer && writer.state !== 'writing'"
             type="button"
             variant="outline"
             size="sm"

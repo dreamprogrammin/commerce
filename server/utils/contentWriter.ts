@@ -1,9 +1,10 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { WriterCategory, WrittenOfferProduct, WrittenProduct } from '~/utils/aiWriter'
+import type { SavedOfferProduct, WriterCategory, WrittenOfferProduct, WrittenProduct } from '~/utils/aiWriter'
 import type { OfferItem } from '~/utils/supplierOfferList'
 import { Buffer } from 'node:buffer'
 import { adminPromptTask, PROMPT_SHOP_RULES } from '~/constants/adminPrompts'
+import { toSavedOfferProduct } from '~/utils/aiWriter'
 import { sanitizeBrandHtml } from '../../supabase/functions/generate-brand-seo/validate'
 
 /**
@@ -393,5 +394,61 @@ export async function writeOfferProduct(db: SupabaseClient, offerId: string, ite
     output: reply.usage.output_tokens,
     rate: usdKzt,
   }
-  return { ...written, model: claude.spec, photo: Boolean(photo), usage, budget }
+  const result: WrittenOfferProduct = { ...written, model: claude.spec, photo: Boolean(photo), usage, budget }
+  result.savedAt = await saveWrittenText(db, offerId, itemIndex, offer.written, result)
+  return result
+}
+
+/**
+ * Ответ — к товару поставщика (26.11.2026, владелец: «контент, который был
+ * сгенерирован, должен сохраняться даже после перезагрузки страницы»). Форма
+ * этот ответ уже получает; не сохранился — пропадёт только после
+ * перезагрузки, поэтому ошибка здесь не роняет запрос. До миграции
+ * 20261126120000 колонки нет — тогда null.
+ *
+ * Прежние ответы по другим товарам поста — из того же чтения, что и сам
+ * товар: два «Сгенерировать» по разным товарам одного поста в одни и те же
+ * секунды — случай, который здесь не разбирается.
+ */
+async function saveWrittenText(
+  db: SupabaseClient,
+  offerId: string,
+  itemIndex: number,
+  before: Record<string, SavedOfferProduct>,
+  result: WrittenOfferProduct,
+): Promise<string | null> {
+  const writtenAt = new Date().toISOString()
+  const { error } = await db.from('supplier_offers')
+    .update({ written_texts: { ...before, [String(itemIndex)]: toSavedOfferProduct(result, writtenAt) } })
+    .eq('id', offerId)
+  if (error) {
+    console.warn('[content-writer] ответ ИИ не сохранён у товара поставщика — миграция 20261126120000?', error.code, error.message)
+    return null
+  }
+  return writtenAt
+}
+
+/**
+ * Сохранённые ответы — к сегодняшним разделам и брендам (26.11.2026). Пока
+ * ответ лежал, бренд, которого «на сайте нет», могли создать кнопкой формы,
+ * а раздел или бренд — удалить: созданный подставляется, удалённый — нет.
+ */
+export async function freshSavedTexts(db: SupabaseClient, texts: Record<string, SavedOfferProduct>): Promise<Record<string, SavedOfferProduct>> {
+  const entries = Object.entries(texts)
+  if (!entries.length)
+    return texts
+  const { categories, brands } = await siteLists(db)
+  const fresh: Record<string, SavedOfferProduct> = {}
+  for (const [key, text] of entries) {
+    // Бренд удалили — его название снова «нового» бренда: форма предложит создать
+    const named = text.newBrand ?? (text.brand && !brands.some(b => b.id === text.brand!.id) ? text.brand.name : null)
+    const brand = named ? matchSiteBrand(brands, named) : text.brand
+    fresh[key] = {
+      ...text,
+      category: text.category ? (categories.find(c => c.id === text.category!.id) ?? null) : null,
+      brand: brand && { id: brand.id, name: brand.name },
+      newBrand: brand ? null : named,
+    }
+  }
+  return fresh
 }

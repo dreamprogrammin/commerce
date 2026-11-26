@@ -1,3 +1,4 @@
+import type { SavedOfferProduct } from './aiWriter'
 import type { OfferGuess } from './offerGuess'
 import type { OrderSheetLine } from './orderSheet'
 
@@ -182,6 +183,11 @@ export interface OfferDraftSource {
   supplierId: string | null
   supplierName: string | null
   items: OfferItem[] | null
+  /**
+   * Тексты, уже написанные ИИ, по номерам товаров поста (26.11.2026): форма
+   * берёт их, а не пишет заново. Нет поля — сервер старой сборки.
+   */
+  written?: Record<string, SavedOfferProduct>
 }
 
 /** Что форма нового товара берёт из поста; чего нет — остаётся пустым */
