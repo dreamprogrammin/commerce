@@ -49,7 +49,8 @@ export interface RestockProduct {
   forming: number
 }
 
-export type SupplierOrderStatus = 'ordered' | 'in_transit' | 'received' | 'cancelled'
+// 'draft' — формирующийся заказ «Поставок» (26.11.2026); как в utils/supplierOrders.ts
+export type SupplierOrderStatus = 'draft' | 'ordered' | 'in_transit' | 'received' | 'cancelled'
 
 export interface SupplierOrderLine {
   /** null — товар потом удалили; название и артикул — снимок на момент заказа */
