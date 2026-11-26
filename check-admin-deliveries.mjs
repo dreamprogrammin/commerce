@@ -29,6 +29,8 @@
  *     раздел говорит, что ждёт миграции, открытые заказы видны и
  *     принимаются; «На сайт» создаёт товар видимым, а не скрытым навсегда;
  *     шаг дашборда — «позже»; «К закупке» работает;
+ *  8) видимый товар («0» в «В заказ поставщику») и его правка — поисковикам
+ *     по одному запросу, а не по два (стор и страница);
  *  без ошибок консоли.
  *
  * Данные заводит сам — поставщик с каналом и двумя постами, товар с остатком
@@ -55,6 +57,8 @@ const NEW_NAME = 'Машинка проверки поставок'
 const NEW_SKU = 'PD-NEW-1'
 const OFF_NAME = 'Кукла проверки поставок'
 const OFF_SKU = 'PD-NEW-2'
+const VIS_NAME = 'Кукла проверки поставок на витрине'
+const VIS_SKU = 'PD-NEW-3'
 const SHOTS = process.env.SHOTS
 
 if (!/localhost|127\.0\.0\.1/.test(BASE))
@@ -177,7 +181,7 @@ DELETE FROM public.supplier_orders WHERE supplier_id = :'sup';
 UPDATE public.products p SET supplier_id = s.supplier_id, stock_quantity = s.stock_quantity, cost_price = s.cost_price, is_active = s.is_active
 FROM json_to_recordset(:'saved'::json) AS s(id uuid, supplier_id uuid, stock_quantity integer, cost_price numeric, is_active boolean)
 WHERE p.id = s.id;
-DELETE FROM public.products WHERE sku IN ('${NEW_SKU}', '${OFF_SKU}') AND name IN ('${NEW_NAME}', '${OFF_NAME}');
+DELETE FROM public.products WHERE sku IN ('${NEW_SKU}', '${OFF_SKU}', '${VIS_SKU}') AND name IN ('${NEW_NAME}', '${OFF_NAME}', '${VIS_NAME}');
 DELETE FROM public.supplier_channels WHERE id = :'ch';
 DELETE FROM public.suppliers WHERE id = :'sup';
 COMMIT;
@@ -492,6 +496,33 @@ try {
   hide(false)
   hidden = false
   check(await until(async () => (await api('/api/admin/deliveries', adminToken)).json?.ready === true), 'миграция вернулась — раздел снова в работе')
+
+  console.log('\n== видимый товар — поисковикам один раз на создание и на правку')
+  // Стор и страница сообщали оба: на создание видимого и на каждую правку уходило по два запроса (найдено 26.11.2026)
+  await page.goto(`${BASE}/admin/products/new?offer=${d.o2}&item=0`, { waitUntil: 'load', timeout: 120000 })
+  await page.locator('[data-testid=supplier-order]').waitFor({ timeout: 30000 })
+  await until(async () => await page.locator('#name').inputValue() === OFF_NAME)
+  await page.locator('#name').fill(VIS_NAME)
+  await page.locator('#sku').fill(VIS_SKU)
+  await page.locator('[data-testid=supplier-order-qty]').fill('0')
+  await page.locator('#price').fill('990')
+  const seoCreate = seo.length
+  await page.getByRole('button', { name: 'Создать товар' }).click()
+  await page.waitForURL(u => u.pathname === '/admin/products', { timeout: 60000 })
+  const vis = await until(async () => await productBy(VIS_SKU))
+  await page.waitForTimeout(2000)
+  const createSeo = seo.slice(seoCreate)
+  check(vis?.is_active === true && createSeo.length === 1 && createSeo[0]?.[0]?.endsWith(`/catalog/products/${vis.slug}`), `видимый товар создан — поисковикам один запрос: ${createSeo.length} ${JSON.stringify(createSeo)}`)
+  check(psql(`SELECT count(*) FROM public.supplier_order_items WHERE product_id = :'p';`, { p: vis?.id ?? '00000000-0000-0000-0000-000000000000' }) === '0', '«0» в «В заказ поставщику» — в заказ не лёг')
+  await page.goto(`${BASE}/admin/products/${vis.id}`, { waitUntil: 'load', timeout: 120000 })
+  await until(async () => await page.locator('#name').inputValue() === VIS_NAME, 30000)
+  const seoEdit = seo.length
+  await page.locator('#price').fill('1090')
+  await page.getByRole('button', { name: 'Сохранить изменения' }).click()
+  await until(async () => Number((await rest(`products?select=price&id=eq.${vis.id}`))[0]?.price) === 1090, 30000)
+  await page.waitForTimeout(2000)
+  const editSeo = seo.slice(seoEdit)
+  check(editSeo.length === 1, `правка товара — поисковикам один запрос: ${editSeo.length} ${JSON.stringify(editSeo)}`)
 
   check(!errors.length, `без ошибок консоли${errors.length ? ` — ${errors[0].slice(0, 160)}` : ''}`)
   check(!failed.length, `без ответов с ошибкой${failed.length ? ` — ${failed[0]}` : ''}`)
