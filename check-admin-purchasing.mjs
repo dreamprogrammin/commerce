@@ -398,6 +398,9 @@ try {
   const page = await newPage({ width: 1366, height: 900 })
   const pageLinks = await page.locator('[data-testid=purchasing-pages] a').evaluateAll(as => as.map(a => [a.getAttribute('href'), a.textContent.trim()]))
   check(JSON.stringify(pageLinks) === JSON.stringify(PAGES), `кнопки страниц закупа по порядку: ${pageLinks.map(p => p[1]).join(', ')}`)
+  // «Цифры Kaspi» стояли без иконки: в PAGE_ICON не было '/admin/kaspi' (найдено 26.11.2026)
+  const noIcon = await page.locator('[data-testid=purchasing-pages] a').evaluateAll(as => as.filter(a => !a.querySelector('svg')).map(a => a.textContent.trim()))
+  check(noIcon.length === 0, `у каждой кнопки страниц закупа — иконка${noIcon.length ? `; без иконки: ${noIcon.join(', ')}` : ''}`)
   const t0 = await tiles(page)
   check(t0.map(t => t.id).join() === 'monthly,missing,restock,offers', `четыре плитки: ${t0.map(t => t.id).join(', ')}`)
   const tile = id => t0.find(t => t.id === id) ?? {}
