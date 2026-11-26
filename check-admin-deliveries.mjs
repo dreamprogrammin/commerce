@@ -18,7 +18,9 @@
  *     поисковикам о скрытом не сказано;
  *  3) тот же поставщик — тот же заказ (копится), остаток до приёмки не
  *     меняется; количество правится; таблица и текст для поставщика; шаг и
- *     кнопка «Поставки» на дашборде;
+ *     кнопка «Поставки» на дашборде; «К закупке» знает о формирующемся:
+ *     товар из него не «на пороге» (второй раз не предлагается), в «Добавить
+ *     товар» — «формируется N», в строке — ссылка на «Поставки»;
  *  4) «Заказано» — дата через 3 дня по умолчанию; правка даты; опаздывает;
  *     следующий товар — уже новый заказ; формирующийся удаляется;
  *  5) приёмка частями: окно говорит, что новый товар появится на сайте, и
@@ -160,7 +162,7 @@ VALUES (:'ch', 1, now(), '${NEW_NAME}, арт. ${NEW_SKU}', 'https://t.me/probe_
 INSERT INTO public.supplier_offers (channel_id, message_id, posted_at, caption, post_url, read_items)
 VALUES (:'ch', 2, now(), '${OFF_NAME}, арт. ${OFF_SKU}', 'https://t.me/probe_deliveries/2', '${ITEM(OFF_NAME, OFF_SKU, 800)}'::jsonb) RETURNING id AS o2 \\gset
 SELECT id AS old FROM public.products WHERE is_active AND stock_quantity BETWEEN 1 AND 50 ORDER BY name, id LIMIT 1 \\gset
-SELECT json_build_object('id', id, 'supplier_id', supplier_id, 'stock_quantity', stock_quantity, 'cost_price', cost_price, 'is_active', is_active)::text AS saved
+SELECT json_build_object('id', id, 'supplier_id', supplier_id, 'stock_quantity', stock_quantity, 'cost_price', cost_price, 'is_active', is_active, 'min_stock_level', min_stock_level)::text AS saved
 FROM public.products WHERE id = :'old' \\gset
 UPDATE public.products SET supplier_id = :'sup', cost_price = 700 WHERE id = :'old';
 SELECT coalesce((SELECT id::text FROM public.products WHERE supplier_id IS NULL ORDER BY id LIMIT 1), '') AS nosup \\gset
@@ -178,8 +180,8 @@ function cleanup() {
 BEGIN;
 DELETE FROM public.stock_receipts WHERE order_id IN (SELECT id FROM public.supplier_orders WHERE supplier_id = :'sup');
 DELETE FROM public.supplier_orders WHERE supplier_id = :'sup';
-UPDATE public.products p SET supplier_id = s.supplier_id, stock_quantity = s.stock_quantity, cost_price = s.cost_price, is_active = s.is_active
-FROM json_to_recordset(:'saved'::json) AS s(id uuid, supplier_id uuid, stock_quantity integer, cost_price numeric, is_active boolean)
+UPDATE public.products p SET supplier_id = s.supplier_id, stock_quantity = s.stock_quantity, cost_price = s.cost_price, is_active = s.is_active, min_stock_level = s.min_stock_level
+FROM json_to_recordset(:'saved'::json) AS s(id uuid, supplier_id uuid, stock_quantity integer, cost_price numeric, is_active boolean, min_stock_level integer)
 WHERE p.id = s.id;
 DELETE FROM public.products WHERE sku IN ('${NEW_SKU}', '${OFF_SKU}', '${VIS_SKU}') AND name IN ('${NEW_NAME}', '${OFF_NAME}', '${VIS_NAME}');
 DELETE FROM public.supplier_channels WHERE id = :'ch';
@@ -345,6 +347,32 @@ try {
   check(await mobile.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'формирующийся заказ на телефоне — без горизонтальной прокрутки')
   if (SHOTS)
     await mobile.screenshot({ path: `${SHOTS}/deliveries-forming-390.png`, fullPage: true })
+
+  console.log('\n== «К закупке» знает о формирующемся')
+  // Порог — ровно остаток: без учёта формирующегося заказа товар был бы «на пороге»
+  // и «К закупке» предложила бы его второй раз (найдено 26.11.2026)
+  psql(`UPDATE public.products SET min_stock_level = stock_quantity WHERE id = :'p';`, { p: d.old })
+  const rs = await api('/api/admin/restock', adminToken)
+  const rsOld = rs.json?.products?.find(p => p.id === d.old)
+  check(rs.status === 200 && rsOld?.forming === 4 && rsOld.pending === 0 && rsOld.stock <= rsOld.minStock, `«К закупке»: в формирующемся ${rsOld?.forming} шт., заказано ${rsOld?.pending}, остаток ${rsOld?.stock} при пороге ${rsOld?.minStock}`)
+  check(!rs.json?.orders?.some(o => o.number === o1.number), 'формирующийся заказ — не в списке заказов «К закупке»')
+  await page.goto(`${BASE}/admin/restock`, { waitUntil: 'load', timeout: 120000 })
+  const restockBlock = page.locator(`[data-testid=supplier-block][data-supplier="${SUPPLIER}"]`)
+  await restockBlock.waitFor({ timeout: 30000 })
+  check(await restockBlock.locator(`[data-testid=restock-row][data-product="${d.old}"]`).count() === 0, 'товар из формирующегося заказа — не «на пороге», второй раз не предложен')
+  await restockBlock.locator('[data-testid=order-add]').click()
+  const pick = page.locator('[data-testid=order-add-item]', { hasText: d.oldName })
+  await pick.waitFor({ timeout: 10000 })
+  check(flat(await pick.innerText()).includes('формируется 4'), `в «Добавить товар» — «формируется 4»: «${flat(await pick.innerText()).slice(0, 160)}»`)
+  await pick.click()
+  const formingRow = restockBlock.locator(`[data-testid=restock-row][data-product="${d.old}"] [data-testid=row-forming]`)
+  await formingRow.waitFor({ timeout: 10000 })
+  check(flat(await formingRow.innerText()) === 'в формирующемся заказе 4 шт.' && await formingRow.getAttribute('href') === '/admin/deliveries', `добавлен вручную — «${flat(await formingRow.innerText())}» со ссылкой на «Поставки»`)
+  if (SHOTS)
+    await page.screenshot({ path: `${SHOTS}/restock-forming-1366.png`, fullPage: true })
+  psql(`UPDATE public.products SET min_stock_level = :'m' WHERE id = :'p';`, { p: d.old, m: String(d.saved.min_stock_level) })
+  await page.goto(`${BASE}/admin/deliveries`, { waitUntil: 'load', timeout: 120000 })
+  await draftCard.waitFor({ timeout: 30000 })
 
   console.log('\n== «Заказано»')
   await draftCard.locator('[data-testid=draft-place]').click()

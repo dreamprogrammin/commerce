@@ -72,6 +72,8 @@ interface RestockProduct extends RestockItem {
   alerts: number
   wishlist: number
   pending: number
+  /** В формирующихся заказах («Поставки»): поставщику ещё не отправлено */
+  forming: number
 }
 
 const suppliers = ref<RestockSupplier[]>([])
@@ -813,6 +815,9 @@ async function assignSupplier(productId: string, supplierId: string) {
                       <span v-if="row.manual" class="ml-2 text-primary">добавлен вручную</span>
                       <span v-else-if="row.quantity === 0" class="ml-2">не берём</span>
                       <span v-if="row.item.pending" class="ml-2 text-amber-700 dark:text-amber-400" data-testid="row-pending">уже заказано {{ row.item.pending }} шт.</span>
+                      <NuxtLink v-if="row.item.forming" to="/admin/deliveries" class="ml-2 text-amber-700 hover:underline dark:text-amber-400" data-testid="row-forming">
+                        в формирующемся заказе {{ row.item.forming }} шт.
+                      </NuxtLink>
                     </div>
                   </TableCell>
                   <TableCell class="text-center">
@@ -965,6 +970,9 @@ async function assignSupplier(productId: string, supplierId: string) {
                   <p v-if="row.item.pending" class="text-xs text-amber-700 dark:text-amber-400">
                     уже заказано {{ row.item.pending }} шт.
                   </p>
+                  <NuxtLink v-if="row.item.forming" to="/admin/deliveries" class="block text-xs text-amber-700 hover:underline dark:text-amber-400">
+                    в формирующемся заказе {{ row.item.forming }} шт.
+                  </NuxtLink>
                   <p v-if="row.item.cartCustomers || row.item.alerts || row.item.wishlist" class="text-xs text-muted-foreground">
                     <span
                       v-if="row.item.cartCustomers"
@@ -1104,7 +1112,7 @@ async function assignSupplier(productId: string, supplierId: string) {
                                   {{ product.name }}
                                 </div>
                                 <div class="text-xs text-muted-foreground">
-                                  <span v-if="product.sku">Арт. {{ product.sku }} · </span>продано {{ product.sold90 }} за 90 дн.<span v-if="product.pending"> · заказано {{ product.pending }}</span>
+                                  <span v-if="product.sku">Арт. {{ product.sku }} · </span>продано {{ product.sold90 }} за 90 дн.<span v-if="product.pending"> · заказано {{ product.pending }}</span><span v-if="product.forming" data-testid="pick-forming"> · формируется {{ product.forming }}</span>
                                 </div>
                               </div>
                               <span class="text-xs text-muted-foreground tabular-nums whitespace-nowrap">остаток {{ product.stock }}</span>

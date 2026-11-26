@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aggregateSales, pendingByProduct } from '../../server/utils/adminRestock'
+import { aggregateSales, formingByProduct, pendingByProduct } from '../../server/utils/adminRestock'
 
 const now = new Date('2026-10-30T12:00:00Z')
 const daysAgo = (d: number) => new Date(now.getTime() - d * 86_400_000).toISOString()
@@ -42,5 +42,24 @@ describe('pendingByProduct', () => {
       { status: 'ordered', lines: [line('c', 2, 5)] },
     ])
     expect(Object.fromEntries(pending)).toEqual({ a: 5, b: 3 })
+  })
+
+  it('формирующийся заказ — не «заказано»: поставщику он ещё не отправлен', () => {
+    const line = (productId: string, quantity: number) => ({ productId, name: 'x', sku: null, quantity, received: 0, costPrice: null })
+    expect(pendingByProduct([{ status: 'draft', lines: [line('a', 5)] }]).size).toBe(0)
+  })
+})
+
+describe('formingByProduct', () => {
+  it('лежит в формирующихся заказах — только по ним, удалённые товары не в счёт', () => {
+    const line = (productId: string | null, quantity: number) => ({ productId, name: 'x', sku: null, quantity, received: 0, costPrice: null })
+    const forming = formingByProduct([
+      { status: 'draft', lines: [line('a', 3), line('b', 2), line(null, 4)] },
+      { status: 'draft', lines: [line('a', 1)] },
+      { status: 'ordered', lines: [line('a', 9), line('c', 2)] },
+      { status: 'in_transit', lines: [line('b', 7)] },
+      { status: 'received', lines: [line('c', 5)] },
+    ])
+    expect(Object.fromEntries(forming)).toEqual({ a: 4, b: 2 })
   })
 })
