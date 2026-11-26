@@ -6,6 +6,7 @@ import type { Battery, BatteryState } from '@/utils/usageBatteries'
 import {
   ArrowRight,
   Bot,
+  ChartColumn,
   Check,
   Gauge,
   Inbox,
@@ -48,6 +49,7 @@ const PAGE_ICON: Record<(typeof PURCHASING_PAGES)[number]['to'], Component> = {
   '/admin/telegram': Send,
   '/admin/supplier-offers': PackageSearch,
   '/admin/demand': Search,
+  '/admin/kaspi': ChartColumn,
   '/admin/ai': Bot,
   '/admin/restock': ShoppingCart,
   '/admin/deliveries': PackageCheck,
