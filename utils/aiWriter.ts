@@ -1,4 +1,5 @@
 import type { AiRequestUsage, WriterBudget } from './aiCost'
+import type { DemandPhrase } from './writerDemand'
 
 /**
  * «Тексты для сайта» (23 ноября 2026) — что отвечает сервер
@@ -40,6 +41,12 @@ export interface WrittenOfferProduct extends WrittenProduct {
    * миграции 20261126120000 колонки нет); нет поля — сервер старой сборки.
    */
   savedAt?: string | null
+  /**
+   * Запросы покупателей, которые ушли модели вместе с товаром (27.11.2026):
+   * фраза и поисков в месяц. Пусто — спроса по товару нет, текст написан без
+   * него; нет поля — ответ сервера старой сборки.
+   */
+  demand?: DemandPhrase[]
 }
 
 /**
@@ -64,6 +71,7 @@ export function toSavedOfferProduct(result: WrittenOfferProduct, writtenAt: stri
     model: result.model,
     photo: result.photo,
     ...(result.usage ? { usage: result.usage } : {}),
+    ...(result.demand ? { demand: result.demand } : {}),
     writtenAt,
   }
 }
@@ -102,10 +110,16 @@ export function savedOfferTexts(raw: unknown): Record<string, SavedOfferProduct>
       model,
       photo: v.photo === true,
       ...(savedUsage(usage) ? { usage: savedUsage(usage)! } : {}),
+      ...(Array.isArray(v.demand) ? { demand: savedDemand(v.demand) } : {}),
       writtenAt,
     }
   }
   return texts
+}
+
+function savedDemand(raw: unknown[]): DemandPhrase[] {
+  return raw.filter((p): p is DemandPhrase => isObject(p) && typeof p.phrase === 'string' && typeof p.volume === 'number' && Number.isFinite(p.volume))
+    .map(p => ({ phrase: p.phrase, volume: p.volume }))
 }
 
 const count = (x: unknown): number | null => typeof x === 'number' && Number.isFinite(x) && x >= 0 ? x : null
