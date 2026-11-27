@@ -47,6 +47,7 @@
     "@tanstack/vue-query": "5.62.7",
     "@tanstack/vue-table": "^8.21.3",
     "@vueuse/core": "^13.6.0",
+    "barcode-detector": "3.2.3",
     "browser-image-compression": "^2.0.2",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
@@ -81,7 +82,8 @@
     "vue-draggable-next": "^2.3.0",
     "vue-router": "5.1.0",
     "vue-sonner": "^2.0.2",
-    "web-vitals": "^6.1.1"
+    "web-vitals": "^6.1.1",
+    "zxing-wasm": "3.1.6"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^5.2.0",

@@ -609,7 +609,16 @@ export default defineNuxtConfig({
           'X-Content-Type-Options': 'nosniff',
           'X-Frame-Options': 'SAMEORIGIN',
           'Referrer-Policy': 'strict-origin-when-cross-origin',
-          'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+          /*
+           * Камера — только самому сайту (27.11.2026): ею сканируют штрихкоды
+           * на «Приёмке по факту» в админке (/admin/deliveries/receive/…).
+           * Разрешена на всех страницах, а не правилом для /admin/**: сайт
+           * ставится на телефон приложением со start_url «/», в админку оттуда
+           * переходят без перезагрузки, и политику даёт заголовок первой
+           * загруженной страницы — витрины. Чужим фреймам камера закрыта
+           * по-прежнему: (self) — это только uhti.kz.
+           */
+          'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
           'Content-Security-Policy-Report-Only': [
             `default-src 'self'`,
             `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com`,
@@ -1049,6 +1058,12 @@ export default defineNuxtConfig({
               // Конфетти — одна страница: pages/order/success/[id].vue
               if (id.includes('canvas-confetti'))
                 return 'vendor-confetti'
+              // Сканер штрихкодов — только «Приёмка по факту» в админке
+              // (composables/admin/useBarcodeCamera.ts), import() по «Камера».
+              // Без своей строки 46 КБ уехали в общий vendor и на каждую
+              // страницу сайта (замерено на сборке 27.11.2026: 783 → 830 КБ)
+              if (id.includes('barcode-detector') || id.includes('zxing-wasm'))
+                return 'vendor-admin-barcode'
               // Маски телефонов — формы чекаута и профиля, не каталог
               if (id.includes('maska'))
                 return 'vendor-forms'

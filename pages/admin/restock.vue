@@ -19,6 +19,7 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  ScanBarcode,
   ShoppingCart,
   Truck,
   Undo2,
@@ -681,6 +682,12 @@ async function assignSupplier(productId: string, supplierId: string) {
                   <Button size="sm" data-testid="order-receive" @click="openReceive(order)">
                     <PackageCheck class="w-4 h-4 mr-1.5" />
                     Принять
+                  </Button>
+                  <Button variant="outline" size="sm" as-child>
+                    <NuxtLink :to="`/admin/deliveries/receive/${order.id}`" data-testid="order-receive-scan">
+                      <ScanBarcode class="w-4 h-4 mr-1.5" />
+                      Принять по факту
+                    </NuxtLink>
                   </Button>
                   <Button variant="ghost" size="sm" data-testid="order-saved-copy" @click="copySavedOrder(order)">
                     <Copy class="w-4 h-4 mr-1.5" />

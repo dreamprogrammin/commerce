@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ReceiveOrderData } from '~/utils/receiveScan'
 import type { PurchasingStatus } from '~/utils/smartPurchasing'
 import type { DeliveriesData, DeliveryProduct, DeliveryReceipt, SupplierOrder, SupplierOrderStatus } from '~/utils/supplierOrders'
 import { almatyDay } from '~/utils/supplierOrders'
@@ -225,6 +226,74 @@ export async function loadDeliveries(db: SupabaseClient, now = new Date()): Prom
     orders: list,
     products,
     receipts,
+  }
+}
+
+/**
+ * Заказ для экрана приёмки по факту (27.11.2026, utils/receiveScan.ts): тот
+ * же разбор, что у «Поставок», плюс штрихкоды и артикулы товаров заказа и
+ * штрихкоды всех прочих товаров — чтобы чужую коробку экран узнал сразу.
+ * Принимать можно только отправленный поставщику и не закрытый заказ — это
+ * проверяет и сама приёмка (admin_receive_supplier_order); здесь закрытый
+ * отдаётся, чтобы экран сказал «уже принят», а не «не найден».
+ */
+export async function loadReceiveOrder(db: SupabaseClient, orderId: string): Promise<ReceiveOrderData> {
+  const data = await loadDeliveries(db)
+  if (!data.ordersReady)
+    throw createError({ statusCode: 409, message: 'Заказов поставщикам ещё нет в базе: нужна миграция 20261031160000' })
+  const order = data.orders.find(o => o.id === orderId)
+  if (!order)
+    throw createError({ statusCode: 404, message: 'Заказ не найден — возможно, он давно закрыт' })
+  const ids = [...new Set(order.lines.map(l => l.productId).filter((id): id is string => Boolean(id)))]
+  const [own, others] = await Promise.all([
+    ids.length
+      ? db.from('products').select('id, barcode, sku').in('id', ids)
+      : Promise.resolve({ data: [] as { id: string, barcode: string | null, sku: string | null }[], error: null }),
+    loadProductBarcodes(db),
+  ])
+  if (own.error)
+    throw createError({ statusCode: 500, message: own.error.message })
+  const codes = new Map((own.data ?? []).map(p => [p.id, p]))
+  const products: ReceiveOrderData['products'] = {}
+  for (const id of ids) {
+    const p = data.products[id]
+    if (p)
+      products[id] = { ...p, barcode: codes.get(id)?.barcode?.trim() || null, sku: codes.get(id)?.sku?.trim() || null }
+  }
+  const inOrder = new Set(ids)
+  const supplier = data.suppliers.find(s => s.id === order.supplierId)
+  return {
+    order,
+    supplier: supplier ? { id: supplier.id, name: supplier.name } : null,
+    products,
+    otherBarcodes: others
+      .filter(p => !inOrder.has(p.id))
+      .map(p => ({ productId: p.id, name: p.name, barcode: p.barcode })),
+  }
+}
+
+/**
+ * Все товары со штрихкодом — страницами: PostgREST отдаёт не больше 1000
+ * строк за раз, а «этот код уже у другого товара» обязано видеть все.
+ */
+export async function loadProductBarcodes(db: SupabaseClient): Promise<{ id: string, name: string, barcode: string }[]> {
+  const PAGE = 1000
+  const rows: { id: string, name: string, barcode: string }[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db.from('products')
+      .select('id, name, barcode')
+      .not('barcode', 'is', null)
+      .order('id')
+      .range(from, from + PAGE - 1)
+    if (error)
+      throw createError({ statusCode: 500, message: error.message })
+    for (const p of data ?? []) {
+      const barcode = p.barcode?.trim()
+      if (barcode)
+        rows.push({ id: p.id, name: p.name.trim(), barcode })
+    }
+    if (!data || data.length < PAGE)
+      return rows
   }
 }
 
