@@ -403,6 +403,7 @@ const aiServer = http.createServer((req, res) => {
         rules: systemText.startsWith('Ты пишешь тексты'),
         clipboardAnswer: systemText.includes('Отвечай строго по полям из задания'),
         demandRule: systemText.includes('СПРОС: если в сообщении есть блок СПРОС'),
+        demandSpecific: systemText.includes('Общее слово раздела («куклы», «машинки», «настольные игры», «игрушки») типом не ставь') && systemText.includes('числа поисков — только для выбора, в текст их не пиши'),
         listed: numberIn(systemText, 'РАЗДЕЛЫ КАТАЛОГА', CATEGORY_PATH) > 0 && numberIn(systemText, 'БРЕНДЫ НА САЙТЕ', PROBE_BRAND) > 0,
         images: parts.filter(b => b.type === 'image').map(b => `${b.source?.type} ${b.source?.media_type}${b.source?.data === PNG_B64 ? ' как отдано' : ''}`),
         data,
@@ -544,7 +545,7 @@ async function cleanup() {
   await removeProbeProducts()
   // Раздел и бренды «Текстов для сайта» — после товаров: товары держат бренд
   psql(`DELETE FROM public.product_lines WHERE name = :'l'; DELETE FROM public.brands WHERE name IN (:'b1', :'b2', :'b3'); DELETE FROM public.categories WHERE slug LIKE 'probe-ai-texts-%';`, { b1: PROBE_BRAND, b2: NEW_BRAND, b3: TYPED_BRAND, l: TYPED_LINE })
-  psql(`DELETE FROM public.market_demand_topics WHERE name LIKE 'Проверка спроса%'; DELETE FROM public.market_demand_keywords WHERE keyword IN ('проверка спроса po-1016', 'проверка спроса po-1013', 'проверка спроса po-1014');`)
+  psql(`DELETE FROM public.market_demand_topics WHERE name LIKE 'Проверка спроса%'; DELETE FROM public.market_demand_keywords WHERE keyword IN ('проверка спроса po-1016', 'проверка спроса po-1013', 'проверка спроса po-1014', 'проверка персонажа po-1013');`)
   const ids = psql(`SELECT coalesce(string_agg(c.id::text, ','), '') FROM public.supplier_channels c JOIN public.suppliers s ON s.id = c.supplier_id WHERE s.name IN ('${SUPPLIER_OPEN}', '${SUPPLIER_CLOSED}');`)
   for (const id of new Set([...channelIds, ...ids.split(',').filter(Boolean), ORPHAN]))
     await removeFiles(await bucketFiles(id))
@@ -1377,6 +1378,10 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
 
   // Клик со страницы, а не переход по адресу: ссылка ведёт куда надо
   await page.route('**/api/seo/notify-indexing', r => r.fulfill({ json: { success: true, indexnow: { submitted: false, urls_count: 0 }, yandex_ping: { submitted: false }, bing_ping: { submitted: false } } }))
+  // Персонаж (27.11.2026): тема-франшиза по названию товара — второй темой в блоке СПРОС. Спрос у неё меньше,
+  // чем у темы «низкий» (100), — иначе по признакам первой выбралась бы она сама
+  psql(`INSERT INTO public.market_demand_topics (name, kind, keywords, match_terms) VALUES ('Проверка спроса персонаж', 'franchise', '{"проверка персонажа po-1013"}', '{"po-1013"}');
+INSERT INTO public.market_demand_keywords (keyword, search_volume) VALUES ('проверка персонажа po-1013', 50) ON CONFLICT (keyword) DO UPDATE SET search_volume = 50;`)
   await page.locator('[data-testid=offer-card]', { hasText: 'PO-1013' }).locator('[data-testid=offer-to-site]').click()
   await page.waitForURL(u => u.pathname === '/admin/products/new' && u.searchParams.get('offer') === offerIdOf(1013), { timeout: 30000 })
   const t13 = TEXTS['PO-1013']
@@ -1408,8 +1413,12 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   // Тексты по спросу (27.11.2026): фразы товара и его темы с поисками в месяц — в сообщении модели и строкой в карточке
   const demand13 = /СПРОС \(что покупатели ищут в Google по Казахстану, запросов в месяц\):\n([\s\S]*)$/.exec(w13?.data ?? '')?.[1] ?? ''
   check(w13?.demandRule && /^Запросы про этот товар:\n(?:- [^\n]+\n)*- игрушка po 1013 [^\n]+ — 30\n/.test(demand13) && demand13.includes('Частые запросы темы «Проверка спроса низкий»:\n- проверка спроса po-1013 — 100'), `модели — правило про спрос и блок СПРОС: фразы товара (30) и темы (100): ${JSON.stringify(demand13)}`)
+  check(w13?.demandSpecific, 'правило про спрос: тип в названии — точный запрос, а не общее слово раздела; числа поисков — не в текст')
+  check(demand13.endsWith('Частые запросы темы «Проверка спроса низкий»:\n- проверка спроса po-1013 — 100\nЧастые запросы темы «Проверка спроса персонаж»:\n- проверка персонажа po-1013 — 50'), `персонаж из названия товара — второй темой после темы товара: ${JSON.stringify(demand13)}`)
   const demandLine13 = await textOf(page.locator('[data-testid=ai-writer-demand]'))
   check(demandLine13.startsWith('Написано под запросы покупателей: «') && demandLine13.includes('«проверка спроса po-1013» — 100 в мес.') && /po 1013[^»]*» — 30 в мес\./.test(demandLine13), `в карточке — под какие запросы написано: ${demandLine13}`)
+  check(demandLine13.endsWith('«проверка персонажа po-1013» — 50 в мес.'), `в карточке — и запрос персонажа: ${demandLine13}`)
+  psql(`DELETE FROM public.market_demand_topics WHERE name = 'Проверка спроса персонаж'; DELETE FROM public.market_demand_keywords WHERE keyword = 'проверка персонажа po-1013';`)
   check(ai.writerRetrieved <= 1, `справка о модели текстов — не больше одной на сервер: ${ai.writerRetrieved}`)
   const lines13 = await usageLines(page)
   check(ai.rates <= 1 && lines13[0] === SPENT_LINE && lines13.at(-1) === RATE_LINE, `курс — не больше одного запроса за день на сервер (${ai.rates}), расход второго описания — той же строкой`)

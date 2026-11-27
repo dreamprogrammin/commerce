@@ -8,7 +8,7 @@ import { adminPromptTask, PROMPT_SHOP_RULES } from '~/constants/adminPrompts'
 import { toSavedOfferProduct } from '~/utils/aiWriter'
 import { offerText, topicMatches } from '~/utils/offerDemand'
 import { guessesOf } from '~/utils/offerGuess'
-import { demandBlock, demandPhrases, normPhrase, writerDemand, writerTopic } from '~/utils/writerDemand'
+import { demandBlock, demandPhrases, normPhrase, writerDemand, writerTopics } from '~/utils/writerDemand'
 import { sanitizeBrandHtml } from '../../supabase/functions/generate-brand-seo/validate'
 
 /**
@@ -179,20 +179,25 @@ async function offerPhoto(db: SupabaseClient, offerId: string): Promise<{ mediaT
 
 // ---------- спрос ----------
 
-/** Фраз в одном запросе .in() — адрес PostgREST не резиновый */
-const PHRASES_PER_QUERY = 150
+/**
+ * Фраз в одном запросе .in(): кириллица в адресе — по 6 байт на букву, 40
+ * фраз — до ~6 КБ. На бою 27.11 у товара не больше 13 фраз (свои — до 4, у
+ * темы и у персонажа — до 10) — один запрос.
+ */
+const PHRASES_PER_QUERY = 40
 
 /**
  * Спрос для текста товара (27.11.2026, utils/writerDemand.ts): фразы товара
- * (search_queries и запрос разбора demand_guess), тема «Спроса на рынке» и
- * поисков в месяц по ним. Текст без спроса лучше, чем никакого: любая ошибка
- * или отсутствие миграций — null, генерация идёт дальше.
+ * (search_queries и запрос разбора demand_guess), тема «Спроса на рынке»,
+ * персонаж из названия и поисков в месяц по ним. Текст без спроса лучше,
+ * чем никакого: любая ошибка или отсутствие миграций — null, генерация идёт
+ * дальше.
  */
 async function offerWriterDemand(db: SupabaseClient, offerId: string, itemIndex: number, offer: { caption: string, items: OfferItem[] | null }): Promise<WriterDemand | null> {
   try {
     const [row, topicsRes] = await Promise.all([
       db.from('supplier_offers').select('search_queries, demand_guess').eq('id', offerId).maybeSingle(),
-      db.from('market_demand_topics').select('topic_id:id, name, keywords, match_terms, is_active').eq('is_active', true),
+      db.from('market_demand_topics').select('topic_id:id, name, kind, keywords, match_terms, is_active').eq('is_active', true),
     ])
     if (row.error || topicsRes.error) {
       console.error('[content-writer] спрос не прочитан', row.error?.message ?? topicsRes.error?.message)
@@ -202,14 +207,16 @@ async function offerWriterDemand(db: SupabaseClient, offerId: string, itemIndex:
     const queries = Array.isArray(r?.search_queries) ? r.search_queries[itemIndex] : null
     const guess = guessesOf(r?.demand_guess)?.[itemIndex] ?? null
     const own = [...(Array.isArray(queries) ? queries.filter((q): q is string => typeof q === 'string') : []), ...(guess?.query ? [guess.query] : [])]
-    const topics = (topicsRes.data ?? []) as { topic_id: string, name: string, keywords: string[], match_terms: string[], is_active: boolean }[]
+    const topics = (topicsRes.data ?? []) as { topic_id: string, name: string, kind: 'type' | 'franchise', keywords: string[], match_terms: string[], is_active: boolean }[]
     const item = offer.items?.[itemIndex]
-    // Тема — по этому товару поста, а не по всему посту
+    // Тема — по этому товару поста, а не по всему посту; персонаж — только по его названию и бренду
     const text = offerText({ caption: offer.caption, items: item ? [item] : [] })
-    const candidates = guess?.topic && topics.some(t => t.topic_id === guess.topic)
-      ? topics.filter(t => t.topic_id === guess.topic)
+    const itemText = offerText({ caption: '', items: item ? [item] : [] })
+    const guessed = guess?.topic ? topics.filter(t => t.topic_id === guess.topic) : []
+    const pool = guessed.length
+      ? [...guessed, ...topics.filter(t => t.kind === 'franchise' && topicMatches(t, itemText))]
       : topics.filter(t => topicMatches(t, text))
-    const phrases = [...new Set([...own, ...candidates.flatMap(t => t.keywords)].map(normPhrase).filter(Boolean))]
+    const phrases = [...new Set([...own, ...pool.flatMap(t => t.keywords)].map(normPhrase).filter(Boolean))]
     const volumes = new Map<string, number | null>()
     for (let i = 0; i < phrases.length; i += PHRASES_PER_QUERY) {
       const { data, error } = await db.from('market_demand_keywords')
@@ -222,7 +229,7 @@ async function offerWriterDemand(db: SupabaseClient, offerId: string, itemIndex:
       for (const k of (data ?? []) as { keyword: string, search_volume: number | null }[])
         volumes.set(normPhrase(k.keyword), k.search_volume)
     }
-    return writerDemand(own, writerTopic(candidates, guess?.topic, text, volumes), volumes)
+    return writerDemand(own, writerTopics(pool, guess?.topic, text, itemText, volumes), volumes)
   }
   catch (e) {
     console.error('[content-writer] спрос не собран', (e as Error).message)
@@ -252,11 +259,12 @@ export function productSystem(categories: WriterCategory[], brands: WriterBrand[
 
 ${adminPromptTask('product')}
 
-СПРОС: если в сообщении есть блок СПРОС — это реальные запросы покупателей в Google по Казахстану и сколько раз в месяц их ищут. Пиши под них:
-- в названии называй вид товара так, как его ищут чаще всего (из подходящих этому товару запросов);
-- в описании и SEO-описании естественно используй 2–3 самые частые подходящие фразы, словами покупателя, — в связном тексте, а не списком;
-- фразу, которая этому товару не подходит (другой персонаж, бренд, возраст или вид вещи), не используй и товар под неё не подгоняй — правда о товаре важнее запроса;
-- одну фразу — не больше двух раз на весь текст.
+СПРОС: если в сообщении есть блок СПРОС — это запросы, которыми покупатели в Казахстане ищут такие товары в Google, и сколько раз в месяц их ищут. Пиши словами покупателя:
+- «Тип» в названии — самый частый из запросов, которые называют именно эту вещь: «настольный футбол», а не «настольные игры»; «машинка на пульте», если её ищут чаще, чем «радиоуправляемую машину». Общее слово раздела («куклы», «машинки», «настольные игры», «игрушки») типом не ставь, если вещь можно назвать точнее — запросом из блока или названием из ДАННЫХ;
+- этот главный запрос повтори в первом предложении абзаца описания; SEO-описание начинай с него;
+- ещё 1–2 частых запроса, которые подходят товару (другое название той же вещи, персонаж, общий вид товара), — в абзаце описания, связным текстом, а не списком; слова можно склонять и переставлять;
+- запрос, который товару не подходит (другой персонаж, бренд, возраст или вид вещи), не используй и товар под него не подгоняй — правда о товаре важнее запроса;
+- в описании один запрос — не больше двух раз; числа поисков — только для выбора, в текст их не пиши.
 Блока СПРОС нет — пиши как обычно.
 
 ОТКУДА ДАННЫЕ: товар пришёл от оптового поставщика. К блоку ДАННЫЕ приложено фото из его поста — что на нём видно (вид товара, цвет, детали комплекта, надписи на коробке), тоже данные. Название от поставщика бывает машинным переводом — перепиши его по схеме из задания.
