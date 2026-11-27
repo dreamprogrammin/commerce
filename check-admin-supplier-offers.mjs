@@ -402,6 +402,7 @@ const aiServer = http.createServer((req, res) => {
         cache: Array.isArray(body.system) ? body.system.at(-1)?.cache_control?.type ?? null : null,
         rules: systemText.startsWith('Ты пишешь тексты'),
         clipboardAnswer: systemText.includes('Отвечай строго по полям из задания'),
+        demandRule: systemText.includes('СПРОС: если в сообщении есть блок СПРОС'),
         listed: numberIn(systemText, 'РАЗДЕЛЫ КАТАЛОГА', CATEGORY_PATH) > 0 && numberIn(systemText, 'БРЕНДЫ НА САЙТЕ', PROBE_BRAND) > 0,
         images: parts.filter(b => b.type === 'image').map(b => `${b.source?.type} ${b.source?.media_type}${b.source?.data === PNG_B64 ? ' как отдано' : ''}`),
         data,
@@ -1404,6 +1405,11 @@ INSERT INTO public.market_demand_monthly (keyword, month, search_volume) SELECT 
   check(w13?.model === WRITER && w13.effort === 'low' && w13.format === 'json_schema' && w13.fields === 'name,description,seo_description,category,brand,new_brand' && w13.cache === 'ephemeral', `запрос — ${WRITER}, низкий уровень рассуждений, ответ по схеме, правила в кеше: ${JSON.stringify(w13 && { model: w13.model, effort: w13.effort, format: w13.format, cache: w13.cache })}`)
   check(w13?.rules && !w13.clipboardAnswer && w13.listed, 'в промпте — правила и задание кнопки «Скопировать промпт», без строк «Имя поля:», со списками разделов и брендов сайта')
   check(JSON.stringify(w13?.images) === '["base64 image/png как отдано"]' && w13.data.includes('- Код модели (артикул с коробки): PO-1013') && !/₸|Цена \d/.test(w13.data), `модели — фото поста из бакета и подпись без цены: ${JSON.stringify(w13?.images)}`)
+  // Тексты по спросу (27.11.2026): фразы товара и его темы с поисками в месяц — в сообщении модели и строкой в карточке
+  const demand13 = /СПРОС \(что покупатели ищут в Google по Казахстану, запросов в месяц\):\n([\s\S]*)$/.exec(w13?.data ?? '')?.[1] ?? ''
+  check(w13?.demandRule && /^Запросы про этот товар:\n(?:- [^\n]+\n)*- игрушка po 1013 [^\n]+ — 30\n/.test(demand13) && demand13.includes('Частые запросы темы «Проверка спроса низкий»:\n- проверка спроса po-1013 — 100'), `модели — правило про спрос и блок СПРОС: фразы товара (30) и темы (100): ${JSON.stringify(demand13)}`)
+  const demandLine13 = await textOf(page.locator('[data-testid=ai-writer-demand]'))
+  check(demandLine13.startsWith('Написано под запросы покупателей: «') && demandLine13.includes('«проверка спроса po-1013» — 100 в мес.') && /po 1013[^»]*» — 30 в мес\./.test(demandLine13), `в карточке — под какие запросы написано: ${demandLine13}`)
   check(ai.writerRetrieved <= 1, `справка о модели текстов — не больше одной на сервер: ${ai.writerRetrieved}`)
   const lines13 = await usageLines(page)
   check(ai.rates <= 1 && lines13[0] === SPENT_LINE && lines13.at(-1) === RATE_LINE, `курс — не больше одного запроса за день на сервер (${ai.rates}), расход второго описания — той же строкой`)

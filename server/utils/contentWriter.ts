@@ -2,9 +2,13 @@ import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { SavedOfferProduct, WriterCategory, WrittenOfferProduct, WrittenProduct } from '~/utils/aiWriter'
 import type { OfferItem } from '~/utils/supplierOfferList'
+import type { WriterDemand } from '~/utils/writerDemand'
 import { Buffer } from 'node:buffer'
 import { adminPromptTask, PROMPT_SHOP_RULES } from '~/constants/adminPrompts'
 import { toSavedOfferProduct } from '~/utils/aiWriter'
+import { offerText, topicMatches } from '~/utils/offerDemand'
+import { guessesOf } from '~/utils/offerGuess'
+import { demandBlock, demandPhrases, normPhrase, writerDemand, writerTopic } from '~/utils/writerDemand'
 import { sanitizeBrandHtml } from '../../supabase/functions/generate-brand-seo/validate'
 
 /**
@@ -173,6 +177,59 @@ async function offerPhoto(db: SupabaseClient, offerId: string): Promise<{ mediaT
   return { mediaType, data: Buffer.from(await blob.arrayBuffer()).toString('base64') }
 }
 
+// ---------- спрос ----------
+
+/** Фраз в одном запросе .in() — адрес PostgREST не резиновый */
+const PHRASES_PER_QUERY = 150
+
+/**
+ * Спрос для текста товара (27.11.2026, utils/writerDemand.ts): фразы товара
+ * (search_queries и запрос разбора demand_guess), тема «Спроса на рынке» и
+ * поисков в месяц по ним. Текст без спроса лучше, чем никакого: любая ошибка
+ * или отсутствие миграций — null, генерация идёт дальше.
+ */
+async function offerWriterDemand(db: SupabaseClient, offerId: string, itemIndex: number, offer: { caption: string, items: OfferItem[] | null }): Promise<WriterDemand | null> {
+  try {
+    const [row, topicsRes] = await Promise.all([
+      db.from('supplier_offers').select('search_queries, demand_guess').eq('id', offerId).maybeSingle(),
+      db.from('market_demand_topics').select('topic_id:id, name, keywords, match_terms, is_active').eq('is_active', true),
+    ])
+    if (row.error || topicsRes.error) {
+      console.error('[content-writer] спрос не прочитан', row.error?.message ?? topicsRes.error?.message)
+      return null
+    }
+    const r = row.data as { search_queries: unknown, demand_guess: unknown } | null
+    const queries = Array.isArray(r?.search_queries) ? r.search_queries[itemIndex] : null
+    const guess = guessesOf(r?.demand_guess)?.[itemIndex] ?? null
+    const own = [...(Array.isArray(queries) ? queries.filter((q): q is string => typeof q === 'string') : []), ...(guess?.query ? [guess.query] : [])]
+    const topics = (topicsRes.data ?? []) as { topic_id: string, name: string, keywords: string[], match_terms: string[], is_active: boolean }[]
+    const item = offer.items?.[itemIndex]
+    // Тема — по этому товару поста, а не по всему посту
+    const text = offerText({ caption: offer.caption, items: item ? [item] : [] })
+    const candidates = guess?.topic && topics.some(t => t.topic_id === guess.topic)
+      ? topics.filter(t => t.topic_id === guess.topic)
+      : topics.filter(t => topicMatches(t, text))
+    const phrases = [...new Set([...own, ...candidates.flatMap(t => t.keywords)].map(normPhrase).filter(Boolean))]
+    const volumes = new Map<string, number | null>()
+    for (let i = 0; i < phrases.length; i += PHRASES_PER_QUERY) {
+      const { data, error } = await db.from('market_demand_keywords')
+        .select('keyword, search_volume')
+        .in('keyword', phrases.slice(i, i + PHRASES_PER_QUERY))
+      if (error) {
+        console.error('[content-writer] поиски фраз не прочитаны', error.message)
+        return null
+      }
+      for (const k of (data ?? []) as { keyword: string, search_volume: number | null }[])
+        volumes.set(normPhrase(k.keyword), k.search_volume)
+    }
+    return writerDemand(own, writerTopic(candidates, guess?.topic, text, volumes), volumes)
+  }
+  catch (e) {
+    console.error('[content-writer] спрос не собран', (e as Error).message)
+    return null
+  }
+}
+
 // ---------- ответ модели ----------
 
 const PRODUCT_SCHEMA = {
@@ -194,6 +251,13 @@ export function productSystem(categories: WriterCategory[], brands: WriterBrand[
   return `${PROMPT_SHOP_RULES}
 
 ${adminPromptTask('product')}
+
+СПРОС: если в сообщении есть блок СПРОС — это реальные запросы покупателей в Google по Казахстану и сколько раз в месяц их ищут. Пиши под них:
+- в названии называй вид товара так, как его ищут чаще всего (из подходящих этому товару запросов);
+- в описании и SEO-описании естественно используй 2–3 самые частые подходящие фразы, словами покупателя, — в связном тексте, а не списком;
+- фразу, которая этому товару не подходит (другой персонаж, бренд, возраст или вид вещи), не используй и товар под неё не подгоняй — правда о товаре важнее запроса;
+- одну фразу — не больше двух раз на весь текст.
+Блока СПРОС нет — пиши как обычно.
 
 ОТКУДА ДАННЫЕ: товар пришёл от оптового поставщика. К блоку ДАННЫЕ приложено фото из его поста — что на нём видно (вид товара, цвет, детали комплекта, надписи на коробке), тоже данные. Название от поставщика бывает машинным переводом — перепиши его по схеме из задания.
 
@@ -348,7 +412,8 @@ export async function writeOfferProduct(db: SupabaseClient, offerId: string, ite
   if (!item?.name)
     throw createError({ statusCode: 409, message: 'ИИ ещё не прочитал этот товар — нажмите «Прочитать» в «Товарах поставщиков»' })
 
-  const claude = await claudeFor(db, WRITE_TIMEOUT_MS)
+  // Спрос — заодно с ключом модели: оба — круги до базы
+  const [claude, demand] = await Promise.all([claudeFor(db, WRITE_TIMEOUT_MS), offerWriterDemand(db, offerId, itemIndex, offer)])
   // Курс для строки «Расход» — пока модель пишет; не бросает (server/utils/usdKzt.ts)
   const rate = usdKztRate()
   const reply = await claude.client.messages.create({
@@ -360,7 +425,7 @@ export async function writeOfferProduct(db: SupabaseClient, offerId: string, ite
       role: 'user',
       content: [
         ...(photo ? [{ type: 'image' as const, source: { type: 'base64' as const, media_type: photo.mediaType, data: photo.data } }] : []),
-        { type: 'text' as const, text: offerProductData(item, offer.caption, items.length) },
+        { type: 'text' as const, text: [offerProductData(item, offer.caption, items.length), demandBlock(demand)].filter(Boolean).join('\n\n') },
       ],
     }],
   }).catch(providerFailure)
@@ -394,7 +459,7 @@ export async function writeOfferProduct(db: SupabaseClient, offerId: string, ite
     output: reply.usage.output_tokens,
     rate: usdKzt,
   }
-  const result: WrittenOfferProduct = { ...written, model: claude.spec, photo: Boolean(photo), usage, budget }
+  const result: WrittenOfferProduct = { ...written, model: claude.spec, photo: Boolean(photo), usage, budget, demand: demandPhrases(demand) }
   result.savedAt = await saveWrittenText(db, offerId, itemIndex, offer.written, result)
   return result
 }

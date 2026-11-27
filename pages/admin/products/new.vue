@@ -149,6 +149,11 @@ function fillForm(result: WrittenOfferProduct) {
 }
 
 /** «26.11 в 14:05» — по Алматы */
+/** «1 200 в мес.» — неразрывные пробелы, как у цен */
+function formatSearches(n: number): string {
+  return `${n.toLocaleString('ru-RU').replace(/\s/g, '\u00A0')}\u00A0в\u00A0мес.`
+}
+
 function savedWhen(iso: string): string {
   const parts = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Almaty', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
     .formatToParts(new Date(iso))
@@ -491,6 +496,19 @@ async function createFromForm(payload: {
                 на товаре не указан — оставлен пустым
               </template>
             </p>
+            <div v-if="writer.result.demand" data-testid="ai-writer-demand">
+              <template v-if="writer.result.demand.length">
+                <p>Написано под запросы покупателей:</p>
+                <ul class="list-disc pl-5 break-words">
+                  <li v-for="p in writer.result.demand" :key="p.phrase">
+                    «{{ p.phrase }}» — {{ formatSearches(p.volume) }}
+                  </li>
+                </ul>
+              </template>
+              <p v-else class="text-muted-foreground">
+                Спроса по этому товару нет — текст написан без запросов покупателей.
+              </p>
+            </div>
             <ul v-if="writer.result.warnings.length" class="list-disc space-y-1 pl-5 text-amber-700" data-testid="ai-writer-warnings">
               <li v-for="w in writer.result.warnings" :key="w">
                 {{ w }}
