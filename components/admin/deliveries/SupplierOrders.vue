@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   MessageCircle,
   PackageCheck,
+  ScanBarcode,
   Send,
   Trash2,
   Truck,
@@ -503,6 +504,13 @@ async function downloadSheet(order: SupplierOrder) {
                 <Button size="sm" :disabled="busy !== null" data-testid="order-receive" @click="receivingOrder = order">
                   <PackageCheck class="mr-1.5 h-4 w-4" />
                   Принять
+                </Button>
+                <!-- С телефоном у коробок: камера считает, что пришло на самом деле (27.11.2026) -->
+                <Button variant="outline" size="sm" as-child>
+                  <NuxtLink :to="`/admin/deliveries/receive/${order.id}`" data-testid="order-receive-scan">
+                    <ScanBarcode class="mr-1.5 h-4 w-4" />
+                    Принять по факту
+                  </NuxtLink>
                 </Button>
                 <Button v-if="data.ready" variant="outline" size="sm" :disabled="busy !== null" data-testid="order-expected" @click="openExpected(order)">
                   <CalendarDays class="mr-1.5 h-4 w-4" />

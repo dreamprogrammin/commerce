@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { ReceiveProduct, ReceiveResult, SupplierOrder, SupplierOrderLine } from '@/utils/supplierOrders'
 import { toast } from 'vue-sonner'
-import { useAdminRevalidateStore } from '@/stores/adminStore/adminRevalidateStore'
-import { adminFetch } from '@/utils/adminFetch'
+import { useReceiveSubmit } from '@/composables/admin/useReceiveSubmit'
 import { plural } from '@/utils/restockOrder'
 import { receiveDefaults, receiveMoney, receivePlan, remaining, salePriceOf } from '@/utils/supplierOrders'
 
@@ -24,8 +23,7 @@ const emit = defineEmits<{
   (e: 'received', result: ReceiveResult): void
 }>()
 
-const revalidateStore = useAdminRevalidateStore()
-const { notifyProducts } = useSeoIndexing()
+const { receive } = useReceiveSubmit()
 
 const quantities = ref<Record<string, number>>({})
 const close = ref(false)
@@ -85,32 +83,8 @@ async function submit() {
     return
   saving.value = true
   try {
-    const result = await adminFetch<ReceiveResult>(`/api/admin/restock/orders/${order.id}/receive`, {
-      method: 'POST',
-      body: {
-        items: Object.entries(quantities.value).map(([productId, quantity]) => ({ productId, quantity })),
-        close: preview.value.short && close.value,
-      },
-    })
+    const result = await receive(order, quantities.value, preview.value.short && close.value)
     emit('update:order', null)
-    // Кеш карточек сразу: уведомление «снова в наличии» ведёт на карточку,
-    // а закешированная на сутки страница показала бы «нет в наличии»
-    const productIds = result.received.map(r => r.product_id)
-    if (productIds.length) {
-      revalidateStore.enqueue({ productIds })
-      revalidateStore.flushNow()
-    }
-    // Новый товар только что появился на сайте — поисковикам
-    const shown = result.shown ?? []
-    if (shown.length)
-      void notifyProducts(shown.map(s => s.slug))
-    toast.success(`Принято ${result.units} шт. по заказу №${order.number}`, {
-      description: [
-        result.status === 'received' ? 'Заказ закрыт' : 'Заказ открыт — ждём остальное',
-        result.notified ? `«Товар снова в наличии» ушло ${result.notified} ${plural(result.notified, 'покупателю', 'покупателям', 'покупателям')}` : '',
-        shown.length ? `На сайте ${plural(shown.length, 'появился', 'появились', 'появились')} ${shown.length} ${plural(shown.length, 'новый товар', 'новых товара', 'новых товаров')}` : '',
-      ].filter(Boolean).join('. '),
-    })
     emit('received', result)
   }
   catch (error: any) {
