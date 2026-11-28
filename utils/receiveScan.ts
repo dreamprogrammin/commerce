@@ -139,6 +139,7 @@ export const SCAN_ABSENT_MS = 1000
  */
 export function createScanGate(absentMs = SCAN_ABSENT_MS) {
   const lastSeen = new Map<string, number>()
+  let pausedAt: number | null = null
   return {
     seen(raw: string, now: number): boolean {
       const key = codeKey(raw)
@@ -146,8 +147,37 @@ export function createScanGate(absentMs = SCAN_ABSENT_MS) {
       lastSeen.set(key, now)
       return prev === undefined || now - prev >= absentMs
     },
-    reset() {
-      lastSeen.clear()
+    /**
+     * Кадры перестали читаться: камеру выключили (свернули приложение, ушли
+     * со страницы) или открыли окно. Пока так, «кода нет в кадре» не копится:
+     * коробка, что стояла перед камерой, после включения — та же штука, а не
+     * новая (28.11.2026: одна коробка давала три штуки).
+     */
+    pause(now: number) {
+      pausedAt ??= now
+    },
+    /** Кадры читаются снова — время паузы в отсутствие кода не идёт */
+    resume(now: number) {
+      if (pausedAt === null)
+        return
+      const gap = now - pausedAt
+      for (const [key, at] of lastSeen)
+        lastSeen.set(key, at + gap)
+      pausedAt = null
+    },
+    /** Коды, что сейчас «в кадре» (на паузе — на её начало): их запоминает счёт в телефоне */
+    present(now: number): string[] {
+      const at = pausedAt ?? now
+      return [...lastSeen].filter(([, seenAt]) => at - seenAt < absentMs).map(([key]) => key)
+    },
+    /**
+     * После перезагрузки страницы (iPhone выгружает фоновую вкладку): коды,
+     * что были в кадре, — снова «в кадре», пока камера не увидит кадры без них.
+     */
+    hold(codes: string[], now: number) {
+      pausedAt ??= now
+      for (const code of codes)
+        lastSeen.set(codeKey(code), pausedAt)
     },
   }
 }
@@ -163,6 +193,11 @@ export interface ReceiveDraft {
    * Считается как orderSummary(order).receivedUnits.
    */
   base: number
+  /**
+   * Коды «ещё в кадре», когда кадры перестали читаться (createScanGate.present):
+   * после перезагрузки коробка, оставшаяся перед камерой, — та же штука.
+   */
+  held: string[]
 }
 
 export const receiveDraftKey = (orderId: string) => `admin-receive:${orderId}`
@@ -180,7 +215,7 @@ export function readReceiveDraft(raw: string | null, productIds: string[]): Rece
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
     return null
-  const { counts, savedAt, base } = parsed as { counts?: unknown, savedAt?: unknown, base?: unknown }
+  const { counts, savedAt, base, held } = parsed as { counts?: unknown, savedAt?: unknown, base?: unknown, held?: unknown }
   if (!counts || typeof counts !== 'object' || Array.isArray(counts) || typeof savedAt !== 'string' || Number.isNaN(Date.parse(savedAt)))
     return null
   if (typeof base !== 'number' || !Number.isInteger(base) || base < 0)
@@ -191,5 +226,7 @@ export function readReceiveDraft(raw: string | null, productIds: string[]): Rece
     if (ids.has(id) && typeof n === 'number' && Number.isInteger(n) && n > 0 && n <= 9999)
       clean[id] = n
   }
-  return Object.keys(clean).length ? { counts: clean, savedAt, base } : null
+  // Коды кадра — строки как с камеры; прежний счёт без них — пусто
+  const heldCodes = Array.isArray(held) ? held.filter((c): c is string => typeof c === 'string' && c.length > 0 && c.length <= 64).slice(0, 20) : []
+  return Object.keys(clean).length ? { counts: clean, savedAt, base, held: heldCodes } : null
 }

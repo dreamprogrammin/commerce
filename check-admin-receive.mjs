@@ -534,6 +534,17 @@ try {
   await cam.evaluate(() => Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true }))
   await cam.locator('[data-testid=receive-camera]').click()
   check(await until(async () => await cameraState(cam) === 'on', 20000), 'снова «Камера» — включилась')
+  // Коробка так и стоит перед камерой: включили снова — это не новая штука
+  await sleep(2000)
+  check(await countOf(cam, d.p3) === 1, `снова включили — коробка в кадре второй раз не посчитана: пазл ${await countOf(cam, d.p3)}`)
+  // Пока открыто подтверждение, кадры не читаются; вернулись к счёту — коробка всё та же
+  await cam.locator('[data-testid=receive-open-confirm]').click()
+  await cam.locator('[data-testid=receive-confirm]').waitFor({ timeout: 10000 })
+  await sleep(1500)
+  await cam.getByRole('button', { name: 'Вернуться к счёту' }).click()
+  await cam.locator('[data-testid=receive-confirm]').waitFor({ state: 'detached', timeout: 10000 })
+  await sleep(2000)
+  check(await cameraState(cam) === 'on' && await countOf(cam, d.p3) === 1, `подтверждение закрыли — коробка в кадре второй раз не посчитана: пазл ${await countOf(cam, d.p3)}, камера ${await cameraState(cam)}`)
   // Ушли со страницы: удержанная страница живёт в фоне, камера — нет
   await cam.evaluate(() => document.querySelector('#__nuxt').__vue_app__.config.globalProperties.$router.push('/admin/deliveries'))
   await cam.waitForURL(u => u.pathname === '/admin/deliveries', { timeout: 30000 })
@@ -541,7 +552,18 @@ try {
   await cam.goBack()
   await cam.waitForURL(u => u.pathname === PAGE, { timeout: 30000 })
   await cam.locator('[data-testid=receive-scan-line]').first().waitFor({ timeout: 30000 })
-  check(await cameraState(cam) === 'off' && await countOf(cam, d.p3) === 1, 'вернулись — счёт тот же, камера ждёт нажатия')
+  check(await cameraState(cam) === 'off' && await countOf(cam, d.p3) === 1, `вернулись — счёт тот же, камера ждёт нажатия: пазл ${await countOf(cam, d.p3)}, камера ${await cameraState(cam)}`)
+  // Перезагрузка — так бывает, когда iPhone выгружает вкладку в фоне: счёт и «что было в кадре» — из телефона
+  await cam.reload({ waitUntil: 'load', timeout: 120000 })
+  await cam.locator('[data-testid=receive-scan-line]').first().waitFor({ timeout: 30000 })
+  const held = JSON.parse(await draftOf(cam) || '{}').held ?? []
+  check(await countOf(cam, d.p3) === 1 && held.length === 1, `после перезагрузки — счёт и код «в кадре» из телефона: пазл ${await countOf(cam, d.p3)}, коды ${JSON.stringify(held)}`)
+  await cam.locator('[data-testid=receive-camera]').click()
+  check(await until(async () => await cameraState(cam) === 'on', 20000), 'после перезагрузки «Камера» — включилась')
+  await sleep(2000)
+  check(await countOf(cam, d.p3) === 1, `после перезагрузки коробка в кадре второй раз не посчитана: пазл ${await countOf(cam, d.p3)}`)
+  await cam.locator('[data-testid=receive-camera]').click()
+  await until(async () => await cameraState(cam) === 'off', 5000)
 
   console.log('\n== камера: код пропал и вернулся — ещё штука')
   const blinkBrowser = await chromium.launch({ channel: 'chromium', args: ['--use-fake-device-for-media-stream', `--use-file-for-fake-video-capture=${BLINK}`] })

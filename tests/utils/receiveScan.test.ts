@@ -62,15 +62,49 @@ describe('камера: тот же товар ещё в кадре', () => {
     expect(gate.seen('012345678905', 0)).toBe(true)
     expect(gate.seen('0012345678905', 100)).toBe(false)
     expect(gate.seen('4601234567890', 200)).toBe(true)
-    gate.reset()
-    expect(gate.seen('012345678905', 300)).toBe(true)
+  })
+  it('камеру выключали или открывали окно — коробка в кадре та же штука', () => {
+    const gate = createScanGate()
+    expect(gate.seen('4601234567890', 0)).toBe(true)
+    expect(gate.seen('4601234567890', 500)).toBe(false)
+    gate.pause(600)
+    gate.pause(900) // повторная пауза отсчёт не сдвигает
+    gate.resume(10_600)
+    expect(gate.seen('4601234567890', 10_700)).toBe(false)
+    gate.resume(20_000) // без паузы — ничего
+    expect(gate.seen('4601234567890', 10_700 + SCAN_ABSENT_MS - 1)).toBe(false)
+  })
+  it('код пропал ещё до паузы — после неё считается снова', () => {
+    const gate = createScanGate()
+    expect(gate.seen('4601234567890', 0)).toBe(true)
+    gate.pause(SCAN_ABSENT_MS + 500)
+    gate.resume(60_000)
+    expect(gate.seen('4601234567890', 60_000)).toBe(true)
+  })
+  it('коды «в кадре» — для счёта в телефоне; на паузе — на её начало', () => {
+    const gate = createScanGate()
+    gate.seen('0012345678905', 0)
+    gate.seen('4601234567890', 900)
+    expect(gate.present(950).sort()).toEqual(['12345678905', '4601234567890'])
+    gate.pause(1600)
+    expect(gate.present(99_000)).toEqual(['4601234567890'])
+  })
+  it('после перезагрузки: сохранённый код «в кадре» до первых кадров без него', () => {
+    const gate = createScanGate()
+    gate.hold(['4601234567890'], 5000)
+    gate.resume(60_000)
+    expect(gate.seen('4601234567890', 60_100)).toBe(false)
+    expect(gate.seen('012345678905', 60_100)).toBe(true)
+    expect(gate.seen('4601234567890', 60_100 + SCAN_ABSENT_MS)).toBe(true)
   })
 })
 
 describe('сохранённый счёт', () => {
   it('только строки заказа и целые 1–9999', () => {
     const raw = JSON.stringify({ counts: { a: 2, b: 0, c: 3, d: 1.5, e: 10000, x: 4 }, savedAt: '2026-11-27T10:00:00.000Z', base: 1 })
-    expect(readReceiveDraft(raw, ['a', 'b', 'c', 'd', 'e'])).toEqual({ counts: { a: 2, c: 3 }, savedAt: '2026-11-27T10:00:00.000Z', base: 1 })
+    expect(readReceiveDraft(raw, ['a', 'b', 'c', 'd', 'e'])).toEqual({ counts: { a: 2, c: 3 }, savedAt: '2026-11-27T10:00:00.000Z', base: 1, held: [] })
+    const withHeld = JSON.stringify({ counts: { a: 1 }, savedAt: '2026-11-27T10:00:00.000Z', base: 0, held: ['4601234567890', 5, '', 'x'.repeat(65)] })
+    expect(readReceiveDraft(withHeld, ['a'])?.held).toEqual(['4601234567890'])
   })
   it('мусор, пустой счёт и счёт без отметки «сколько было принято» — null', () => {
     expect(readReceiveDraft(null, ['a'])).toBeNull()
