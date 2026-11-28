@@ -79,6 +79,13 @@ describe('feedItemXml', () => {
     expect(withGtin).not.toContain('identifier_exists')
   })
 
+  it('код магазина на «2» — не GTIN: в фид идёт identifier_exists, а не gtin', () => {
+    // 2100000000005 — внутренний диапазон GS1; Google такие gtin не принимает
+    const xml = feedItemXml({ ...base, barcode: '2100000000005' }, 'https://uhti.kz')
+    expect(xml).not.toContain('<g:gtin>')
+    expect(xml).toContain('<g:identifier_exists>no</g:identifier_exists>')
+  })
+
   it('текст не может закрыть CDATA раньше времени', () => {
     const xml = feedItemXml({ ...base, name: 'Набор ]]> <script>' }, 'https://uhti.kz')
     expect(xml).toContain('<g:title><![CDATA[Набор ]]]]><![CDATA[> <script>]]></g:title>')
