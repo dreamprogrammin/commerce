@@ -66,6 +66,8 @@ interface LastScan {
   productId: string | null
 }
 const lastScan = ref<LastScan | null>(null)
+/** «Тот же товар ещё в кадре» — помнится и через выключение камеры, и через перезагрузку */
+const gate = createScanGate()
 
 const order = computed(() => data.value?.order ?? null)
 const products = computed(() => data.value?.products ?? {})
@@ -92,7 +94,7 @@ const draftKey = receiveDraftKey(orderId)
 function saveDraft() {
   try {
     if (Object.keys(counts.value).length && countBase.value !== null)
-      localStorage.setItem(draftKey, JSON.stringify({ counts: counts.value, savedAt: new Date().toISOString(), base: countBase.value }))
+      localStorage.setItem(draftKey, JSON.stringify({ counts: counts.value, savedAt: new Date().toISOString(), base: countBase.value, held: gate.present(performance.now()) }))
     else
       localStorage.removeItem(draftKey)
   }
@@ -128,6 +130,8 @@ function restoreDraft() {
   counts.value = draft.counts
   countBase.value = draft.base
   restoredAt.value = draft.savedAt
+  // Коробка, что стояла перед камерой до перезагрузки, — та же штука
+  gate.hold(draft.held, performance.now())
 }
 /** Счёт — в ноль; stale — потому что по заказу приняли где-то ещё */
 function dropCount(stale: boolean) {
@@ -249,7 +253,6 @@ function handleCode(raw: string, source: 'camera' | 'input') {
 }
 
 // --- Камера ---
-const gate = createScanGate()
 const videoEl = shallowRef<HTMLVideoElement | null>(null)
 const {
   state: cameraState,
@@ -293,7 +296,7 @@ async function toggleCamera() {
     stopCamera()
     return
   }
-  gate.reset()
+  // Отметки «ещё в кадре» не стираются: коробка, что стоит перед камерой, — та же штука
   if (videoEl.value)
     await startCamera(videoEl.value)
 }
@@ -433,7 +436,6 @@ async function again() {
     if (!await load(true))
       return
     result.value = null
-    gate.reset()
   }
   finally {
     againBusy.value = false
@@ -445,11 +447,22 @@ const resetAsk = ref(false)
 function reset() {
   dropCount(false)
   resetAsk.value = false
-  gate.reset()
 }
 
 // Пока открыт вопрос или подтверждение — кадры не читаются, камера не гаснет
 watch([bindCode, confirmOpen], ([code, confirm]) => pauseCamera(code !== null || confirm))
+// Отсутствие кода копится, только пока кадры читаются: камеру выключали или открывали
+// окно — коробка, оставшаяся в кадре, второй раз не посчитается
+const reading = computed(() => cameraState.value === 'on' && bindCode.value === null && !confirmOpen.value)
+watch(reading, (on) => {
+  if (on) {
+    gate.resume(performance.now())
+    return
+  }
+  gate.pause(performance.now())
+  // Что было в кадре — в счёт телефона: вкладку в фоне iPhone может выгрузить
+  saveDraft()
+})
 
 // Печать «в пустоту» (фокус не в поле) — в поле кода: сканер-клавиатура не теряет коды
 function onKeydown(e: KeyboardEvent) {
