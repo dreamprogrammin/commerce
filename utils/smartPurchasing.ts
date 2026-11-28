@@ -25,6 +25,7 @@ export const PURCHASING_PAGES = [
   { to: '/admin/ai', label: 'Модели ИИ' },
   { to: '/admin/restock', label: 'К закупке' },
   { to: '/admin/deliveries', label: 'Поставки' },
+  { to: '/admin/receiving', label: 'Приёмка товаров' },
 ] as const
 
 /** Дашборд — корень раздела */

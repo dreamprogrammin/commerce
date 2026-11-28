@@ -8,6 +8,7 @@ import {
   Bot,
   ChartColumn,
   Check,
+  ClipboardCheck,
   Gauge,
   Inbox,
   PackageCheck,
@@ -53,6 +54,7 @@ const PAGE_ICON: Record<(typeof PURCHASING_PAGES)[number]['to'], Component> = {
   '/admin/ai': Bot,
   '/admin/restock': ShoppingCart,
   '/admin/deliveries': PackageCheck,
+  '/admin/receiving': ClipboardCheck,
 }
 
 const CARD = 'rounded-[20px] bg-background shadow-sm'

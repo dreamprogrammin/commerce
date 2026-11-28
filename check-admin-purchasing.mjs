@@ -89,7 +89,7 @@ const OLD_LINKS = [
   '/admin/ai',
 ]
 // Страницы закупа — кнопками на дашборде, в меню их нет
-const PAGES = [['/admin/suppliers', 'Поставщики'], ['/admin/telegram', 'Аккаунт Telegram'], ['/admin/supplier-offers', 'Товары поставщиков'], ['/admin/demand', 'Спрос на рынке'], ['/admin/kaspi', 'Цифры Kaspi'], ['/admin/ai', 'Модели ИИ'], ['/admin/restock', 'К закупке'], ['/admin/deliveries', 'Поставки']]
+const PAGES = [['/admin/suppliers', 'Поставщики'], ['/admin/telegram', 'Аккаунт Telegram'], ['/admin/supplier-offers', 'Товары поставщиков'], ['/admin/demand', 'Спрос на рынке'], ['/admin/kaspi', 'Цифры Kaspi'], ['/admin/ai', 'Модели ИИ'], ['/admin/restock', 'К закупке'], ['/admin/deliveries', 'Поставки'], ['/admin/receiving', 'Приёмка товаров']]
 const MENU = [...OLD_LINKS.filter(h => !PAGES.some(([p]) => p === h)), '/admin/purchasing']
 
 if (!/localhost|127\.0\.0\.1/.test(BASE))
